@@ -191,7 +191,7 @@ const Performance = () => {
               onChange={e => setDeptFilter(e.target.value)}
             >
               <option value="All">All Departments</option>
-              {CHART_DATA.map(d => <option key={d.department} value={d.department}>{d.department}</option>)}
+              {chartData.map(d => <option key={d.department} value={d.department}>{d.department}</option>)}
             </select>
           </div>
         </div>
