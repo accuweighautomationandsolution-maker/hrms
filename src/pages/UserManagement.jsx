@@ -224,7 +224,9 @@ const UserManagement = () => {
                         <td style={{ padding: '1rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <span style={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
-                              {visiblePasswords[user.id] ? (user.plainPassword || 'Unavailable') : '••••••••'}
+                              {visiblePasswords[user.id] ? 
+                                (user.plainPassword || <span style={{color: 'var(--color-danger)', fontSize: '0.7rem'}}>Unrecoverable (Use Reset)</span>) 
+                                : '••••••••'}
                             </span>
                             <button 
                               className="btn btn-ghost" 
