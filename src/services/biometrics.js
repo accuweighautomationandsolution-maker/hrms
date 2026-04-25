@@ -1,12 +1,13 @@
-// A service demonstrating how the frontend interacts with an Identix/ZKTeco biometric device.
-// IP-based pulling typically involves a local bridge or direct TCP/UDP socket commands.
+// A service demonstrating how the frontend interacts with an Identix X2008 biometric device.
+// Identix X2008 supports both Pull (TCP/IP) and Push (Real-time HTTP/Socket) protocols.
 
 export const BiometricService = {
   /**
    * Simulates connecting to the hardware at a specific IP and pulling new logs.
+   * Typically uses ZK protocol over TCP port 4370.
    */
   fetchLogs: async (ip, port) => {
-    console.log(`Connecting to Identix Terminal at ${ip}:${port}...`);
+    console.log(`Connecting to Identix X2008 Terminal at ${ip}:${port}...`);
     
     return new Promise((resolve) => {
       // Simulate network latency for a punch-clock pull
@@ -25,14 +26,44 @@ export const BiometricService = {
   },
 
   /**
-   * Simulates checking the connection status of registered biometric terminals.
+   * Simulates a "Push" listener. In a real environment, this would be a WebSocket 
+   * or an HTTP endpoint that the hardware 'pushes' data to upon every punch.
+   */
+  subscribeToPushEvents: (onPunch) => {
+    console.log("Subscribing to Real-time Push Events from Identix X2008...");
+    
+    // Simulate a random punch event every 30-60 seconds for demonstration
+    const interval = setInterval(() => {
+      const now = new Date();
+      const mockPunch = {
+        empId: Math.floor(Math.random() * 5) + 1,
+        time: `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`,
+        type: Math.random() > 0.5 ? 'Punch In' : 'Punch Out',
+        timestamp: now.toISOString()
+      };
+      onPunch(mockPunch);
+    }, 45000);
+
+    return () => clearInterval(interval);
+  },
+
+  /**
+   * Simulates checking the connection status and health of the Identix X2008.
    */
   getDeviceStatus: async (ip, port) => {
     return new Promise((resolve) => {
       setTimeout(() => {
-        const isOnline = ip.startsWith('192'); // Simulation logic
+        const isOnline = ip.startsWith('192'); 
         resolve([
-          { deviceId: 'Identix-99', location: 'Main Hub', status: isOnline ? 'Online' : 'Conflict', lastPing: 'Now', ip: `${ip}:${port}` },
+          { 
+            deviceId: 'IDX-X2008-01', 
+            model: 'Identix X2008',
+            location: 'Main Entry/Exit', 
+            status: isOnline ? 'Online' : 'Offline', 
+            method: 'Push/Pull (Hybrid)',
+            lastPing: new Date().toLocaleTimeString(), 
+            ip: `${ip}:${port}` 
+          },
         ]);
       }, 800);
     });

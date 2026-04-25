@@ -145,6 +145,35 @@ const Attendance = () => {
 
   useEffect(() => {
     BiometricService.getDeviceStatus(bioConfig.ip, bioConfig.port).then(d => setDevices(d));
+    
+    // Subscribe to Push events for real-time reflection
+    const unsubscribe = BiometricService.subscribeToPushEvents((punch) => {
+      const now = new Date();
+      const day = now.getDate();
+      const m = now.getMonth();
+      const y = now.getFullYear();
+      
+      // Only process if it's for the current displayed month/year (or always in background)
+      const punchKey = `${punch.empId}_${y}_${m}_${day}`;
+      
+      setRecords(prev => {
+        const existing = prev[punchKey] || {};
+        const updated = {
+          ...prev,
+          [punchKey]: {
+            ...existing,
+            punchIn: punch.type === 'Punch In' ? punch.time : (existing.punchIn || '09:00'),
+            punchOut: punch.type === 'Punch Out' ? punch.time : (existing.punchOut || ''),
+            remark: existing.remark || 'Real-time Push Sync',
+            source: 'Biometric (Push)'
+          }
+        };
+        dataService.saveAttendance(updated);
+        return updated;
+      });
+    });
+
+    return () => unsubscribe();
   }, [bioConfig]);
 
   const holidays   = useMemo(() => getHolidayDates(year, month, dataService.getCustomHolidays()), [year, month]);
@@ -245,6 +274,12 @@ const Attendance = () => {
         {/* Biometric Controls */}
         {!isEmployee && (
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            {devices[0] && (
+               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', padding: '0.4rem 0.6rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: devices[0].status === 'Online' ? 'var(--color-success)' : 'var(--color-danger)' }}></div>
+                  <span style={{ fontWeight: '600' }}>X2008: {devices[0].status}</span>
+               </div>
+            )}
             <button 
               className="btn btn-outline" 
               onClick={() => setShowBioConfig(true)}
@@ -258,7 +293,7 @@ const Attendance = () => {
               disabled={syncLoading}
             >
               <Activity size={18} className={syncLoading ? 'animate-spin' : ''} />
-              {syncLoading ? 'Connecting...' : 'Pull Biometric Data'}
+              {syncLoading ? 'Connecting...' : 'Pull Hardware Data'}
             </button>
           </div>
         )}
@@ -505,7 +540,7 @@ const Attendance = () => {
             
             <div style={{ backgroundColor: 'rgba(37,99,235,0.05)', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', borderLeft: '3px solid var(--color-primary)' }}>
               <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-text-muted)', lineHeight: '1.4' }}>
-                <strong>Hardware Sync Logic:</strong> To pull data correctly, the <strong>Employee ID</strong> in your Identix device must exactly match the ID in this HRMS registry.
+                <strong>Identix X2008 Setup:</strong> This model supports push-mode. Ensure the device is connected to the same Ethernet segment and the "Push Protocol" is enabled in hardware settings.
               </p>
             </div>
 
