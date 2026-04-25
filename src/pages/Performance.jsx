@@ -4,13 +4,14 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import FeedbackPortal from '../components/FeedbackPortal';
 import { dataService } from '../utils/dataService';
 
-const PERFORMANCE_DATA = [
-  { id: 501, name: 'Alice Smith', role: 'Software Engineer', dept: 'Engineering', lastMonthly: 4.2, lastHalfYearly: 4.5, lastAnnual: null, status: 'Pending Review' },
-  { id: 502, name: 'Bob Johnson', role: 'DevOps Lead', dept: 'Operations', lastMonthly: null, lastHalfYearly: 3.8, lastAnnual: 4.1, status: 'Completed' },
-  { id: 503, name: 'Charlie Davis', role: 'Product Manager', dept: 'Product', lastMonthly: 4.8, lastHalfYearly: 4.6, lastAnnual: null, status: 'Overdue' },
-  { id: 504, name: 'Diana King', role: 'UI/UX Designer', dept: 'Design', lastMonthly: 4.0, lastHalfYearly: 4.2, lastAnnual: null, status: 'Pending Review' },
-  { id: 505, name: 'Evan Wright', role: 'Junior Analyst', dept: 'Sales', lastMonthly: 3.5, lastHalfYearly: 3.9, lastAnnual: null, status: 'Pending Review' }
-];
+// Static metrics for demo employees - will be merged with live employee data if they exist
+const MOCK_PERFORMANCE_METRICS = {
+  1: { lastMonthly: 4.2, lastHalfYearly: 4.5, lastAnnual: null, status: 'Pending Review' },
+  2: { lastMonthly: null, lastHalfYearly: 3.8, lastAnnual: 4.1, status: 'Completed' },
+  3: { lastMonthly: 4.8, lastHalfYearly: 4.6, lastAnnual: null, status: 'Overdue' },
+  4: { lastMonthly: 4.0, lastHalfHalfYearly: 4.2, lastAnnual: null, status: 'Pending Review' },
+  5: { lastMonthly: 3.5, lastHalfYearly: 3.9, lastAnnual: null, status: 'Pending Review' }
+};
 
 const CHART_DATA = [
   { department: 'Engineering', score: 4.4, color: '#2563eb' },
@@ -69,7 +70,18 @@ const Performance = () => {
   const [feedbackConfig, setFeedbackConfig] = useState({ isOpen: false, empId: null, type: 'Appraisal Review' });
 
   const filteredData = useMemo(() => {
-    return PERFORMANCE_DATA.filter(emp => {
+    // Source of truth: Active employees from dataService
+    const activeEmployees = dataService.getEmployees().filter(e => e.status !== 'Terminated' && e.status !== 'Resigned');
+    
+    return activeEmployees.map(emp => {
+      // Merge with mock metrics for demo or real feedback history
+      const metrics = MOCK_PERFORMANCE_METRICS[emp.id] || { lastMonthly: null, lastHalfYearly: null, lastAnnual: null, status: 'Not Scheduled' };
+      return {
+        ...emp,
+        dept: emp.department, // Map property name
+        ...metrics
+      };
+    }).filter(emp => {
       const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                            emp.role.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesDept = deptFilter === 'All' || emp.dept === deptFilter;
@@ -83,8 +95,11 @@ const Performance = () => {
 
   const openRecord = (empId) => {
     const history = dataService.getFeedbackHistory(empId);
-    const emp = PERFORMANCE_DATA.find(e => e.id === empId);
-    setViewingRecord({ emp, history });
+    const emp = dataService.getEmployeeById(empId);
+    if (!emp) return;
+    
+    const metrics = MOCK_PERFORMANCE_METRICS[empId] || { lastMonthly: null, lastHalfYearly: null, lastAnnual: null, status: 'Not Scheduled' };
+    setViewingRecord({ emp: { ...emp, dept: emp.department, ...metrics }, history });
   };
 
   return (
