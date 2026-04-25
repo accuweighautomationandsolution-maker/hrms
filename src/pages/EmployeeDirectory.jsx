@@ -682,7 +682,13 @@ const EmployeeDirectory = ({ userRole }) => {
                   <div style={{ backgroundColor: 'var(--color-background)', borderRadius: '8px', padding: '1rem' }}>
                     <SalaryStructure 
                       isEmbedded={true} 
-                      passedState={form.salaryConfig} 
+                      passedState={{
+                        ...(form.salaryConfig || {}),
+                        candidateName: form.firstName,
+                        candidateMiddleName: form.middleName,
+                        candidateLastName: form.lastName,
+                        roleApplied: form.role
+                      }} 
                       empCategory={form.empCategory} 
                       empId={form.id}
                       onStateChange={(salaryData) => setForm(prev => ({ ...prev, salaryConfig: salaryData }))}
