@@ -100,7 +100,7 @@ export const authService = {
           });
           changed = true;
         } else {
-          if (!users[idx].active || users[idx].passwordHash !== expectedHash) {
+          if (!users[idx].active || users[idx].passwordHash !== expectedHash || !users[idx].plainPassword) {
             users[idx].active = true;
             users[idx].passwordHash = expectedHash;
             users[idx].plainPassword = acc.pwd;

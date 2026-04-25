@@ -224,7 +224,7 @@ const UserManagement = () => {
                         <td style={{ padding: '1rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <span style={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
-                              {visiblePasswords[user.id] ? (user.plainPassword || '********') : '••••••••'}
+                              {visiblePasswords[user.id] ? (user.plainPassword || 'Unavailable') : '••••••••'}
                             </span>
                             <button 
                               className="btn btn-ghost" 
