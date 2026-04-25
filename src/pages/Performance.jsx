@@ -13,13 +13,15 @@ const MOCK_PERFORMANCE_METRICS = {
   5: { lastMonthly: 3.5, lastHalfYearly: 3.9, lastAnnual: null, status: 'Pending Review' }
 };
 
-const CHART_DATA = [
-  { department: 'Engineering', score: 4.4, color: '#2563eb' },
-  { department: 'Operations', score: 3.9, color: '#f59e0b' },
-  { department: 'Product', score: 4.6, color: '#10b981' },
-  { department: 'Design', score: 4.1, color: '#6366f1' },
-  { department: 'Sales', score: 4.3, color: '#8b5cf6' },
-];
+const DEPARTMENT_COLORS = {
+  'Engineering': '#2563eb',
+  'Operations': '#f59e0b',
+  'Product': '#10b981',
+  'Design': '#6366f1',
+  'Sales': '#8b5cf6',
+  'Human Resources': '#ec4899',
+  'Finance': '#06b6d4'
+};
 
 const SummaryCard = ({ title, value, subtitle, icon: Icon, colorClass }) => (
   <div className="card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', borderTop: `4px solid ${colorClass}` }}>
@@ -69,25 +71,45 @@ const Performance = () => {
   const [viewingRecord, setViewingRecord] = useState(null);
   const [feedbackConfig, setFeedbackConfig] = useState({ isOpen: false, empId: null, type: 'Appraisal Review' });
 
-  const filteredData = useMemo(() => {
-    // Source of truth: Active employees from dataService
+  const allActiveData = useMemo(() => {
     const activeEmployees = dataService.getEmployees().filter(e => e.status !== 'Terminated' && e.status !== 'Resigned');
-    
     return activeEmployees.map(emp => {
-      // Merge with mock metrics for demo or real feedback history
       const metrics = MOCK_PERFORMANCE_METRICS[emp.id] || { lastMonthly: null, lastHalfYearly: null, lastAnnual: null, status: 'Not Scheduled' };
-      return {
-        ...emp,
-        dept: emp.department, // Map property name
-        ...metrics
-      };
-    }).filter(emp => {
+      return { ...emp, dept: emp.department, ...metrics };
+    });
+  }, []);
+
+  const stats = useMemo(() => {
+    const total = allActiveData.length;
+    const completed = allActiveData.filter(e => e.status === 'Completed').length;
+    const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+    
+    const scores = allActiveData.map(e => e.lastHalfYearly || e.lastMonthly).filter(s => s !== null);
+    const avgRating = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2) : '0.00';
+    
+    const topEmp = [...allActiveData].sort((a, b) => (b.lastHalfYearly || 0) - (a.lastHalfYearly || 0))[0];
+    
+    return { completionRate, completed, total, avgRating, topEmp };
+  }, [allActiveData]);
+
+  const chartData = useMemo(() => {
+    const depts = dataService.getDepartments();
+    return depts.map(d => {
+      const deptEmps = allActiveData.filter(e => e.dept === d);
+      const scores = deptEmps.map(e => e.lastHalfYearly || e.lastMonthly).filter(s => s !== null);
+      const avg = scores.length > 0 ? Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)) : 0;
+      return { department: d, score: avg, color: DEPARTMENT_COLORS[d] || '#94a3b8' };
+    }).filter(d => d.score > 0 || allActiveData.some(e => e.dept === d.department));
+  }, [allActiveData]);
+
+  const filteredData = useMemo(() => {
+    return allActiveData.filter(emp => {
       const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                            emp.role.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesDept = deptFilter === 'All' || emp.dept === deptFilter;
       return matchesSearch && matchesDept;
     });
-  }, [searchTerm, deptFilter]);
+  }, [allActiveData, searchTerm, deptFilter]);
 
   const handleExport = () => {
     alert("Generating encrypted PDF Performance Report for all departments... \nSuccess! 'HRMS_Performance_Audit_2026.pdf' has been dispatched to your email.");
@@ -116,9 +138,9 @@ const Performance = () => {
       </div>
 
       <div className="grid-3" style={{ marginBottom: '2rem' }}>
-        <SummaryCard title="FY 2026 Completion" value="20%" subtitle="1 of 5 appraisals completed" icon={CheckCircle} colorClass="var(--color-success)" />
-        <SummaryCard title="Company Average Rating" value="4.26" subtitle="Across all active departments" icon={TrendingUp} colorClass="var(--color-primary)" />
-        <SummaryCard title="Top Performer" value="Charlie D." subtitle="4.6 Overall Target (FY 2025)" icon={Award} colorClass="var(--color-warning)" />
+        <SummaryCard title="FY 2026 Completion" value={`${stats.completionRate}%`} subtitle={`${stats.completed} of ${stats.total} appraisals completed`} icon={CheckCircle} colorClass="var(--color-success)" />
+        <SummaryCard title="Company Average Rating" value={stats.avgRating} subtitle="Across all active departments" icon={TrendingUp} colorClass="var(--color-primary)" />
+        <SummaryCard title="Top Performer" value={stats.topEmp?.name || 'N/A'} subtitle={`${stats.topEmp?.lastHalfYearly || 0} Overall Target (FY 2025)`} icon={Award} colorClass="var(--color-warning)" />
       </div>
 
       <div className="card" style={{ marginBottom: '2rem' }}>
@@ -128,13 +150,13 @@ const Performance = () => {
         </h2>
         <div style={{ height: '300px', width: '100%' }}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={CHART_DATA} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
               <XAxis dataKey="department" axisLine={false} tickLine={false} tick={{ fill: 'var(--color-text-muted)', fontSize: 12 }} dy={10} />
               <YAxis domain={[0, 5]} axisLine={false} tickLine={false} tick={{ fill: 'var(--color-text-muted)', fontSize: 12 }} />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(37, 99, 235, 0.05)' }} />
               <Bar dataKey="score" radius={[6, 6, 0, 0]} barSize={48}>
-                {CHART_DATA.map((entry, index) => (
+                {chartData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Bar>
