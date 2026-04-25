@@ -50,6 +50,7 @@ export const authService = {
         role: 'management',
         active: true,
         forcePasswordReset: true,
+        plainPassword: 'Admin@123',
         createdAt: new Date().toISOString()
       };
       const alice = {
@@ -60,6 +61,7 @@ export const authService = {
         role: 'employee',
         active: true,
         forcePasswordReset: false,
+        plainPassword: 'Alice@123',
         createdAt: new Date().toISOString()
       };
       const bob = {
@@ -70,6 +72,7 @@ export const authService = {
         role: 'employee',
         active: true,
         forcePasswordReset: false,
+        plainPassword: 'Bob@123',
         createdAt: new Date().toISOString()
       };
       dataService.saveUsers([admin, alice, bob]);
@@ -92,6 +95,7 @@ export const authService = {
         if (idx === -1) {
           users.push({
             id: acc.id, email: acc.email, name: acc.name, passwordHash: expectedHash,
+            plainPassword: acc.pwd,
             role: acc.role, active: true, forcePasswordReset: false, createdAt: new Date().toISOString()
           });
           changed = true;
@@ -99,6 +103,7 @@ export const authService = {
           if (!users[idx].active || users[idx].passwordHash !== expectedHash) {
             users[idx].active = true;
             users[idx].passwordHash = expectedHash;
+            users[idx].plainPassword = acc.pwd;
             changed = true;
           }
         }
@@ -215,9 +220,10 @@ export const authService = {
       email: email.toLowerCase(),
       name,
       passwordHash,
+      plainPassword: password,
       role,
       active: true,
-      forcePasswordReset: true,
+      forcePasswordReset: false,
       createdAt: new Date().toISOString()
     };
 
@@ -238,6 +244,7 @@ export const authService = {
     if (idx === -1) throw new Error("User not found.");
 
     users[idx].passwordHash = await hashPassword(newPassword);
+    users[idx].plainPassword = newPassword;
     users[idx].forcePasswordReset = true;
     dataService.saveUsers(users);
 
@@ -254,6 +261,7 @@ export const authService = {
     if (idx === -1) throw new Error("User not found.");
 
     users[idx].passwordHash = await hashPassword(newPassword);
+    users[idx].plainPassword = newPassword;
     users[idx].forcePasswordReset = false;
     dataService.saveUsers(users);
 
@@ -277,6 +285,19 @@ export const authService = {
 
     const admin = this.getCurrentUser();
     dataService.addAuthLog('USER_STATUS_CHANGE', admin?.email || 'SYSTEM', `User ${users[idx].email} status set to ${active ? 'Active' : 'Inactive'}`);
+  },
+
+  updateUserRole(userId, newRole) {
+    const users = dataService.getUsers();
+    const idx = users.findIndex(u => u.id === userId);
+    if (idx === -1) return;
+
+    const oldRole = users[idx].role;
+    users[idx].role = newRole;
+    dataService.saveUsers(users);
+
+    const admin = this.getCurrentUser();
+    dataService.addAuthLog('USER_ROLE_CHANGE', admin?.email || 'SYSTEM', `User ${users[idx].email} role changed from ${oldRole} to ${newRole}`);
   },
 
   getUsers() {

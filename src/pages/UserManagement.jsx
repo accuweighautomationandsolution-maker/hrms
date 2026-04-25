@@ -12,7 +12,9 @@ import {
   CheckCircle2,
   Lock,
   ChevronDown,
-  Loader2
+  Loader2,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { authService } from "../utils/authService";
 
@@ -32,6 +34,14 @@ const UserManagement = () => {
     role: "employee",
   });
   const [formError, setFormError] = useState("");
+  const [visiblePasswords, setVisiblePasswords] = useState({});
+
+  const togglePasswordVisibility = (userId) => {
+    setVisiblePasswords(prev => ({
+      ...prev,
+      [userId]: !prev[userId]
+    }));
+  };
 
   useEffect(() => {
     loadData();
@@ -70,6 +80,13 @@ const UserManagement = () => {
       } catch (err) {
         alert(err.message);
       }
+    }
+  };
+
+  const handleRoleChange = (userId, newRole) => {
+    if(window.confirm(`Are you sure you want to change this user's access role?`)) {
+      authService.updateUserRole(userId, newRole);
+      loadData();
     }
   };
 
@@ -170,6 +187,7 @@ const UserManagement = () => {
                     <tr>
                       <th style={{ padding: '1rem' }}>Name & Email</th>
                       <th style={{ padding: '1rem' }}>Role</th>
+                      <th style={{ padding: '1rem' }}>Password</th>
                       <th style={{ padding: '1rem' }}>Status</th>
                       <th style={{ padding: '1rem' }}>Created On</th>
                       <th style={{ padding: '1rem', textAlign: 'right' }}>Actions</th>
@@ -183,9 +201,40 @@ const UserManagement = () => {
                           <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>{user.email}</div>
                         </td>
                         <td style={{ padding: '1rem' }}>
-                          <span className={`badge ${user.role === 'management' ? 'badge-blue' : 'badge-ghost'}`}>
-                            {user.role === 'management' ? 'HR / Admin' : 'Employee'}
-                          </span>
+                          <select 
+                            className={`form-input`}
+                            style={{ 
+                              padding: '0.3rem 1.5rem 0.3rem 0.75rem', 
+                              height: 'auto', 
+                              fontSize: '0.75rem', 
+                              fontWeight: 'bold', 
+                              backgroundColor: user.role === 'management' ? 'rgba(37,99,235,0.1)' : 'var(--color-background)',
+                              color: user.role === 'management' ? 'var(--color-primary)' : 'var(--color-text-main)',
+                              border: user.role === 'management' ? '1px solid rgba(37,99,235,0.2)' : '1px solid var(--color-border)',
+                              borderRadius: '4px',
+                              cursor: 'pointer'
+                            }}
+                            value={user.role}
+                            onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                          >
+                            <option value="management">HR / Admin</option>
+                            <option value="employee">Employee</option>
+                          </select>
+                        </td>
+                        <td style={{ padding: '1rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
+                              {visiblePasswords[user.id] ? (user.plainPassword || '********') : '••••••••'}
+                            </span>
+                            <button 
+                              className="btn btn-ghost" 
+                              style={{ padding: '0.2rem' }}
+                              onClick={() => togglePasswordVisibility(user.id)}
+                              title={visiblePasswords[user.id] ? "Hide Password" : "Show Password"}
+                            >
+                              {visiblePasswords[user.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                          </div>
                         </td>
                         <td style={{ padding: '1rem' }}>
                           {user.active ? (
