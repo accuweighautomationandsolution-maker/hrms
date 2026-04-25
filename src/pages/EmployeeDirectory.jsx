@@ -34,6 +34,7 @@ const EmployeeDirectory = ({ userRole }) => {
   });
 
   const [departments, setDepartments] = useState([]);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
 
   useEffect(() => {
     setDepartments(dataService.getDepartments());
@@ -48,6 +49,27 @@ const EmployeeDirectory = ({ userRole }) => {
     setErrorMsg('');
   };
 
+  const handleFileUpload = (e) => {
+    const files = Array.from(e.target.files);
+    const validFiles = [];
+    let hasError = false;
+
+    files.forEach(file => {
+      if (file.size > 2 * 1024 * 1024) {
+        showNotification(`File ${file.name} exceeds the 2 MB limit.`, 'error');
+        hasError = true;
+      } else {
+        validFiles.push({ name: file.name, size: file.size, type: file.type });
+      }
+    });
+
+    if (validFiles.length > 0) {
+      setUploadedFiles(prev => [...prev, ...validFiles]);
+      showNotification(`${validFiles.length} document(s) added to vault.`, 'success');
+    }
+    e.target.value = null; // reset input
+  };
+
   const resetForm = () => {
     setForm({
       firstName: '', middleName: '', lastName: '', dob: '', contact: '', altContact: '', email: '', marital: '', gender: '',
@@ -57,6 +79,7 @@ const EmployeeDirectory = ({ userRole }) => {
       hasESIC: false, esicIp: '',
       salaryConfig: null
     });
+    setUploadedFiles([]);
     setErrorMsg('');
   };
 
@@ -87,6 +110,7 @@ const EmployeeDirectory = ({ userRole }) => {
       esicIp: emp.esicNumber || '',
       salaryConfig: salary || null
     }));
+    setUploadedFiles([]);
     setActiveTab(1);
     setShowModal(true);
   };
@@ -495,11 +519,32 @@ const EmployeeDirectory = ({ userRole }) => {
 
               {/* SECTION 5: Documents */}
               {activeTab === 5 && (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '4rem 2rem', border: '2px dashed var(--color-border)', borderRadius: '8px', cursor: 'pointer', backgroundColor: 'var(--color-surface)', transition: 'border 0.2s ease' }} onMouseOver={(e) => e.currentTarget.style.borderColor = 'var(--color-primary)'} onMouseOut={(e) => e.currentTarget.style.borderColor = 'var(--color-border)'}>
-                  <UploadCloud size={48} color="var(--color-text-muted)" style={{ marginBottom: '1rem' }} />
-                  <h3 style={{ marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>Secure Document Vault</h3>
-                  <p style={{ color: 'var(--color-text-muted)', marginBottom: '1rem', textAlign: 'center' }}>Upload Aadhar, PAN, Degrees, or Certifications.</p>
-                  <span style={{ backgroundColor: 'var(--color-background)', padding: '0.4rem 0.8rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid var(--color-border)' }}>MAX LIMIT: 5 MB EACH (Multiple Supported)</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  <label 
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '4rem 2rem', border: '2px dashed var(--color-border)', borderRadius: '8px', cursor: 'pointer', backgroundColor: 'var(--color-surface)', transition: 'border 0.2s ease' }} 
+                    onMouseOver={(e) => e.currentTarget.style.borderColor = 'var(--color-primary)'} 
+                    onMouseOut={(e) => e.currentTarget.style.borderColor = 'var(--color-border)'}
+                  >
+                    <UploadCloud size={48} color="var(--color-text-muted)" style={{ marginBottom: '1rem' }} />
+                    <h3 style={{ marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>Secure Document Vault</h3>
+                    <p style={{ color: 'var(--color-text-muted)', marginBottom: '1rem', textAlign: 'center' }}>Upload Aadhar, PAN, Degrees, or Certifications.</p>
+                    <span style={{ backgroundColor: 'var(--color-background)', padding: '0.4rem 0.8rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid var(--color-border)' }}>MAX LIMIT: 2 MB EACH (Multiple Supported)</span>
+                    <input type="file" multiple style={{ display: 'none' }} onChange={handleFileUpload} />
+                  </label>
+                  
+                  {uploadedFiles.length > 0 && (
+                    <div style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '1rem' }}>
+                      <h4 style={{ margin: '0 0 1rem', fontSize: '0.875rem' }}>Attached Documents ({uploadedFiles.length})</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {uploadedFiles.map((f, i) => (
+                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', backgroundColor: 'var(--color-surface)', borderRadius: '4px', fontSize: '0.8rem' }}>
+                            <span>📄 {f.name}</span>
+                            <span style={{ color: 'var(--color-text-muted)' }}>{(f.size / 1024 / 1024).toFixed(2)} MB</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
