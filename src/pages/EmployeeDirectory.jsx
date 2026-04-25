@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-import { MoreVertical, Search, Filter, UserPlus, FileText, MapPin, Briefcase, ShieldCheck, UploadCloud, AlertCircle, IndianRupee, Lock, Save, Download, FileSpreadsheet, Printer, MessageSquareShare, Trash2 } from 'lucide-react';
+import { MoreVertical, Search, Filter, UserPlus, FileText, MapPin, Briefcase, ShieldCheck, UploadCloud, AlertCircle, IndianRupee, Lock, Save, Download, FileSpreadsheet, Printer, MessageSquareShare, Trash2, CreditCard } from 'lucide-react';
 import SalaryStructure from './SalaryStructure';
 import { dataService } from '../utils/dataService';
 import FeedbackPortal from '../components/FeedbackPortal';
@@ -25,7 +25,11 @@ const EmployeeDirectory = ({ userRole }) => {
 
   // Form State
   const [form, setForm] = useState({
-    firstName: '', middleName: '', lastName: '', dob: '', contact: '', altContact: '', email: '', marital: '', gender: '',
+    firstName: '', middleName: '', lastName: '', dob: '', contact: '', altContact: '', email: '', marital: '', gender: '', bloodGroup: '',
+    aadharNo: '', panNo: '', dlNo: '', dlExpiry: '', dlType: '', passportNo: '', passportExpiry: '',
+    bankAccountName: '', bankAccountNumber: '', bankName: '', bankIfsc: '', bankBranch: '',
+    hasMediclaim: false, mediclaimPolicyNo: '', mediclaimAmount: '', mediclaimCompany: '',
+    hasTermInsurance: false, termPolicyNo: '', termAmount: '', termCompany: '',
     empId: '', role: '', department: '', joinDate: '', probType: 'Probation', probPeriod: '6 Months', exitDate: '', empCategory: 'Staff Employee',
     presAddress: '', permAddress: '', sameAsPresent: false,
     hasPF: false, uan: '', pfMemberId: '',
@@ -70,9 +74,17 @@ const EmployeeDirectory = ({ userRole }) => {
     e.target.value = null; // reset input
   };
 
+  const handleRemoveFile = (indexToRemove) => {
+    setUploadedFiles(prev => prev.filter((_, index) => index !== indexToRemove));
+  };
+
   const resetForm = () => {
     setForm({
-      firstName: '', middleName: '', lastName: '', dob: '', contact: '', altContact: '', email: '', marital: '', gender: '',
+      firstName: '', middleName: '', lastName: '', dob: '', contact: '', altContact: '', email: '', marital: '', gender: '', bloodGroup: '',
+      aadharNo: '', panNo: '', dlNo: '', dlExpiry: '', dlType: '', passportNo: '', passportExpiry: '',
+      bankAccountName: '', bankAccountNumber: '', bankName: '', bankIfsc: '', bankBranch: '',
+      hasMediclaim: false, mediclaimPolicyNo: '', mediclaimAmount: '', mediclaimCompany: '',
+      hasTermInsurance: false, termPolicyNo: '', termAmount: '', termCompany: '',
       empId: '', joinDate: '', probPeriod: '', probType: '', exitDate: '', empCategory: '',
       presAddress: '', permAddress: '', sameAsPresent: false,
       hasPF: false, uan: '', pfMemberId: '',
@@ -108,6 +120,27 @@ const EmployeeDirectory = ({ userRole }) => {
       pfMemberId: emp.pfMemberId || '',
       hasESIC: !!emp.esicNumber,
       esicIp: emp.esicNumber || '',
+      bloodGroup: emp.bloodGroup || '',
+      aadharNo: emp.aadharNo || '',
+      panNo: emp.panNo || '',
+      dlNo: emp.dlNo || '',
+      dlExpiry: emp.dlExpiry || '',
+      dlType: emp.dlType || '',
+      passportNo: emp.passportNo || '',
+      passportExpiry: emp.passportExpiry || '',
+      bankAccountName: emp.bankAccountName || '',
+      bankAccountNumber: emp.bankAccountNumber || '',
+      bankName: emp.bankName || '',
+      bankIfsc: emp.bankIfsc || '',
+      bankBranch: emp.bankBranch || '',
+      hasMediclaim: !!emp.hasMediclaim,
+      mediclaimPolicyNo: emp.mediclaimPolicyNo || '',
+      mediclaimAmount: emp.mediclaimAmount || '',
+      mediclaimCompany: emp.mediclaimCompany || '',
+      hasTermInsurance: !!emp.hasTermInsurance,
+      termPolicyNo: emp.termPolicyNo || '',
+      termAmount: emp.termAmount || '',
+      termCompany: emp.termCompany || '',
       salaryConfig: salary || null
     }));
     setUploadedFiles([]);
@@ -174,7 +207,28 @@ const EmployeeDirectory = ({ userRole }) => {
       permAddress: form.sameAsPresent ? form.presAddress : form.permAddress,
       uanNumber: form.hasPF ? form.uan : '',
       pfMemberId: form.hasPF ? form.pfMemberId : '',
-      esicNumber: form.hasESIC ? form.esicIp : ''
+      esicNumber: form.hasESIC ? form.esicIp : '',
+      bloodGroup: form.bloodGroup,
+      aadharNo: form.aadharNo,
+      panNo: form.panNo,
+      dlNo: form.dlNo,
+      dlExpiry: form.dlExpiry,
+      dlType: form.dlType,
+      passportNo: form.passportNo,
+      passportExpiry: form.passportExpiry,
+      bankAccountName: form.bankAccountName,
+      bankAccountNumber: form.bankAccountNumber,
+      bankName: form.bankName,
+      bankIfsc: form.bankIfsc,
+      bankBranch: form.bankBranch,
+      hasMediclaim: form.hasMediclaim,
+      mediclaimPolicyNo: form.hasMediclaim ? form.mediclaimPolicyNo : '',
+      mediclaimAmount: form.hasMediclaim ? form.mediclaimAmount : '',
+      mediclaimCompany: form.hasMediclaim ? form.mediclaimCompany : '',
+      hasTermInsurance: form.hasTermInsurance,
+      termPolicyNo: form.hasTermInsurance ? form.termPolicyNo : '',
+      termAmount: form.hasTermInsurance ? form.termAmount : '',
+      termCompany: form.hasTermInsurance ? form.termCompany : ''
     };
 
     const savedEmp = dataService.saveEmployee(empData);
@@ -337,7 +391,7 @@ const EmployeeDirectory = ({ userRole }) => {
       </div>
 
       {showModal && (
-        <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div className="card" style={{ width: '100%', maxWidth: '900px', padding: 0, maxHeight: '95vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             
             <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', backgroundColor: 'var(--color-background)' }}>
@@ -355,51 +409,105 @@ const EmployeeDirectory = ({ userRole }) => {
               <TabButton num={4} label="Compliance" icon={ShieldCheck} />
               <TabButton num={5} label="Vault" icon={UploadCloud} />
               <TabButton num={6} label="Compensation" icon={IndianRupee} />
+              <TabButton num={7} label="Banking & Ins." icon={CreditCard} />
             </div>
 
             <div style={{ padding: '2rem', flex: 1, overflowY: 'auto' }}>
               
               {/* SECTION 1: Personal Identity */}
               {activeTab === 1 && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
-                  <div className="form-group">
-                    <label className="form-label">First Name *</label>
-                    <input type="text" className="form-input" style={{width:'100%', borderColor: !form.firstName ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                      value={form.firstName} onChange={(e) => handleInput('firstName', e.target.value)} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--color-primary)' }}>Basic Details</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
+                      <div className="form-group">
+                        <label className="form-label">First Name *</label>
+                        <input type="text" className="form-input" style={{width:'100%', borderColor: !form.firstName ? 'var(--color-danger)' : 'var(--color-border)'}} 
+                          value={form.firstName} onChange={(e) => handleInput('firstName', e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Middle Name</label>
+                        <input type="text" className="form-input" style={{width:'100%'}} 
+                          value={form.middleName} onChange={(e) => handleInput('middleName', e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Last Name *</label>
+                        <input type="text" className="form-input" style={{width:'100%', borderColor: !form.lastName ? 'var(--color-danger)' : 'var(--color-border)'}} 
+                          value={form.lastName} onChange={(e) => handleInput('lastName', e.target.value)} />
+                      </div>
+                      <div className="form-group"><label className="form-label">Date of Birth</label><input type="date" className="form-input" style={{width:'100%'}} value={form.dob} onChange={e => handleInput('dob', e.target.value)} /></div>
+                      <div className="form-group">
+                        <label className="form-label">Gender</label>
+                        <select className="form-input" style={{width:'100%'}} value={form.gender} onChange={e => handleInput('gender', e.target.value)}>
+                          <option>Select...</option><option>Male</option><option>Female</option><option>Other</option>
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Blood Group</label>
+                        <select className="form-input" style={{width:'100%'}} value={form.bloodGroup} onChange={e => handleInput('bloodGroup', e.target.value)}>
+                          <option>Select...</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Marital Status</label>
+                        <select className="form-input" style={{width:'100%'}} value={form.marital} onChange={e => handleInput('marital', e.target.value)}>
+                          <option>Select...</option><option>Single</option><option>Married</option>
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Contact Number *</label>
+                        <input type="tel" className="form-input" style={{width:'100%', borderColor: !form.contact ? 'var(--color-danger)' : 'var(--color-border)'}} 
+                          value={form.contact} onChange={e => handleInput('contact', e.target.value)} />
+                      </div>
+                      <div className="form-group"><label className="form-label">Alternate Contact</label><input type="tel" className="form-input" style={{width:'100%'}} value={form.altContact} onChange={e => handleInput('altContact', e.target.value)} /></div>
+                      <div className="form-group">
+                        <label className="form-label">Personal Mail ID *</label>
+                        <input type="email" className="form-input" style={{width:'100%', borderColor: !form.email ? 'var(--color-danger)' : 'var(--color-border)'}} 
+                          value={form.email} onChange={e => handleInput('email', e.target.value)} />
+                      </div>
+                    </div>
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Middle Name</label>
-                    <input type="text" className="form-input" style={{width:'100%'}} 
-                      value={form.middleName} onChange={(e) => handleInput('middleName', e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Last Name *</label>
-                    <input type="text" className="form-input" style={{width:'100%', borderColor: !form.lastName ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                      value={form.lastName} onChange={(e) => handleInput('lastName', e.target.value)} />
-                  </div>
-                  <div className="form-group"><label className="form-label">Date of Birth</label><input type="date" className="form-input" style={{width:'100%'}} value={form.dob} onChange={e => handleInput('dob', e.target.value)} /></div>
-                  <div className="form-group">
-                    <label className="form-label">Gender</label>
-                    <select className="form-input" style={{width:'100%'}} value={form.gender} onChange={e => handleInput('gender', e.target.value)}>
-                      <option>Select...</option><option>Male</option><option>Female</option><option>Other</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Marital Status</label>
-                    <select className="form-input" style={{width:'100%'}} value={form.marital} onChange={e => handleInput('marital', e.target.value)}>
-                      <option>Select...</option><option>Single</option><option>Married</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Contact Number *</label>
-                    <input type="tel" className="form-input" style={{width:'100%', borderColor: !form.contact ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                      value={form.contact} onChange={e => handleInput('contact', e.target.value)} />
-                  </div>
-                  <div className="form-group"><label className="form-label">Alternate Contact</label><input type="tel" className="form-input" style={{width:'100%'}} value={form.altContact} onChange={e => handleInput('altContact', e.target.value)} /></div>
-                  <div className="form-group">
-                    <label className="form-label">Personal Mail ID *</label>
-                    <input type="email" className="form-input" style={{width:'100%', borderColor: !form.email ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                      value={form.email} onChange={e => handleInput('email', e.target.value)} />
+
+                  <div>
+                    <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--color-primary)' }}>Government ID Details</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
+                      <div className="form-group">
+                        <label className="form-label">Aadhar Card No.</label>
+                        <input type="text" className="form-input" style={{width:'100%'}} value={form.aadharNo} onChange={e => handleInput('aadharNo', e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">PAN Card No.</label>
+                        <input type="text" className="form-input" style={{width:'100%'}} value={form.panNo} onChange={e => handleInput('panNo', e.target.value)} />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
+                        <div className="form-group">
+                          <label className="form-label">Driving License No.</label>
+                          <input type="text" className="form-input" style={{width:'100%'}} value={form.dlNo} onChange={e => handleInput('dlNo', e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">DL Expiry Date</label>
+                          <input type="date" className="form-input" style={{width:'100%'}} value={form.dlExpiry} onChange={e => handleInput('dlExpiry', e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Type of License</label>
+                          <select className="form-input" style={{width:'100%'}} value={form.dlType} onChange={e => handleInput('dlType', e.target.value)}>
+                            <option value="">Select...</option>
+                            <option value="2-Wheeler">2-Wheeler</option>
+                            <option value="4-Wheeler">4-Wheeler</option>
+                            <option value="Both">Both (2W & 4W)</option>
+                            <option value="Commercial">Commercial</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Passport No.</label>
+                          <input type="text" className="form-input" style={{width:'100%'}} value={form.passportNo} onChange={e => handleInput('passportNo', e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Passport Expiry Date</label>
+                          <input type="date" className="form-input" style={{width:'100%'}} value={form.passportExpiry} onChange={e => handleInput('passportExpiry', e.target.value)} />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -537,9 +645,20 @@ const EmployeeDirectory = ({ userRole }) => {
                       <h4 style={{ margin: '0 0 1rem', fontSize: '0.875rem' }}>Attached Documents ({uploadedFiles.length})</h4>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         {uploadedFiles.map((f, i) => (
-                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', backgroundColor: 'var(--color-surface)', borderRadius: '4px', fontSize: '0.8rem' }}>
-                            <span>📄 {f.name}</span>
-                            <span style={{ color: 'var(--color-text-muted)' }}>{(f.size / 1024 / 1024).toFixed(2)} MB</span>
+                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem', backgroundColor: 'var(--color-surface)', borderRadius: '4px', fontSize: '0.8rem' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', wordBreak: 'break-all' }}>📄 {f.name}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexShrink: 0 }}>
+                              <span style={{ color: 'var(--color-text-muted)' }}>{(f.size / 1024 / 1024).toFixed(2)} MB</span>
+                              <button 
+                                type="button" 
+                                className="btn btn-ghost" 
+                                style={{ padding: '0.2rem', color: 'var(--color-danger)' }} 
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleRemoveFile(i); }}
+                                title="Remove document"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -570,25 +689,110 @@ const EmployeeDirectory = ({ userRole }) => {
                 </div>
               )}
 
+              {/* SECTION 7: Banking & Insurance */}
+              {activeTab === 7 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+                  
+                  {/* Bank Details */}
+                  <div style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: '8px' }}>
+                    <h3 style={{ fontSize: '1.1rem', marginBottom: '1.5rem', color: 'var(--color-primary)' }}>Bank Details</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
+                      <div className="form-group">
+                        <label className="form-label">Account Holder Name</label>
+                        <input type="text" className="form-input" style={{width:'100%'}} value={form.bankAccountName} onChange={e => handleInput('bankAccountName', e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Account Number</label>
+                        <input type="text" className="form-input" style={{width:'100%'}} value={form.bankAccountNumber} onChange={e => handleInput('bankAccountNumber', e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Bank Name</label>
+                        <input type="text" className="form-input" style={{width:'100%'}} value={form.bankName} onChange={e => handleInput('bankName', e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">IFSC Code</label>
+                        <input type="text" className="form-input" style={{width:'100%'}} value={form.bankIfsc} onChange={e => handleInput('bankIfsc', e.target.value)} />
+                      </div>
+                      <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                        <label className="form-label">Branch Name</label>
+                        <input type="text" className="form-input" style={{width:'100%'}} value={form.bankBranch} onChange={e => handleInput('bankBranch', e.target.value)} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mediclaim */}
+                  <div style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: '8px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', marginBottom: form.hasMediclaim ? '1.5rem' : '0' }}>
+                      <input type="checkbox" checked={form.hasMediclaim} onChange={(e) => handleInput('hasMediclaim', e.target.checked)} style={{ width: '20px', height: '20px', accentColor: 'var(--color-primary)' }} />
+                      <span style={{ fontWeight: '600', fontSize: '1rem' }}>Employee has Mediclaim Policy</span>
+                    </label>
+                    {form.hasMediclaim && (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', paddingLeft: '2rem', borderLeft: '3px solid var(--color-primary)' }}>
+                        <div className="form-group">
+                          <label className="form-label">Policy Number</label>
+                          <input type="text" className="form-input" style={{width:'100%'}} value={form.mediclaimPolicyNo} onChange={e => handleInput('mediclaimPolicyNo', e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Policy Amount</label>
+                          <input type="number" className="form-input" style={{width:'100%'}} value={form.mediclaimAmount} onChange={e => handleInput('mediclaimAmount', e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Policy Company</label>
+                          <input type="text" className="form-input" style={{width:'100%'}} value={form.mediclaimCompany} onChange={e => handleInput('mediclaimCompany', e.target.value)} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Term Insurance */}
+                  <div style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: '8px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', marginBottom: form.hasTermInsurance ? '1.5rem' : '0' }}>
+                      <input type="checkbox" checked={form.hasTermInsurance} onChange={(e) => handleInput('hasTermInsurance', e.target.checked)} style={{ width: '20px', height: '20px', accentColor: 'var(--color-primary)' }} />
+                      <span style={{ fontWeight: '600', fontSize: '1rem' }}>Employee has Term Insurance Policy</span>
+                    </label>
+                    {form.hasTermInsurance && (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', paddingLeft: '2rem', borderLeft: '3px solid var(--color-primary)' }}>
+                        <div className="form-group">
+                          <label className="form-label">Policy Number</label>
+                          <input type="text" className="form-input" style={{width:'100%'}} value={form.termPolicyNo} onChange={e => handleInput('termPolicyNo', e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Policy Amount</label>
+                          <input type="number" className="form-input" style={{width:'100%'}} value={form.termAmount} onChange={e => handleInput('termAmount', e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Policy Company</label>
+                          <input type="text" className="form-input" style={{width:'100%'}} value={form.termCompany} onChange={e => handleInput('termCompany', e.target.value)} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              )}
+
             </div>
 
-            <div style={{ padding: '1.5rem', borderTop: '1px solid var(--color-border)', backgroundColor: 'var(--color-background)', display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ padding: '1.5rem', borderTop: '1px solid var(--color-border)', backgroundColor: 'var(--color-background)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <button className="btn btn-outline" onClick={() => setActiveTab(Math.max(1, activeTab - 1))} disabled={activeTab === 1}>← Previous Block</button>
               
-              {activeTab < 6 ? (
-                <button className="btn btn-primary" onClick={() => setActiveTab(activeTab + 1)}>Next Block →</button>
-              ) : (
-                <button className="btn btn-primary" 
-                  disabled={!isFormValid}
-                  onClick={handleSave} 
-                  style={{ 
-                    backgroundColor: isFormValid ? 'var(--color-success)' : 'var(--color-text-muted)', 
-                    borderColor: isFormValid ? 'var(--color-success)' : 'var(--color-border)',
-                    cursor: isFormValid ? 'pointer' : 'not-allowed'
-                  }}>
-                  <Save size={16} /> Save & Complete Onboarding
-                </button>
-              )}
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button className="btn btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
+                {activeTab < 7 ? (
+                  <button className="btn btn-primary" onClick={() => setActiveTab(activeTab + 1)}>Next Block →</button>
+                ) : (
+                  <button className="btn btn-primary" 
+                    disabled={!isFormValid}
+                    onClick={handleSave} 
+                    style={{ 
+                      backgroundColor: isFormValid ? 'var(--color-success)' : 'var(--color-text-muted)', 
+                      borderColor: isFormValid ? 'var(--color-success)' : 'var(--color-border)',
+                      cursor: isFormValid ? 'pointer' : 'not-allowed'
+                    }}>
+                    <Save size={16} /> Save & Complete Onboarding
+                  </button>
+                )}
+              </div>
             </div>
 
           </div>
