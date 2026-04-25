@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-import { MoreVertical, Search, Filter, UserPlus, FileText, MapPin, Briefcase, ShieldCheck, UploadCloud, AlertCircle, IndianRupee, Lock, Save, Download, FileSpreadsheet, Printer, MessageSquareShare, Trash2, CreditCard } from 'lucide-react';
+import { MoreVertical, Search, Filter, UserPlus, FileText, MapPin, Briefcase, ShieldCheck, UploadCloud, AlertCircle, IndianRupee, Lock, Save, Download, FileSpreadsheet, Printer, MessageSquareShare, Trash2, CreditCard, TrendingUp } from 'lucide-react';
 import SalaryStructure from './SalaryStructure';
 import { dataService } from '../utils/dataService';
 import FeedbackPortal from '../components/FeedbackPortal';
@@ -694,10 +694,25 @@ const EmployeeDirectory = ({ userRole }) => {
                       onStateChange={(salaryData) => setForm(prev => ({ ...prev, salaryConfig: salaryData }))}
                     />
                     
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem', borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem' }}>
-                      <button className="btn btn-outline" onClick={() => showNotification('This is a structural preview. Final values will be committed upon saving the profile.', 'info')} style={{ gap: '0.5rem', fontSize: '0.8rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem', borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem', gap: '1rem' }}>
+                      <button className="btn btn-outline" onClick={() => showNotification(form.id ? 'Salary structure is active and validated.' : 'This is a structural preview. Final values will be committed upon saving the profile.', 'info')} style={{ gap: '0.5rem', fontSize: '0.8rem' }}>
                         <IndianRupee size={14} /> Validate Structure
                       </button>
+                      {form.id && (
+                        <button className="btn btn-primary" onClick={() => {
+                          setShowModal(false);
+                          navigate('/compensation', { 
+                            state: { 
+                              isAppraisal: true, 
+                              employeeName: `${form.firstName} ${form.middleName ? form.middleName + ' ' : ''}${form.lastName}`.trim(), 
+                              employeeRole: form.role, 
+                              empId: form.id 
+                            } 
+                          });
+                        }} style={{ gap: '0.5rem', fontSize: '0.8rem', backgroundColor: 'var(--color-primary)' }}>
+                          <TrendingUp size={14} /> Execute Appraisal
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
