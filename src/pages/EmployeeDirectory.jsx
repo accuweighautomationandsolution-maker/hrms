@@ -28,8 +28,8 @@ const EmployeeDirectory = ({ userRole }) => {
     firstName: '', middleName: '', lastName: '', dob: '', contact: '', altContact: '', email: '', marital: '', gender: '', bloodGroup: '',
     aadharNo: '', panNo: '', dlNo: '', dlExpiry: '', dlType: '', passportNo: '', passportExpiry: '',
     bankAccountName: '', bankAccountNumber: '', bankName: '', bankIfsc: '', bankBranch: '',
-    hasMediclaim: false, mediclaimPolicyNo: '', mediclaimAmount: '', mediclaimCompany: '',
-    hasTermInsurance: false, termPolicyNo: '', termAmount: '', termCompany: '',
+    hasMediclaim: false, mediclaimPolicies: [{ policyNo: '', amount: '', company: '' }],
+    hasTermInsurance: false, termInsurancePolicies: [{ policyNo: '', amount: '', company: '' }],
     empId: '', role: '', department: '', joinDate: '', probType: 'Probation', probPeriod: '6 Months', exitDate: '', empCategory: 'Staff Employee',
     presAddress: '', permAddress: '', sameAsPresent: false,
     hasPF: false, uan: '', pfMemberId: '',
@@ -51,6 +51,22 @@ const EmployeeDirectory = ({ userRole }) => {
   const handleInput = (field, val) => {
     setForm(prev => ({ ...prev, [field]: val }));
     setErrorMsg('');
+  };
+
+  const handlePolicyChange = (type, index, field, value) => {
+    setForm(prev => {
+      const updatedPolicies = [...prev[type]];
+      updatedPolicies[index] = { ...updatedPolicies[index], [field]: value };
+      return { ...prev, [type]: updatedPolicies };
+    });
+  };
+
+  const addPolicy = (type) => {
+    setForm(prev => ({ ...prev, [type]: [...prev[type], { policyNo: '', amount: '', company: '' }] }));
+  };
+
+  const removePolicy = (type, index) => {
+    setForm(prev => ({ ...prev, [type]: prev[type].filter((_, i) => i !== index) }));
   };
 
   const handleFileUpload = (e) => {
@@ -83,8 +99,8 @@ const EmployeeDirectory = ({ userRole }) => {
       firstName: '', middleName: '', lastName: '', dob: '', contact: '', altContact: '', email: '', marital: '', gender: '', bloodGroup: '',
       aadharNo: '', panNo: '', dlNo: '', dlExpiry: '', dlType: '', passportNo: '', passportExpiry: '',
       bankAccountName: '', bankAccountNumber: '', bankName: '', bankIfsc: '', bankBranch: '',
-      hasMediclaim: false, mediclaimPolicyNo: '', mediclaimAmount: '', mediclaimCompany: '',
-      hasTermInsurance: false, termPolicyNo: '', termAmount: '', termCompany: '',
+      hasMediclaim: false, mediclaimPolicies: [{ policyNo: '', amount: '', company: '' }],
+      hasTermInsurance: false, termInsurancePolicies: [{ policyNo: '', amount: '', company: '' }],
       empId: '', joinDate: '', probPeriod: '', probType: '', exitDate: '', empCategory: '',
       presAddress: '', permAddress: '', sameAsPresent: false,
       hasPF: false, uan: '', pfMemberId: '',
@@ -134,13 +150,9 @@ const EmployeeDirectory = ({ userRole }) => {
       bankIfsc: emp.bankIfsc || '',
       bankBranch: emp.bankBranch || '',
       hasMediclaim: !!emp.hasMediclaim,
-      mediclaimPolicyNo: emp.mediclaimPolicyNo || '',
-      mediclaimAmount: emp.mediclaimAmount || '',
-      mediclaimCompany: emp.mediclaimCompany || '',
+      mediclaimPolicies: (emp.mediclaimPolicies && emp.mediclaimPolicies.length > 0) ? emp.mediclaimPolicies : [{ policyNo: '', amount: '', company: '' }],
       hasTermInsurance: !!emp.hasTermInsurance,
-      termPolicyNo: emp.termPolicyNo || '',
-      termAmount: emp.termAmount || '',
-      termCompany: emp.termCompany || '',
+      termInsurancePolicies: (emp.termInsurancePolicies && emp.termInsurancePolicies.length > 0) ? emp.termInsurancePolicies : [{ policyNo: '', amount: '', company: '' }],
       salaryConfig: salary || null
     }));
     setUploadedFiles([]);
@@ -222,13 +234,9 @@ const EmployeeDirectory = ({ userRole }) => {
       bankIfsc: form.bankIfsc,
       bankBranch: form.bankBranch,
       hasMediclaim: form.hasMediclaim,
-      mediclaimPolicyNo: form.hasMediclaim ? form.mediclaimPolicyNo : '',
-      mediclaimAmount: form.hasMediclaim ? form.mediclaimAmount : '',
-      mediclaimCompany: form.hasMediclaim ? form.mediclaimCompany : '',
+      mediclaimPolicies: form.hasMediclaim ? form.mediclaimPolicies : [],
       hasTermInsurance: form.hasTermInsurance,
-      termPolicyNo: form.hasTermInsurance ? form.termPolicyNo : '',
-      termAmount: form.hasTermInsurance ? form.termAmount : '',
-      termCompany: form.hasTermInsurance ? form.termCompany : ''
+      termInsurancePolicies: form.hasTermInsurance ? form.termInsurancePolicies : []
     };
 
     const savedEmp = dataService.saveEmployee(empData);
@@ -727,19 +735,31 @@ const EmployeeDirectory = ({ userRole }) => {
                       <span style={{ fontWeight: '600', fontSize: '1rem' }}>Employee has Mediclaim Policy</span>
                     </label>
                     {form.hasMediclaim && (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', paddingLeft: '2rem', borderLeft: '3px solid var(--color-primary)' }}>
-                        <div className="form-group">
-                          <label className="form-label">Policy Number</label>
-                          <input type="text" className="form-input" style={{width:'100%'}} value={form.mediclaimPolicyNo} onChange={e => handleInput('mediclaimPolicyNo', e.target.value)} />
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label">Policy Amount</label>
-                          <input type="number" className="form-input" style={{width:'100%'}} value={form.mediclaimAmount} onChange={e => handleInput('mediclaimAmount', e.target.value)} />
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label">Policy Company</label>
-                          <input type="text" className="form-input" style={{width:'100%'}} value={form.mediclaimCompany} onChange={e => handleInput('mediclaimCompany', e.target.value)} />
-                        </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {form.mediclaimPolicies.map((policy, index) => (
+                          <div key={index} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr) auto', gap: '1.5rem', paddingLeft: '2rem', borderLeft: '3px solid var(--color-primary)', alignItems: 'end' }}>
+                            <div className="form-group">
+                              <label className="form-label">Policy Number</label>
+                              <input type="text" className="form-input" style={{width:'100%'}} value={policy.policyNo} onChange={e => handlePolicyChange('mediclaimPolicies', index, 'policyNo', e.target.value)} />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Policy Amount</label>
+                              <input type="number" className="form-input" style={{width:'100%'}} value={policy.amount} onChange={e => handlePolicyChange('mediclaimPolicies', index, 'amount', e.target.value)} />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Policy Company</label>
+                              <input type="text" className="form-input" style={{width:'100%'}} value={policy.company} onChange={e => handlePolicyChange('mediclaimPolicies', index, 'company', e.target.value)} />
+                            </div>
+                            {form.mediclaimPolicies.length > 1 && (
+                              <button type="button" className="btn btn-ghost" style={{ color: 'var(--color-danger)', marginBottom: '0.5rem' }} onClick={() => removePolicy('mediclaimPolicies', index)}>
+                                <Trash2 size={18} />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                        <button type="button" className="btn btn-outline" style={{ alignSelf: 'flex-start', marginLeft: '2rem', marginTop: '0.5rem', fontSize: '0.8rem', padding: '0.4rem 0.8rem' }} onClick={() => addPolicy('mediclaimPolicies')}>
+                          + Add Another Mediclaim Policy
+                        </button>
                       </div>
                     )}
                   </div>
@@ -751,19 +771,31 @@ const EmployeeDirectory = ({ userRole }) => {
                       <span style={{ fontWeight: '600', fontSize: '1rem' }}>Employee has Term Insurance Policy</span>
                     </label>
                     {form.hasTermInsurance && (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', paddingLeft: '2rem', borderLeft: '3px solid var(--color-primary)' }}>
-                        <div className="form-group">
-                          <label className="form-label">Policy Number</label>
-                          <input type="text" className="form-input" style={{width:'100%'}} value={form.termPolicyNo} onChange={e => handleInput('termPolicyNo', e.target.value)} />
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label">Policy Amount</label>
-                          <input type="number" className="form-input" style={{width:'100%'}} value={form.termAmount} onChange={e => handleInput('termAmount', e.target.value)} />
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label">Policy Company</label>
-                          <input type="text" className="form-input" style={{width:'100%'}} value={form.termCompany} onChange={e => handleInput('termCompany', e.target.value)} />
-                        </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {form.termInsurancePolicies.map((policy, index) => (
+                          <div key={index} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr) auto', gap: '1.5rem', paddingLeft: '2rem', borderLeft: '3px solid var(--color-primary)', alignItems: 'end' }}>
+                            <div className="form-group">
+                              <label className="form-label">Policy Number</label>
+                              <input type="text" className="form-input" style={{width:'100%'}} value={policy.policyNo} onChange={e => handlePolicyChange('termInsurancePolicies', index, 'policyNo', e.target.value)} />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Policy Amount</label>
+                              <input type="number" className="form-input" style={{width:'100%'}} value={policy.amount} onChange={e => handlePolicyChange('termInsurancePolicies', index, 'amount', e.target.value)} />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Policy Company</label>
+                              <input type="text" className="form-input" style={{width:'100%'}} value={policy.company} onChange={e => handlePolicyChange('termInsurancePolicies', index, 'company', e.target.value)} />
+                            </div>
+                            {form.termInsurancePolicies.length > 1 && (
+                              <button type="button" className="btn btn-ghost" style={{ color: 'var(--color-danger)', marginBottom: '0.5rem' }} onClick={() => removePolicy('termInsurancePolicies', index)}>
+                                <Trash2 size={18} />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                        <button type="button" className="btn btn-outline" style={{ alignSelf: 'flex-start', marginLeft: '2rem', marginTop: '0.5rem', fontSize: '0.8rem', padding: '0.4rem 0.8rem' }} onClick={() => addPolicy('termInsurancePolicies')}>
+                          + Add Another Term Insurance Policy
+                        </button>
                       </div>
                     )}
                   </div>
