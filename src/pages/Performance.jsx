@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Search, Filter, TrendingUp, Award, Target, Star, AlertCircle, CheckCircle, FileText, Plus, Trash2, MessageSquareShare } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import FeedbackPortal from '../components/FeedbackPortal';
+import { dataService } from '../utils/dataService';
 
 const PERFORMANCE_DATA = [
   { id: 501, name: 'Alice Smith', role: 'Software Engineer', dept: 'Engineering', lastMonthly: 4.2, lastHalfYearly: 4.5, lastAnnual: null, status: 'Pending Review' },
@@ -46,6 +47,20 @@ const getScoreColor = (score) => {
   return 'var(--color-danger)';
 };
 
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div style={{ backgroundColor: 'var(--color-surface)', padding: '1rem', border: '1px solid var(--color-border)', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
+        <p style={{ margin: '0 0 0.5rem 0', fontWeight: '600' }}>{label} Department</p>
+        <p style={{ margin: 0, color: 'var(--color-primary)', fontWeight: '700', fontSize: '1.25rem' }}>
+          {payload[0].value} <span style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', fontWeight: '400' }}>/ 5.0 Avg</span>
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
 const Performance = () => {
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -70,20 +85,6 @@ const Performance = () => {
     const history = dataService.getFeedbackHistory(empId);
     const emp = PERFORMANCE_DATA.find(e => e.id === empId);
     setViewingRecord({ emp, history });
-  };
-
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div style={{ backgroundColor: 'var(--color-surface)', padding: '1rem', border: '1px solid var(--color-border)', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
-          <p style={{ margin: '0 0 0.5rem 0', fontWeight: '600' }}>{label} Department</p>
-          <p style={{ margin: 0, color: 'var(--color-primary)', fontWeight: '700', fontSize: '1.25rem' }}>
-            {payload[0].value} <span style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', fontWeight: '400' }}>/ 5.0 Avg</span>
-          </p>
-        </div>
-      );
-    }
-    return null;
   };
 
   return (

@@ -43,14 +43,14 @@ const UserManagement = () => {
     }));
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
   const loadData = () => {
     setUsers(authService.getUsers());
     setLogs(authService.getLogs());
   };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const handleCreateUser = async (e) => {
     e.preventDefault();

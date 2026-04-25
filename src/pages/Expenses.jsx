@@ -316,11 +316,11 @@ const Expenses = () => {
             </div>
 
             <div style={{ flexShrink: 0, borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem' }}>
-              {selectedAdvanceId && totalExpenseAmount > 0 && (
+              {selectedAdvance && totalExpenseAmount > 0 && (
                 <div style={{ backgroundColor: 'var(--color-surface)', padding: '1rem', borderRadius: '8px', border: '1px dashed var(--color-primary)', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'block' }}>Advance Reconciliation Effect</span>
-                    <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>Selected Advance: <strong style={{ color: 'var(--color-primary)' }}>{selectedAdvanceId}</strong></span>
+                    <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>Selected Advance: <strong style={{ color: 'var(--color-primary)' }}>{selectedAdvance.id}</strong></span>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <span style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--color-warning)' }}>- ₹{totalExpenseAmount.toLocaleString()}</span>
