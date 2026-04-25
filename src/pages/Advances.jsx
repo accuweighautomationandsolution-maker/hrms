@@ -177,14 +177,14 @@ const Advances = () => {
 
   const stats = useMemo(() => {
     const totalEMI = activeEmployees.reduce((sum, e) => sum + (e.advanceLoanEMI || 0), 0);
-    const myHistory = advances.filter(h => isEmployee ? h.empId === Number(currentUser.id) : true);
+    const myHistory = advances.filter(h => isEmployee ? (h.empId === Number(currentUser?.id)) : true);
     const totalPrincipal = myHistory.reduce((sum, h) => sum + (h.amount || 0), 0);
     return { totalEMI, totalPrincipal, historyCount: myHistory.length };
-  }, [activeEmployees, advances, isEmployee, currentUser.id]);
+  }, [activeEmployees, advances, isEmployee, currentUser?.id]);
 
   const displayHistory = useMemo(() => {
-    return advances.filter(h => isEmployee ? h.empId === Number(currentUser.id) : true);
-  }, [advances, isEmployee, currentUser.id]);
+    return advances.filter(h => isEmployee ? (h.empId === Number(currentUser?.id)) : true);
+  }, [advances, isEmployee, currentUser?.id]);
 
   return (
     <div className="page-container">
@@ -257,8 +257,8 @@ const Advances = () => {
                        <div>{emp.name}</div>
                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: '400' }}>{emp.empCode}</div>
                     </td>
-                    <td style={{ padding: '1rem', color: 'var(--color-danger)', fontWeight: '700' }}>₹{emp.advanceLoanEMI.toLocaleString()} / mo</td>
-                    <td style={{ padding: '1rem' }}>₹{emp.grossSalary.toLocaleString()}</td>
+                    <td style={{ padding: '1rem', color: 'var(--color-danger)', fontWeight: '700' }}>₹{(emp.advanceLoanEMI || 0).toLocaleString()} / mo</td>
+                    <td style={{ padding: '1rem' }}>₹{(emp.grossSalary || 0).toLocaleString()}</td>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <div style={{ flex: 1, height: '6px', backgroundColor: '#e2e8f0', borderRadius: '3px', position: 'relative' }}>
@@ -303,7 +303,7 @@ const Advances = () => {
                     <td style={{ padding: '1rem', fontWeight: 700 }}>₹{h.amount?.toLocaleString()}</td>
                     <td style={{ padding: '1rem' }}>
                        {h.emi > 0 ? (
-                         <div>₹{h.emi.toLocaleString()} over {h.installments}mo</div>
+                         <div>₹{(h.emi || 0).toLocaleString()} over {h.installments}mo</div>
                        ) : 'Lump-sum Settlement'}
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'right' }}>

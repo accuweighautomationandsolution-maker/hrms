@@ -114,7 +114,7 @@ const AdvanceReport = () => {
         const mp = { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0, 9:0, 10:0, 11:0 };
         reportData.forEach(adv => {
             const m = new Date(adv.issueDate).getMonth();
-            mp[m] += adv.amount;
+            mp[m] += (adv.amount || 0);
         });
         const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
         return Object.keys(mp).map(k => ({ month: months[k], amount: mp[k] }));
@@ -326,7 +326,7 @@ const AdvanceReport = () => {
                                                 {adv.status}
                                             </span>
                                         </td>
-                                        <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '700' }}>₹{adv.amount.toLocaleString()}</td>
+                                        <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '700' }}>₹{(adv.amount || 0).toLocaleString()}</td>
                                     </tr>
                                 ))}
                             </tbody>

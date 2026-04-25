@@ -159,7 +159,7 @@ const Recruitment = () => {
                                         <div style={{ fontSize: '0.8rem', color: 'var(--color-primary)' }}>{c.department}</div>
                                     </td>
                                     <td style={{ padding: '1.25rem 1rem', fontWeight: '600' }}>
-                                        ₹{c.ctc.toLocaleString()}
+                                        ₹{(c.ctc || 0).toLocaleString()}
                                     </td>
                                     <td style={{ padding: '1.25rem 1rem' }}>
                                         <span className={`badge badge-${getStatusVariant(c.status)}`}>

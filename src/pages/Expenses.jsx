@@ -254,7 +254,7 @@ const Expenses = () => {
                     <select className="form-input" value={linkedAdvance} onChange={(e) => setLinkedAdvance(e.target.value)}>
                       <option value="none">None - Out of Pocket</option>
                       {activeAdvances.map(a => (
-                        <option key={a.id} value={a.id}>{a.id} ({a.empName} - Bal: ₹{a.amount.toLocaleString()})</option>
+                        <option key={a.id} value={a.id}>{a.id} ({a.empName} - Bal: ₹{(a.amount || 0).toLocaleString()})</option>
                       ))}
                     </select>
                   </div>
