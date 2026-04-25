@@ -23,7 +23,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     // Determine the ID to fetch for (from props, location state, or passedState)
     const effectiveEmpId = empId || (location.state && location.state.empId);
     
-    if (effectiveEmpId) {
+    if (effectiveEmpId && !isEmbedded) {
       const existing = dataService.getSalaryStructure(effectiveEmpId);
       if (existing) {
         setForm(prev => ({ ...prev, ...existing }));
@@ -198,7 +198,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
               placeholder="e.g. Ramesh"
               value={form.candidateName}
               onChange={(e) => handleInput('candidateName', e.target.value)}
-              disabled={isAppraisal} />
+              disabled={isAppraisal || isEmbedded} />
           </div>
           <div className="form-group hide-on-print-border">
             <label className="form-label">Middle Name</label>
@@ -207,7 +207,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
               placeholder="Optional"
               value={form.candidateMiddleName}
               onChange={(e) => handleInput('candidateMiddleName', e.target.value)}
-              disabled={isAppraisal} />
+              disabled={isAppraisal || isEmbedded} />
           </div>
           <div className="form-group hide-on-print-border">
             <label className="form-label">Last Name</label>
@@ -216,7 +216,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
               placeholder="e.g. Kumar"
               value={form.candidateLastName}
               onChange={(e) => handleInput('candidateLastName', e.target.value)}
-              disabled={isAppraisal} />
+              disabled={isAppraisal || isEmbedded} />
           </div>
           
           <div className="form-group hide-on-print-border">
@@ -226,7 +226,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
               placeholder="e.g. Helper / Engineer"
               value={form.roleApplied}
               onChange={(e) => handleInput('roleApplied', e.target.value)}
-              disabled={isAppraisal} />
+              disabled={isAppraisal || isEmbedded} />
           </div>
           <div className="form-group hide-on-print-border">
             <label className="form-label">Date Prepared</label>
