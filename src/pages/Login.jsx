@@ -119,7 +119,7 @@ const Login = ({ onLoginSuccess }) => {
             <ShieldCheck size={32} />
           </div>
           <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0 }}>
-            {view === 'login' && 'Human Capital Portal'}
+            {view === 'login' && 'Accuweigh Hrms System'}
             {view === 'forgot' && 'Identity Recovery'}
             {view === 'reset-code' && 'Verification Code'}
             {view === 'force-reset' && 'Security Update Required'}
