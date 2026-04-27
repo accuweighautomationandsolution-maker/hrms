@@ -7,6 +7,7 @@ CREATE TABLE employees (
   name TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
   emp_code TEXT UNIQUE NOT NULL,
+  biometric_code TEXT,
   designation TEXT,
   department TEXT,
   joining_date DATE,

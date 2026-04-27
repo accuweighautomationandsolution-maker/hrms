@@ -30,7 +30,7 @@ const EmployeeDirectory = ({ userRole }) => {
     bankAccountName: '', bankAccountNumber: '', bankName: '', bankIfsc: '', bankBranch: '',
     hasMediclaim: false, mediclaimPolicies: [{ policyNo: '', amount: '', company: '' }],
     hasTermInsurance: false, termInsurancePolicies: [{ policyNo: '', amount: '', company: '' }],
-    empId: '', role: '', department: '', joinDate: '', probType: 'Probation', probPeriod: '6 Months', exitDate: '', empCategory: 'Staff Employee',
+    empId: '', biometricCode: '', role: '', department: '', joinDate: '', probType: 'Probation', probPeriod: '6 Months', exitDate: '', empCategory: 'Staff Employee',
     presAddress: '', permAddress: '', sameAsPresent: false,
     hasPF: false, uan: '', pfMemberId: '',
     hasESIC: false, esicIp: '',
@@ -101,7 +101,7 @@ const EmployeeDirectory = ({ userRole }) => {
       bankAccountName: '', bankAccountNumber: '', bankName: '', bankIfsc: '', bankBranch: '',
       hasMediclaim: false, mediclaimPolicies: [{ policyNo: '', amount: '', company: '' }],
       hasTermInsurance: false, termInsurancePolicies: [{ policyNo: '', amount: '', company: '' }],
-      empId: '', joinDate: '', probPeriod: '', probType: '', exitDate: '', empCategory: '',
+      empId: '', biometricCode: '', joinDate: '', probPeriod: '', probType: '', exitDate: '', empCategory: '',
       presAddress: '', permAddress: '', sameAsPresent: false,
       hasPF: false, uan: '', pfMemberId: '',
       hasESIC: false, esicIp: '',
@@ -121,7 +121,8 @@ const EmployeeDirectory = ({ userRole }) => {
       middleName: names.length > 2 ? names[1] : '',
       lastName: names.length > 2 ? names.slice(2).join(' ') : (names[1] || ''),
       email: emp.email,
-      empId: emp.empCode || `EMP-00${emp.id}`,
+      empId: emp.empCode || '',
+      biometricCode: emp.biometricCode || '',
       probType: emp.empType || 'Select...',
       empCategory: emp.category,
       contact: emp.contact || '',
@@ -191,7 +192,7 @@ const EmployeeDirectory = ({ userRole }) => {
 
   const isFormValid = (
     form.firstName && form.lastName && form.email && form.contact &&
-    form.empId && form.joinDate && form.empCategory &&
+    form.empId && form.biometricCode && form.joinDate && form.empCategory &&
     (!form.hasPF || (form.uan && form.pfMemberId)) &&
     (!form.hasESIC || form.esicIp)
   );
@@ -214,6 +215,7 @@ const EmployeeDirectory = ({ userRole }) => {
       category: form.empCategory,
       joiningDate: form.joinDate,
       empCode: form.empId,
+      biometricCode: form.biometricCode,
       contact: form.contact,
       presAddress: form.presAddress,
       permAddress: form.sameAsPresent ? form.presAddress : form.permAddress,
@@ -327,6 +329,7 @@ const EmployeeDirectory = ({ userRole }) => {
             <thead>
               <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Name</th>
+                <th style={{ padding: '1rem', fontWeight: '500' }}>Code</th>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Role</th>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Department</th>
                 {isEmployee && <th style={{ padding: '1rem', fontWeight: '500' }}>Contact Number</th>}
@@ -337,6 +340,7 @@ const EmployeeDirectory = ({ userRole }) => {
             <tbody>
               {employees.filter(e => 
                 e.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                (e.empCode && e.empCode.toLowerCase().includes(searchTerm.toLowerCase())) ||
                 e.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 e.department.toLowerCase().includes(searchTerm.toLowerCase())
               ).map((emp) => (
@@ -352,6 +356,7 @@ const EmployeeDirectory = ({ userRole }) => {
                       </div>
                     </div>
                   </td>
+                  <td style={{ padding: '1rem', color: 'var(--color-text-main)', fontWeight: '600' }}>{emp.empCode}</td>
                   <td style={{ padding: '1rem', color: 'var(--color-text-main)' }}>{emp.role}</td>
                   <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{emp.department}</td>
                   {isEmployee && <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{emp.contact || '+91 98' + Math.floor(10000000 + Math.random() * 90000000)}</td>}
@@ -524,9 +529,14 @@ const EmployeeDirectory = ({ userRole }) => {
               {activeTab === 2 && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
                   <div className="form-group">
-                    <label className="form-label">Employee Number *</label>
-                    <input type="text" className="form-input" placeholder="e.g. EMP-101" style={{width:'100%', borderColor: !form.empId ? 'var(--color-danger)' : 'var(--color-border)'}} 
+                    <label className="form-label">Employee Code * (Company Identity)</label>
+                    <input type="text" className="form-input" placeholder="e.g. ABC-001" style={{width:'100%', borderColor: !form.empId ? 'var(--color-danger)' : 'var(--color-border)'}} 
                       value={form.empId} onChange={e => handleInput('empId', e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Biometric Code *</label>
+                    <input type="text" className="form-input" placeholder="e.g. 101" style={{width:'100%', borderColor: !form.biometricCode ? 'var(--color-danger)' : 'var(--color-border)'}} 
+                      value={form.biometricCode} onChange={e => handleInput('biometricCode', e.target.value)} />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Joining Date *</label>
