@@ -21,9 +21,25 @@ const TrainingInduction = ({ userRole }) => {
     selectedAttendeeIds: []
   });
 
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    setRecords(dataService.getTrainingRecords());
-    setEmployees(dataService.getEmployees());
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [trainingData, employeeData] = await Promise.all([
+          dataService.getTrainingRecords(),
+          dataService.getEmployees()
+        ]);
+        setRecords(trainingData);
+        setEmployees(employeeData);
+      } catch (err) {
+        console.error("Failed to load growth data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
   const handleSave = () => {
@@ -89,6 +105,17 @@ const TrainingInduction = ({ userRole }) => {
         : [...prev.selectedAttendeeIds, id]
     }));
   };
+
+  if (loading) {
+    return (
+      <div className="page-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 1rem' }}></div>
+          <p style={{ color: 'var(--color-text-muted)', fontWeight: '500' }}>Loading growth tracker...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container">

@@ -105,20 +105,6 @@ export const dataService = {
     return getJSON(KEYS.LEAVES, {});
   },
 
-  // ── Dashboard Stats ───────────────────────────────────────────────────────
-  getDashboardStats: async () => {
-    const employees = await dataService.getEmployees();
-    const attendance = await dataService.getAttendance();
-    const leaves = await dataService.getLeaveRequests();
-
-    const activeEmp = employees.filter(e => e.status === 'Active');
-    const today = new Date().toISOString().split('T')[0];
-    
-    return {
-      totalEmployees: activeEmp.length || 0,
-      presentToday: Object.values(attendance).filter(r => r.date === today && r.punchIn).length || 0,
-      onLeave: leaves.filter(l => l.status === 'Approved' && today >= l.startDate && today <= l.endDate).length || 0
-    };
   },
 
   // ── Notices ─────────────────────────────────────────────────────────────
@@ -134,13 +120,16 @@ export const dataService = {
     saveJSON(KEYS.NOTICES, notices);
   },
 
-  // ── Policies ─────────────────────────────────────────────────────────────
   getPolicies: async () => {
     if (supabase) {
       const { data, error } = await supabase.from('policies').select('*').order('created_at', { ascending: false });
       if (!error) return data;
     }
-    return getJSON(KEYS.POLICIES, []);
+    return getJSON(KEYS.POLICIES, [
+      { id: 'POL-001', title: 'Code of Conduct v2.0', category: 'Compliance', uploadDate: '2026-01-15', effectiveDate: '2026-01-01', summary: 'Standard professional ethics and workplace behavior.', version: '2.0', status: 'Active' },
+      { id: 'POL-002', title: 'Work From Home Policy', category: 'IT Policies', uploadDate: '2026-02-10', effectiveDate: '2026-02-15', summary: 'Guidelines for remote work eligibility and security.', version: '1.2', status: 'Active' },
+      { id: 'POL-003', title: 'Prevention of Sexual Harassment (POSH)', category: 'Legal', uploadDate: '2025-12-01', effectiveDate: '2026-01-01', summary: 'Safety and grievance redressal for workplace harassment.', version: '3.0', status: 'Active' }
+    ]);
   },
 
   savePolicies: async (policies) => {
@@ -156,17 +145,39 @@ export const dataService = {
     return getJSON(KEYS.HOLIDAYS, []);
   },
 
+  uploadPolicyFile: async (file) => {
+    if (supabase) {
+      const fileName = `${Date.now()}_${file.name}`;
+      const { data, error } = await supabase.storage
+        .from('policies')
+        .upload(fileName, file);
+
+      if (error) {
+        console.error('Upload Error:', error);
+        throw error;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('policies')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    }
+    // Fallback if no Supabase (mocking URL)
+    return URL.createObjectURL(file);
+  },
+
 
 
   getPersonalAttendanceTrajectory: (userId) => {
     return [];
   },
 
-  getDashboardStats: () => {
-    const emps = dataService.getEmployees().filter(e => e.status !== 'Inactive');
+  getDashboardStats: async () => {
+    const emps = (await dataService.getEmployees()).filter(e => e.status !== 'Inactive');
     const totalEmployees = emps.length;
-    const leaveRequests = dataService.getLeaveRequests();
-    const attendance = dataService.getAttendance();
+    const leaveRequests = await dataService.getLeaveRequests();
+    const attendance = await dataService.getAttendance();
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
@@ -209,9 +220,15 @@ export const dataService = {
   },
 
   // ── Leave Requests ─────────────────────────────────────────────────────────
-  getLeaveRequests: () => getJSON(KEYS.LEAVE_RECS, []),
+  getLeaveRequests: async () => {
+    if (supabase) {
+      const { data, error } = await supabase.from('leave_requests').select('*, employees(name)');
+      if (!error) return data;
+    }
+    return getJSON(KEYS.LEAVE_RECS, []);
+  },
 
-  saveLeaveRequests: (reqs) => saveJSON(KEYS.LEAVE_RECS, reqs),
+  saveLeaveRequests: async (reqs) => saveJSON(KEYS.LEAVE_RECS, reqs),
 
   getReportRangeData: (empId, startDate, endDate) => {
     const attendance = dataService.getAttendance();
@@ -236,31 +253,12 @@ export const dataService = {
     return results;
   },
 
-  // ── Notices ────────────────────────────────────────────────────────────────
-  getNotices: () => getJSON(KEYS.NOTICES, []),
-
-  saveNotices: (notices) => saveJSON(KEYS.NOTICES, notices),
 
   // ── Probation Alerts ──────────────────────────────────────────────
   getUpcomingProbations: () => {
     return [];
   },
 
-  // ── Holidays ───────────────────────────────────────────────────────
-  getCustomHolidays: () => getJSON(KEYS.HOLIDAYS, [
-    { id: 1, fromDate: '2026-01-26', toDate: '2026-01-26', name: "Republic Day",              type: 'National',  compulsory: true  },
-    { id: 2, fromDate: '2026-03-17', toDate: '2026-03-17', name: "Holi",                      type: 'Festival',  compulsory: true  },
-    { id: 3, fromDate: '2026-04-14', toDate: '2026-04-14', name: "Dr. Ambedkar Jayanti",      type: 'State',     compulsory: true  },
-    { id: 4, fromDate: '2026-05-01', toDate: '2026-05-01', name: "Maharashtra Day",           type: 'State',     compulsory: true  },
-    { id: 5, fromDate: '2026-08-15', toDate: '2026-08-15', name: "Independence Day",          type: 'National',  compulsory: true  },
-    { id: 6, fromDate: '2026-08-27', toDate: '2026-08-27', name: "Ganesh Chaturthi",          type: 'Festival',  compulsory: true  },
-    { id: 7, fromDate: '2026-10-02', toDate: '2026-10-02', name: "Gandhi Jayanti",            type: 'National',  compulsory: true  },
-    { id: 8, fromDate: '2026-10-23', toDate: '2026-10-23', name: "Dussehra",                  type: 'Festival',  compulsory: true  },
-    { id: 9, fromDate: '2026-11-10', toDate: '2026-11-12', name: "Diwali Holidays",           type: 'Festival',  compulsory: true  },
-    { id: 11, fromDate: '2026-12-25', toDate: '2026-12-25', name: "Christmas",                type: 'National',  compulsory: false },
-  ]),
-
-  saveCustomHolidays: (holidays) => saveJSON(KEYS.HOLIDAYS, holidays),
 
   // ── Biometrics ─────────────────────────────────────────────────────
   getBiometricConfig: () => getJSON(KEYS.BIO_CONFIG, {
@@ -272,14 +270,6 @@ export const dataService = {
 
   saveBiometricConfig: (config) => saveJSON(KEYS.BIO_CONFIG, config),
 
-  // ── Employees ──────────────────────────────────────────────────────
-  getEmployees: () => getJSON(KEYS.EMPLOYEES, [
-    {
-      id: 1, name: 'Saurabh Bhagwat', role: 'System Administrator', department: 'Management', status: 'Active', empType: 'Permanent', email: 'saurabh@accuweigh.com',
-      grossSalary: 250000, category: 'Staff Employee', empCode: 'AW-MGMT-001', joiningDate: '01-Jan-2024', grade: 'E1', biometricId: 1,
-      uanNumber: '100000000001', esicNumber: '31000000000000001', bankAccount: 'XXXXXXXXXXXX (HDFC)', managerId: null
-    }
-  ]),
 
   getEmployeeById: (id) => dataService.getEmployees().find(e => e.id === Number(id)),
 
@@ -494,14 +484,6 @@ export const dataService = {
 
   getBonusPayments: () => getJSON(KEYS.BONUS_PAYMENTS, []),
   saveBonusPayments: (list) => saveJSON(KEYS.BONUS_PAYMENTS, list),
-  // ── HR Policy Management ──────────────────────────────────────────────
-  getPolicies: () => getJSON(KEYS.POLICIES, [
-    { id: 'POL-001', title: 'Code of Conduct v2.0', category: 'Compliance', uploadDate: '2026-01-15', effectiveDate: '2026-01-01', summary: 'Standard professional ethics and workplace behavior.', version: '2.0', status: 'Active' },
-    { id: 'POL-002', title: 'Work From Home Policy', category: 'IT Policies', uploadDate: '2026-02-10', effectiveDate: '2026-02-15', summary: 'Guidelines for remote work eligibility and security.', version: '1.2', status: 'Active' },
-    { id: 'POL-003', title: 'Prevention of Sexual Harassment (POSH)', category: 'Legal', uploadDate: '2025-12-01', effectiveDate: '2026-01-01', summary: 'Safety and grievance redressal for workplace harassment.', version: '3.0', status: 'Active' }
-  ]),
-  savePolicies: (list) => saveJSON(KEYS.POLICIES, list),
-
   getAcknowledgments: () => getJSON(KEYS.POLICY_ACKS, []),
   
   saveAcknowledgment: (ack) => {
@@ -573,7 +555,7 @@ export const dataService = {
     return all[empId] || null;
   },
 
-  saveSalaryStructure: (empId, data) => {
+  saveSalaryStructure: async (empId, data) => {
     const all = getJSON(KEYS.SALARY_STRUCTURES, {});
     // We snapshot the full object with a timestamp for audit tracking
     all[empId] = {
@@ -585,7 +567,7 @@ export const dataService = {
     
     // Also update the main employee record's gross salary for backward compatibility in the directory
     if (data.targetSalary) {
-      const emps = dataService.getEmployees();
+      const emps = await dataService.getEmployees();
       const idx = emps.findIndex(e => e.id === Number(empId));
       if (idx > -1) {
         emps[idx].grossSalary = Number(data.targetSalary);

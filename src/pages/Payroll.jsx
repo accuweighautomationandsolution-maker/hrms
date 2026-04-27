@@ -15,8 +15,8 @@ const CUR_MO = NOW.getMonth(); // 0-indexed
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 // ── Shared Holiday Calendar Panel ─────────────────────────────────────────
-const HolidayPanel = ({ year, month, workedDays, onToggle }) => {
-  const holidays = useMemo(() => getHolidayDates(year, month, dataService.getCustomHolidays()), [year, month]);
+const HolidayPanel = ({ year, month, workedDays, holidayList, onToggle }) => {
+  const holidays = useMemo(() => getHolidayDates(year, month, holidayList), [year, month, holidayList]);
 
   return (
     <div style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '10px', padding: '1.25rem', marginBottom: '1.25rem' }}>
@@ -361,9 +361,32 @@ const Payroll = () => {
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [employees, setEmployees] = useState([]);
+  const [holidayList, setHolidayList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [holidayWorked, setHolidayWorked] = useState([]); // List of day numbers
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [emps, hols] = await Promise.all([
+          dataService.getEmployees(),
+          dataService.getCustomHolidays()
+        ]);
+        setEmployees(emps);
+        setHolidayList(hols);
+      } catch (err) {
+        console.error("Failed to load payroll data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const employeesWithPayroll = useMemo(() => {
-    return dataService.getEmployees().map(emp => {
+    return employees.map(emp => {
       const daysPresent = dataService.getPresentDaysCount(emp.id, CUR_MO, CUR_YR);
       return {
         ...emp,
@@ -373,7 +396,7 @@ const Payroll = () => {
           : null
       };
     });
-  }, []);
+  }, [employees]);
 
   const isContractual = selectedEmployee?.category === 'Contractual Worker';
 
@@ -419,6 +442,17 @@ const Payroll = () => {
         XLSX.writeFile(workbook, `Payroll_Ledger_${MONTH_NAMES[CUR_MO]}_${CUR_YR}.xlsx`);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="page-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 1rem' }}></div>
+          <p style={{ color: 'var(--color-text-muted)', fontWeight: '500' }}>Loading payroll register...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container">
@@ -471,6 +505,14 @@ const Payroll = () => {
         </div>
       </div>
 
+        <HolidayPanel 
+          year={CUR_YR} 
+          month={CUR_MO} 
+          workedDays={holidayWorked} 
+          holidayList={holidayList}
+          onToggle={(day) => setHolidayWorked(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])} 
+        />
+
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', alignItems: 'center' }}>
           <h2>Salary Register — {MONTH_NAMES[CUR_MO]} {CUR_YR}</h2>
@@ -487,6 +529,7 @@ const Payroll = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
+                <th style={{ padding: '1rem', fontWeight: '500' }}>Code</th>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Employee</th>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Category</th>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Gross / Day Rate</th>
@@ -506,6 +549,9 @@ const Payroll = () => {
                 const ctx = emp.payrollContext;
                 return (
                   <tr key={emp.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                    <td style={{ padding: '1rem', fontWeight: '600', color: 'var(--color-primary)' }}>
+                      {emp.empCode || emp.biometricCode || 'N/A'}
+                    </td>
                     <td style={{ padding: '1rem', fontWeight: '500', color: 'var(--color-text-main)' }}>
                       <div>{emp.name}</div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: '400' }}>{emp.role}</div>

@@ -22,14 +22,28 @@ const LeaveManagement = () => {
   const userRole = authService.getUserRole();
   const isEmployee = userRole === 'employee';
 
-  const [requests, setRequests] = useState(() => {
-    const all = dataService.getLeaveRequests();
-    if (isEmployee) {
-      return all.filter(r => r.empId === Number(currentUser.id));
-    }
-    return all;
-  });
+  const [requests, setRequests] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLeaves = async () => {
+      setLoading(true);
+      try {
+        const all = await dataService.getLeaveRequests();
+        if (isEmployee) {
+          setRequests(all.filter(r => r.empId === Number(currentUser.id)));
+        } else {
+          setRequests(all);
+        }
+      } catch (err) {
+        console.error("Failed to load leave requests:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLeaves();
+  }, [currentUser?.id, isEmployee]);
   
   // Form State
   const [leaveType,   setLeaveType]   = useState('Annual Leave');
@@ -54,6 +68,17 @@ const LeaveManagement = () => {
       XLSX.writeFile(wb, `Leave_Tracker.xlsx`);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="page-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 1rem' }}></div>
+          <p style={{ color: 'var(--color-text-muted)', fontWeight: '500' }}>Loading leave tracker...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container" style={{ position: 'relative' }}>

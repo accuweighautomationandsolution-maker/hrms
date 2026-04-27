@@ -134,18 +134,47 @@ const Attendance = () => {
   const now      = new Date();
   const [year,  setYear]  = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
-  const employeesList = useMemo(() => dataService.getEmployees(), []);
-  const [selectedEmp, setSelectedEmp] = useState(() => {
-    if (isEmployee) return dataService.getEmployeeById(currentUser?.id);
-    return employeesList.length > 0 ? employeesList[0] : null;
-  });
+  const [employeesList, setEmployeesList] = useState([]);
+  const [selectedEmp, setSelectedEmp] = useState(null);
   const [searchQ,     setSearchQ]     = useState('');
   const [punchModal,  setPunchModal]  = useState(null); // { day, ... }
   const [devices,     setDevices]     = useState([]);
-  const [records,     setRecords]     = useState(dataService.getAttendance());
+  const [records,     setRecords]     = useState({});
   const [syncLoading,   setSyncLoading]   = useState(false);
   const [showBioConfig, setShowBioConfig] = useState(false);
-  const [bioConfig,     setBioConfig]     = useState(dataService.getBiometricConfig() || { ip: '192.168.1.201', port: '4370', isEnabled: true });
+  const [bioConfig,     setBioConfig]     = useState({ ip: '192.168.1.201', port: '4370', isEnabled: true });
+  const [holidayList,   setHolidayList]   = useState([]);
+  const [loading,       setLoading]       = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [emps, att, hol, bConf] = await Promise.all([
+          dataService.getEmployees(),
+          dataService.getAttendance(),
+          dataService.getCustomHolidays(),
+          dataService.getBiometricConfig()
+        ]);
+        setEmployeesList(emps);
+        setRecords(att);
+        setHolidayList(hol);
+        if (bConf) setBioConfig(bConf);
+
+        if (isEmployee) {
+          const emp = emps.find(e => String(e.id) === String(currentUser?.id));
+          setSelectedEmp(emp);
+        } else if (emps.length > 0) {
+          setSelectedEmp(emps[0]);
+        }
+      } catch (err) {
+        console.error("Failed to load attendance data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [currentUser?.id, isEmployee]);
 
   useEffect(() => {
     if (!bioConfig.isEnabled) {
@@ -188,7 +217,7 @@ const Attendance = () => {
     dataService.saveAttendance(records);
   }, [records]);
 
-  const holidays   = useMemo(() => getHolidayDates(year, month, dataService.getCustomHolidays()), [year, month]);
+  const holidays   = useMemo(() => getHolidayDates(year, month, holidayList), [year, month, holidayList]);
   const holidaySet = useMemo(() => new Set(holidays.map(h => h.day)), [holidays]);
   const holTypeMap = useMemo(() => Object.fromEntries(holidays.map(h => [h.day, h.type])), [holidays]);
 
@@ -265,6 +294,17 @@ const Attendance = () => {
   const holidayDays   = selectedEmp ? calDays.filter(({ day }) => dayStatus(selectedEmp.id, day) === 'holiday').length : 0;
   const holidayWorked = selectedEmp ? calDays.filter(({ day }) => dayStatus(selectedEmp.id, day) === 'holiday-worked').length : 0;
 
+  if (loading) {
+    return (
+      <div className="page-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 1rem' }}></div>
+          <p style={{ color: 'var(--color-text-muted)', fontWeight: '500' }}>Loading attendance matrix...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -332,7 +372,7 @@ const Attendance = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <p style={{ margin: 0, fontWeight: '600', fontSize: '0.875rem', color: 'var(--color-text-main)' }}>{emp.name}</p>
                     <span style={{ fontSize: '0.65rem', fontWeight: '700', color: 'var(--color-primary)', backgroundColor: 'rgba(37,99,235,0.06)', padding: '2px 4px', borderRadius: '4px' }}>
-                      ID: {emp.biometricId}
+                      {emp.empCode || emp.biometricCode || `B:${emp.biometricId}`}
                     </span>
                   </div>
                   <span className={`badge ${BADGE_COLOR[emp.category]}`} style={{ fontSize: '0.7rem', marginTop: '0.25rem' }}>{emp.category}</span>

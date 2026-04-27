@@ -37,15 +37,26 @@ const EmployeeDirectory = ({ userRole }) => {
     salaryConfig: null
   });
 
-  const [departments, setDepartments] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [uploadedFiles, setUploadedFiles] = useState([]);
 
   useEffect(() => {
-    setDepartments(dataService.getDepartments());
-  }, []);
-
-  useEffect(() => {
-    setEmployees(dataService.getEmployees());
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [emps, depts] = await Promise.all([
+          dataService.getEmployees(),
+          dataService.getDepartments()
+        ]);
+        setEmployees(emps);
+        setDepartments(depts);
+      } catch (err) {
+        console.error("Failed to load directory data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
   const handleInput = (field, val) => {
@@ -283,6 +294,17 @@ const EmployeeDirectory = ({ userRole }) => {
       XLSX.writeFile(wb, `Employee_Directory.xlsx`);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="page-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 1rem' }}></div>
+          <p style={{ color: 'var(--color-text-muted)', fontWeight: '500' }}>Loading employee records...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container" style={{ position: 'relative' }}>

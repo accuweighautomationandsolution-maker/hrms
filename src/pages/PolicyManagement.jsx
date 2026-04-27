@@ -18,10 +18,25 @@ const PolicyManagement = ({ userRole }) => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [newPolicy, setNewPolicy] = useState({ title: '', category: 'HR Policies', version: '1.0', effectiveDate: '' });
   const [selectedFile, setSelectedFile] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setPolicies(dataService.getPolicies());
-    setAcks(dataService.getAcknowledgments());
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [pList, aList] = await Promise.all([
+          dataService.getPolicies(),
+          dataService.getAcknowledgments()
+        ]);
+        setPolicies(pList);
+        setAcks(aList);
+      } catch (err) {
+        console.error("Failed to fetch policies:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
   const filteredPolicies = useMemo(() => {
@@ -57,27 +72,38 @@ const PolicyManagement = ({ userRole }) => {
     }
   };
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
     if (!newPolicy.title || !newPolicy.effectiveDate || !selectedFile) {
       showNotification('Title, Effective Date, and PDF Document are required.', 'error');
       return;
     }
-    const policy = {
-      ...newPolicy,
-      id: `POL-${Date.now()}`,
-      uploadDate: new Date().toISOString().split('T')[0],
-      fileName: selectedFile.name,
-      fileSize: (selectedFile.size / 1024 / 1024).toFixed(2) + ' MB',
-      status: 'Active',
-      summary: `Organization policy for ${newPolicy.category}. Version ${newPolicy.version}.`
-    };
-    const updated = [...policies, policy];
-    dataService.savePolicies(updated);
-    setPolicies(updated);
-    setShowUploadModal(false);
-    setSelectedFile(null);
-    showNotification('New policy published and dispatched to all employees.', 'success');
-    setNewPolicy({ title: '', category: 'HR Policies', version: '1.0', effectiveDate: '' });
+    
+    setIsLoading(true);
+    try {
+      const fileUrl = await dataService.uploadPolicyFile(selectedFile);
+      
+      const policy = {
+        ...newPolicy,
+        id: `POL-${Date.now()}`,
+        uploadDate: new Date().toISOString().split('T')[0],
+        fileName: selectedFile.name,
+        fileUrl: fileUrl,
+        fileSize: (selectedFile.size / 1024 / 1024).toFixed(2) + ' MB',
+        status: 'Active',
+        summary: `Organization policy for ${newPolicy.category}. Version ${newPolicy.version}.`
+      };
+      const updated = [...policies, policy];
+      await dataService.savePolicies(updated);
+      setPolicies(updated);
+      setShowUploadModal(false);
+      setSelectedFile(null);
+      showNotification('New policy published and dispatched to all employees.', 'success');
+      setNewPolicy({ title: '', category: 'HR Policies', version: '1.0', effectiveDate: '' });
+    } catch (error) {
+      showNotification('Failed to upload policy file. Please try again.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleDeletePolicy = (id) => {
@@ -161,7 +187,13 @@ const PolicyManagement = ({ userRole }) => {
             <button className="btn btn-outline"><Filter size={18} /> Filter</button>
           </div>
 
-          <div className="grid-3">
+          {loading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem', color: 'var(--color-text-muted)' }}>
+              <div className="spinner" style={{ width: '30px', height: '30px', border: '3px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+              <p style={{ marginLeft: '1rem' }}>Loading policies...</p>
+            </div>
+          ) : (
+            <div className="grid-3">
             {filteredPolicies.map(p => {
               const stats = isAdmin ? getAckStats(p.id) : null;
               const acknowledged = isAcknowledged(p.id);
@@ -212,7 +244,11 @@ const PolicyManagement = ({ userRole }) => {
                   )}
 
                   <div style={{ display: 'flex', gap: '0.75rem', marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
-                    <button className="btn btn-outline" style={{ flex: 1, padding: '0.5rem' }}>
+                    <button 
+                      className="btn btn-outline" 
+                      style={{ flex: 1, padding: '0.5rem' }}
+                      onClick={() => p.fileUrl && window.open(p.fileUrl, '_blank')}
+                    >
                       <Eye size={16} /> View
                     </button>
                     {!isAdmin ? (
@@ -247,6 +283,7 @@ const PolicyManagement = ({ userRole }) => {
                </div>
             )}
           </div>
+          )}
         </>
       ) : (
         <div className="card">
