@@ -130,6 +130,24 @@ export const dataService = {
     return getJSON(KEYS.NOTICES, []);
   },
 
+  saveNotices: async (notices) => {
+    saveJSON(KEYS.NOTICES, notices);
+  },
+
+  // ── Policies ─────────────────────────────────────────────────────────────
+  getPolicies: async () => {
+    if (supabase) {
+      const { data, error } = await supabase.from('policies').select('*').order('created_at', { ascending: false });
+      if (!error) return data;
+    }
+    return getJSON(KEYS.POLICIES, []);
+  },
+
+  savePolicies: async (policies) => {
+    saveJSON(KEYS.POLICIES, policies);
+  },
+
+  // ── Holidays ─────────────────────────────────────────────────────────────
   getCustomHolidays: async () => {
     if (supabase) {
       const { data, error } = await supabase.from('holidays').select('*').order('date', { ascending: true });

@@ -17,6 +17,7 @@ const PolicyManagement = ({ userRole }) => {
   const [acks, setAcks] = useState([]);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [newPolicy, setNewPolicy] = useState({ title: '', category: 'HR Policies', version: '1.0', effectiveDate: '' });
+  const [selectedFile, setSelectedFile] = useState(null);
 
   useEffect(() => {
     setPolicies(dataService.getPolicies());
@@ -40,22 +41,41 @@ const PolicyManagement = ({ userRole }) => {
     showNotification('Policy acknowledged successfully.', 'success');
   };
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.type !== 'application/pdf') {
+        showNotification('Only PDF documents are allowed.', 'error');
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        showNotification('File size exceeds 10MB limit.', 'error');
+        return;
+      }
+      setSelectedFile(file);
+      showNotification(`File "${file.name}" selected.`, 'success');
+    }
+  };
+
   const handlePublish = () => {
-    if (!newPolicy.title || !newPolicy.effectiveDate) {
-      showNotification('Title and Effective Date are required.', 'error');
+    if (!newPolicy.title || !newPolicy.effectiveDate || !selectedFile) {
+      showNotification('Title, Effective Date, and PDF Document are required.', 'error');
       return;
     }
     const policy = {
       ...newPolicy,
       id: `POL-${Date.now()}`,
       uploadDate: new Date().toISOString().split('T')[0],
+      fileName: selectedFile.name,
+      fileSize: (selectedFile.size / 1024 / 1024).toFixed(2) + ' MB',
       status: 'Active',
-      summary: 'Automatically generated summary for new organization policy.'
+      summary: `Organization policy for ${newPolicy.category}. Version ${newPolicy.version}.`
     };
     const updated = [...policies, policy];
     dataService.savePolicies(updated);
     setPolicies(updated);
     setShowUploadModal(false);
+    setSelectedFile(null);
     showNotification('New policy published and dispatched to all employees.', 'success');
     setNewPolicy({ title: '', category: 'HR Policies', version: '1.0', effectiveDate: '' });
   };
@@ -310,10 +330,38 @@ const PolicyManagement = ({ userRole }) => {
                   value={newPolicy.effectiveDate} onChange={e => setNewPolicy({...newPolicy, effectiveDate: e.target.value})} />
              </div>
 
-             <div style={{ border: '2px dashed var(--color-border)', borderRadius: '12px', padding: '2rem', textAlign: 'center' }}>
-                <ArrowUpRight size={32} color="var(--color-primary)" style={{ marginBottom: '1rem', marginLeft: 'auto', marginRight: 'auto' }} />
-                <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 'bold' }}>Drop PDF Document here</p>
-                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Max size 10MB</p>
+             <div 
+               style={{ 
+                 border: '2px dashed var(--color-border)', 
+                 borderRadius: '12px', 
+                 padding: '2rem', 
+                 textAlign: 'center',
+                 cursor: 'pointer',
+                 backgroundColor: selectedFile ? 'rgba(37, 99, 235, 0.05)' : 'transparent',
+                 borderColor: selectedFile ? 'var(--color-primary)' : 'var(--color-border)'
+               }}
+               onClick={() => document.getElementById('policy-file-input').click()}
+             >
+                <input 
+                  id="policy-file-input" 
+                  type="file" 
+                  accept=".pdf" 
+                  style={{ display: 'none' }} 
+                  onChange={handleFileChange} 
+                />
+                {selectedFile ? (
+                  <>
+                    <CheckCircle size={32} color="var(--color-success)" style={{ marginBottom: '1rem', marginLeft: 'auto', marginRight: 'auto' }} />
+                    <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--color-success)' }}>{selectedFile.name}</p>
+                    <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{(selectedFile.size / 1024 / 1024).toFixed(2)} MB • Ready to dispatch</p>
+                  </>
+                ) : (
+                  <>
+                    <ArrowUpRight size={32} color="var(--color-primary)" style={{ marginBottom: '1rem', marginLeft: 'auto', marginRight: 'auto' }} />
+                    <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 'bold' }}>Click to Upload or Drop PDF</p>
+                    <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Max size 10MB</p>
+                  </>
+                )}
              </div>
 
              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
