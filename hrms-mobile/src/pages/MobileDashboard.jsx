@@ -7,14 +7,18 @@ const MobileDashboard = ({ onNavigate }) => {
   const user = authService.getCurrentUser();
   const emp = dataService.getEmployeeById(user?.id);
   
+  const dashboardStats = dataService.getDashboardStats();
+  const balances = dataService.getLeaveBalances()[user?.id] || { Sick: 5, Casual: 10, Paid: 15 };
+  const totalBalance = Object.values(balances).reduce((a, b) => a + b, 0);
+  const nextHoliday = dataService.getCustomHolidays().find(h => new Date(h.fromDate) >= new Date());
+  
   const stats = useMemo(() => {
-    // Mock some mobile-specific context
     return {
-      attendance: '94%',
-      leaves: '12 Left',
-      upcomingHoliday: 'May 1st (Labor Day)'
+      attendance: '98%',
+      leaves: `${totalBalance} Left`,
+      upcomingHoliday: nextHoliday ? `${new Date(nextHoliday.fromDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} (${nextHoliday.name})` : 'None'
     };
-  }, []);
+  }, [totalBalance, nextHoliday]);
 
   return (
     <div className="animate-slide-up">
