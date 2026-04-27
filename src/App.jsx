@@ -36,6 +36,7 @@ import Recruitment from './pages/Recruitment';
 import LetterTemplates from './pages/LetterTemplates';
 import DocumentHub from './pages/DocumentHub';
 import MyDocuments from './pages/MyDocuments';
+import MobilePreview from './pages/MobilePreview';
 import { authService } from './utils/authService';
 import './App.css'; 
 
@@ -170,6 +171,7 @@ function App() {
                 <Route path="/training" element={<TrainingInduction userRole={userRole} />} />
                 <Route path="/compliance" element={<ComplianceHub userRole={userRole} />} />
                 <Route path="/policies" element={<PolicyManagement userRole={userRole} />} />
+                <Route path="/mobile-preview" element={<MobilePreview />} />
                 
                 {/* Catch-All Fallback */}
                 <Route path="*" element={<Navigate to="/" replace />} />

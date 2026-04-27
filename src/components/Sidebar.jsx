@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, CalendarDays, Clock, Calculator, IndianRupee, Receipt, CheckSquare, LineChart, FileSignature, FileSpreadsheet, ShieldCheck, ChevronDown, ChevronUp, BarChart, Building2, UserPlus, MapPin, Coins, GraduationCap, Briefcase, FileText, FileCheck, Zap } from 'lucide-react';
+import { LayoutDashboard, Users, CalendarDays, Clock, Calculator, IndianRupee, Receipt, CheckSquare, LineChart, FileSignature, FileSpreadsheet, ShieldCheck, ChevronDown, ChevronUp, BarChart, Building2, UserPlus, MapPin, Coins, GraduationCap, Briefcase, FileText, FileCheck, Zap, Smartphone } from 'lucide-react';
 
 const Sidebar = ({ userRole }) => {
   const location = useLocation();
@@ -179,6 +179,10 @@ const Sidebar = ({ userRole }) => {
             </Link>
           </>
         )}
+        <Link to="/mobile-preview" className={`nav-item ${location.pathname === '/mobile-preview' ? 'active' : ''}`} style={{ marginTop: '1rem', borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
+          <Smartphone size={20} color="var(--color-primary)" />
+          <span style={{ fontWeight: '700', color: 'var(--color-primary)' }}>Mobile Employee App</span>
+        </Link>
       </nav>
 
       <div className="sidebar-footer" style={{ marginTop: 'auto', padding: '1.5rem', borderTop: '1px solid var(--color-border)' }}>
