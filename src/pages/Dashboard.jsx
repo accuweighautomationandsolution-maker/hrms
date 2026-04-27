@@ -123,6 +123,7 @@ const Dashboard = ({ userRole }) => {
 
   const now = new Date();
   const isExpired = now < new Date(bulletin.activation) || now > new Date(bulletin.expiry);
+  const dashboardStats = dataService.getDashboardStats();
 
   return (
     <div className="page-container" style={{ position: 'relative' }}>
@@ -132,12 +133,12 @@ const Dashboard = ({ userRole }) => {
           <p className="page-subtitle">Mission control overview. Data updated in real-time.</p>
         </div>
         <button className="btn btn-primary" onClick={() => generateBoardReport({
-          totalEmployees: 124,
-          attendanceRate: '94.2%',
-          onTimeRate: '88.5%',
-          totalAdvances: '2,45,000',
-          totalExpenses: '82,400',
-          trainingProgress: '76%'
+          totalEmployees: dashboardStats.totalEmployees,
+          attendanceRate: `${((dashboardStats.presentToday / Math.max(1, dashboardStats.totalEmployees)) * 100).toFixed(1)}%`,
+          onTimeRate: '100%',
+          totalAdvances: '0',
+          totalExpenses: '0',
+          trainingProgress: '0%'
         })}>
           Export Board Report
         </button>
@@ -207,9 +208,9 @@ const Dashboard = ({ userRole }) => {
           </>
         ) : (
           <>
-            <StatCard title="Total Employees" value="124" icon={Users} colorClass="bg-blue-500" />
-            <StatCard title="Present Today" value="115" icon={UserCheck} colorClass="bg-emerald-500" />
-            <StatCard title="On Leave" value="6" icon={CalendarOff} colorClass="bg-amber-500" />
+            <StatCard title="Total Employees" value={dashboardStats.totalEmployees} icon={Users} colorClass="bg-blue-500" />
+            <StatCard title="Present Today" value={dashboardStats.presentToday} icon={UserCheck} colorClass="bg-emerald-500" />
+            <StatCard title="On Leave" value={dashboardStats.onLeave} icon={CalendarOff} colorClass="bg-amber-500" />
           </>
         )}
       </div>
@@ -368,44 +369,9 @@ const Dashboard = ({ userRole }) => {
                 <button className="btn btn-ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>View All</button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ display: 'flex', gap: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--color-border)' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Clock size={20} color="var(--color-primary)" />
-                  </div>
-                  <div>
-                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600' }}>Probation Expiring: Alice Smith</h4>
-                    <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', margin: '0.25rem 0' }}>Probation ends on April 20th. Please collect 360° feedback and appraisal reports.</p>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: '600' }}>Action Required</span>
-                      <button 
-                        className="btn btn-ghost" 
-                        style={{ fontSize: '0.7rem', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.5rem' }}
-                        onClick={() => setFeedbackConfig({ isOpen: true, empId: 1, type: 'Probation Completion' })}
-                      >
-                        <MessageSquareShare size={12}/> Give Feedback
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--color-border)' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(239, 68, 68, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <AlertCircle size={20} color="var(--color-danger)" />
-                  </div>
-                  <div>
-                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600' }}>Biometric Sync Failure</h4>
-                    <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', margin: '0.25rem 0' }}>Device 'X2008' missed latest ping.</p>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>18 mins ago</span>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(245, 158, 11, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <AlertCircle size={20} color="var(--color-warning)" />
-                  </div>
-                  <div>
-                    <h4 style={{ fontSize: '0.875rem', fontWeight: '600' }}>Unreconciled Advance</h4>
-                    <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', margin: '0.25rem 0' }}>ADV-004 over 30 days pending.</p>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>2 hours ago</span>
-                  </div>
+                <div style={{ textAlign: 'center', padding: '2rem', opacity: 0.5 }}>
+                  <ShieldCheck size={40} style={{ margin: '0 auto 1rem', display: 'block', opacity: 0.3 }} />
+                  <p style={{ fontSize: '0.875rem' }}>No critical exceptions detected.</p>
                 </div>
               </div>
             </div>

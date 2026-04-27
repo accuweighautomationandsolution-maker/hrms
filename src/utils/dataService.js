@@ -100,18 +100,38 @@ export const dataService = {
   },
 
   getPersonalAttendanceTrajectory: (userId) => {
+    return [];
+  },
+
+  getDashboardStats: () => {
+    const emps = dataService.getEmployees().filter(e => e.status !== 'Inactive');
+    const totalEmployees = emps.length;
+    const leaveRequests = dataService.getLeaveRequests();
+    const attendance = dataService.getAttendance();
     const now = new Date();
-    const data = [];
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-    // Mocking last 5 days of data for the chart
-    days.forEach((day, i) => {
-       data.push({
-         day,
-         present: Math.random() > 0.1 ? 1 : 0, // 0 or 1 for personal trend
-         absent: 0
-       });
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const day = now.getDate();
+    const todayStr = now.toISOString().split('T')[0];
+
+    let presentToday = 0;
+    let onLeave = 0;
+
+    emps.forEach(emp => {
+      const key = `${emp.id}_${year}_${month}_${day}`;
+      if (attendance[key] && attendance[key].punchIn) {
+        presentToday++;
+      }
+      const leave = leaveRequests.find(l => 
+        l.empId === emp.id && 
+        l.status === 'Approved' && 
+        todayStr >= l.startDate && 
+        todayStr <= l.endDate
+      );
+      if (leave) onLeave++;
     });
-    return data;
+
+    return { totalEmployees, presentToday, onLeave };
   },
 
   // ── Leaves ─────────────────────────────────────────────────────────────────
@@ -158,22 +178,13 @@ export const dataService = {
   },
 
   // ── Notices ────────────────────────────────────────────────────────────────
-  getNotices: () => getJSON(KEYS.NOTICES, [
-    { id: 1, title: 'Welcome to HRMS 2.0', content: 'We have updated the portal with new branding and dynamic attendance linking.', author: 'HR Admin', date: '2026-04-09' },
-    { id: 2, title: 'Holiday Declaration', content: 'April 14th is a gazetted holiday for Ambedkar Jayanti. All offices remain closed.', author: 'HR Admin', date: '2026-04-10' }
-  ]),
+  getNotices: () => getJSON(KEYS.NOTICES, []),
 
   saveNotices: (notices) => saveJSON(KEYS.NOTICES, notices),
 
   // ── Probation Alerts ──────────────────────────────────────────────
   getUpcomingProbations: () => {
-    // In a real app, we'd query KEYS.EMPLOYEES and calculate the date diff.
-    const allProbations = [
-      { id: 1, empId: 'AW-HR-001', name: 'Alice Smith', expiryDate: 'Apr 17, 2026', daysRemaining: 7 },
-      { id: 4, empId: 'AW-DSG-105', name: 'Diana King', expiryDate: 'Apr 28, 2026', daysRemaining: 18 }
-    ];
-    // Rule: The notice should start displaying from 7 days before expiry.
-    return allProbations.filter(p => p.daysRemaining <= 7);
+    return [];
   },
 
   // ── Holidays ───────────────────────────────────────────────────────
@@ -624,46 +635,7 @@ export const dataService = {
 
   // ── Statutory Compliance Hub ───────────────────────────────────────
   getStatutoryUpdates: () => {
-    let list = getJSON(KEYS.STATUTORY_UPDATES, []);
-    if (list.length === 0) {
-      list = [
-        { 
-          id: 1, 
-          title: 'PF Contribution Rate Update 2026', 
-          category: 'PF', 
-          summary: 'New guidelines for employer contributions for salary above 21k.', 
-          details: 'The EPFO has issued a new circular regarding the voluntary contribution caps for employees in the high-income bracket. Effective from April 1st, 2026, the administrative charges have also been revised to 0.45%.',
-          date: '2026-04-10',
-          priority: 'Critical',
-          refLink: 'https://epfo.gov.in/circulars/2026',
-          tags: ['Provident Fund', 'Payroll', '2026']
-        },
-        { 
-          id: 2, 
-          title: 'ESIC Eligibility Threshold Shift', 
-          category: 'ESIC', 
-          summary: 'Expansion of ESIC coverage to semi-urban industrial clusters.', 
-          details: 'ESIC coverage is now mandatory for all units employing 10 or more persons in the notified industrial clusters of Tier-2 cities. Employer share remains 3.25%.',
-          date: '2026-04-05',
-          priority: 'Important',
-          refLink: 'https://esic.nic.in/updates',
-          tags: ['ESIC', 'Insurance', 'Industrial']
-        },
-        { 
-          id: 3, 
-          title: 'TDS Rate Chart FY 2026-27', 
-          category: 'Income Tax', 
-          summary: 'New tax slabs under the simplified regime released.', 
-          details: 'The Finance Act 2026 introduced minor adjustments to the 20% slab. Standard deduction increased to 75,000 for salaried individuals.',
-          date: '2026-04-14',
-          priority: 'Critical',
-          refLink: 'https://incometaxindia.gov.in',
-          tags: ['TDS', 'Income Tax', 'Budget 2026']
-        }
-      ];
-      saveJSON(KEYS.STATUTORY_UPDATES, list);
-    }
-    return list;
+    return getJSON(KEYS.STATUTORY_UPDATES, []);
   },
 
   saveStatutoryUpdates: (list) => saveJSON(KEYS.STATUTORY_UPDATES, list),
