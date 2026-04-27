@@ -5,13 +5,7 @@ import FeedbackPortal from '../components/FeedbackPortal';
 import { dataService } from '../utils/dataService';
 
 // Static metrics for demo employees - will be merged with live employee data if they exist
-const MOCK_PERFORMANCE_METRICS = {
-  1: { lastMonthly: 4.2, lastHalfYearly: 4.5, lastAnnual: null, status: 'Pending Review' },
-  2: { lastMonthly: null, lastHalfYearly: 3.8, lastAnnual: 4.1, status: 'Completed' },
-  3: { lastMonthly: 4.8, lastHalfYearly: 4.6, lastAnnual: null, status: 'Overdue' },
-  4: { lastMonthly: 4.0, lastHalfHalfYearly: 4.2, lastAnnual: null, status: 'Pending Review' },
-  5: { lastMonthly: 3.5, lastHalfYearly: 3.9, lastAnnual: null, status: 'Pending Review' }
-};
+const MOCK_PERFORMANCE_METRICS = {};
 
 const DEPARTMENT_COLORS = {
   'Engineering': '#2563eb',

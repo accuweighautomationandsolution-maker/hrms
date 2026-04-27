@@ -9,29 +9,20 @@ import { Plus, Edit, Trash2, MessageSquareShare, ShieldCheck, Zap, ChevronRight,
 import { Link } from 'react-router-dom';
 import FeedbackPortal from '../components/FeedbackPortal';
 import RichTextEditor from '../components/RichTextEditor';
+import { alertEngine } from '../utils/alertEngine';
+import { authService } from '../utils/authService';
 import { generateBoardReport } from '../utils/exportUtils';
 
-const ATTENDANCE_DATA = [
-  { day: 'Mon', present: 115, absent: 9 },
-  { day: 'Tue', present: 118, absent: 6 },
-  { day: 'Wed', present: 120, absent: 4 },
-  { day: 'Thu', present: 117, absent: 7 },
-  { day: 'Fri', present: 112, absent: 12 },
-];
+const ATTENDANCE_DATA = [];
 
-const FINANCE_DATA = [
-  { month: 'Jan', advances: 45000, expenses: 38000 },
-  { month: 'Feb', advances: 52000, expenses: 49000 },
-  { month: 'Mar', advances: 38000, expenses: 41000 },
-  { month: 'Apr', advances: 61000, expenses: 22000 },
-];
+const FINANCE_DATA = [];
 
 const KPI_DATA = [
-  { subject: 'Technical Proficiency', A: 4.2, fullMark: 5 },
-  { subject: 'Quality & Accuracy', A: 4.6, fullMark: 5 },
-  { subject: 'Reliability (Attendance)', A: 3.8, fullMark: 5 },
-  { subject: 'Communication', A: 4.1, fullMark: 5 },
-  { subject: 'Leadership', A: 3.5, fullMark: 5 },
+  { subject: 'Technical Proficiency', A: 0, fullMark: 5 },
+  { subject: 'Quality & Accuracy', A: 0, fullMark: 5 },
+  { subject: 'Reliability (Attendance)', A: 0, fullMark: 5 },
+  { subject: 'Communication', A: 0, fullMark: 5 },
+  { subject: 'Leadership', A: 0, fullMark: 5 },
 ];
 
 const StatCard = ({ title, value, icon: Icon, colorClass }) => (
@@ -45,9 +36,6 @@ const StatCard = ({ title, value, icon: Icon, colorClass }) => (
     </div>
   </div>
 );
-
-import { alertEngine } from '../utils/alertEngine';
-import { authService } from '../utils/authService';
 
 const Dashboard = ({ userRole }) => {
   const currentUser = authService.getCurrentUser();

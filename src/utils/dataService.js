@@ -50,18 +50,7 @@ const saveJSON = (key, val) => localStorage.setItem(key, JSON.stringify(val));
 export const dataService = {
   // ── Attendance ─────────────────────────────────────────────────────────────
   getAttendance: () => {
-    const existing = getJSON(KEYS.ATTENDANCE);
-    // Seed mock attendance for April (Month 3) to show ESIC data
-    if (Object.keys(existing).length < 2) {
-      const seedIds = [2, 7]; // Bob and Frank
-      seedIds.forEach(id => {
-        for (let d = 1; d <= 10; d++) {
-          existing[`${id}_2026_3_${d}`] = { punchIn: '09:00', punchOut: '18:00', status: 'Present' };
-        }
-      });
-      saveJSON(KEYS.ATTENDANCE, existing);
-    }
-    return existing;
+    return getJSON(KEYS.ATTENDANCE);
   },
   
   saveAttendance: (records) => saveJSON(KEYS.ATTENDANCE, records),
@@ -127,12 +116,7 @@ export const dataService = {
 
   // ── Leaves ─────────────────────────────────────────────────────────────────
   getLeaveBalances: () => getJSON(KEYS.LEAVES, {
-    1: { Sick: 5, Casual: 10, Paid: 15 },
-    2: { Sick: 3, Casual: 8,  Paid: 12 },
-    3: { Sick: 4, Casual: 12, Paid: 18 },
-    4: { Sick: 2, Casual: 6,  Paid: 10 },
-    5: { Sick: 5, Casual: 10, Paid: 20 },
-    6: { Sick: 0, Casual: 0,  Paid: 0 }
+    1: { Sick: 5, Casual: 10, Paid: 15 }
   }),
 
   getEmployeeBalance: (empId, type = 'total') => {
@@ -148,11 +132,7 @@ export const dataService = {
   },
 
   // ── Leave Requests ─────────────────────────────────────────────────────────
-  getLeaveRequests: () => getJSON(KEYS.LEAVE_RECS, [
-    { id: 1, empId: 1, name: 'Alice Smith', type: 'Annual Leave', duration: 'Apr 10 - Apr 15', status: 'Pending', days: 4, startDate: '2026-04-10', endDate: '2026-04-15' },
-    { id: 2, empId: 2, name: 'Bob Johnson', type: 'Sick Leave', duration: 'Apr 1', status: 'Approved', days: 1, startDate: '2026-04-01', endDate: '2026-04-01' },
-    { id: 3, empId: 3, name: 'Charlie Davis', type: 'Personal Leave', duration: 'Mar 25', status: 'Rejected', days: 1, startDate: '2026-03-25', endDate: '2026-03-25' },
-  ]),
+  getLeaveRequests: () => getJSON(KEYS.LEAVE_RECS, []),
 
   saveLeaveRequests: (reqs) => saveJSON(KEYS.LEAVE_RECS, reqs),
 
@@ -227,40 +207,10 @@ export const dataService = {
   // ── Employees ──────────────────────────────────────────────────────
   getEmployees: () => getJSON(KEYS.EMPLOYEES, [
     {
-      id: 1, name: 'Alice Smith', role: 'Software Engineer', department: 'Engineering', status: 'Active', empType: 'Probation', email: 'alice@company.com',
-      grossSalary: 120000, category: 'Staff Employee', empCode: 'AW-HR-001', joiningDate: '10-Jan-2022', grade: 'A1', biometricId: 1,
-      uanNumber: '100012345678', esicNumber: '31000123450011001', bankAccount: '3029101002345 (HDFC)', managerId: null
-    },
-    {
-      id: 2, name: 'Bob Johnson', role: 'Worker (Shop Floor)', department: 'Product', status: 'Active', empType: 'Permanent', email: 'bob@company.com',
-      grossSalary: 30000, category: 'On role worker', empCode: 'AW-OPS-402', joiningDate: '15-Mar-2023', grade: 'B2', biometricId: 2,
-      uanNumber: '100012344020', esicNumber: '31000123450011402', bankAccount: '9120100456789 (SBI)', managerId: 1
-    },
-    {
-      id: 3, name: 'Charlie Davis', role: 'HR Specialist', department: 'Human Resources', status: 'On Leave', empType: 'Permanent', email: 'charlie@company.com',
-      grossSalary: 55000, category: 'Staff Employee', empCode: 'AW-HR-002', joiningDate: '22-May-2021', grade: 'A2', biometricId: 3,
-      uanNumber: '100012340020', esicNumber: '31000123450011002', bankAccount: '4099101003456 (ICICI)', managerId: null
-    },
-    {
-      id: 4, name: 'Diana King', role: 'UI/UX Designer', department: 'Design', status: 'Active', empType: 'Permanent', email: 'diana@company.com',
-      grossSalary: 95000, advanceLoanEMI: 5000, category: 'Staff Employee', empCode: 'AW-DSG-105', joiningDate: '01-Dec-2023', grade: 'A1', biometricId: 4,
-      uanNumber: '100012341050', esicNumber: '31000123450011105', bankAccount: '6012101005678 (AXIS)', managerId: 1
-    },
-    {
-      id: 5, name: 'Evan Wright', role: 'Junior Analyst', department: 'Engineering', status: 'Inactive', empType: 'Temporary', email: 'evan@company.com',
-      grossSalary: 25000, category: 'Staff Employee', empCode: 'AW-ANL-908', joiningDate: '12-Feb-2024', grade: 'B1', biometricId: 5,
-      uanNumber: '100012349080', esicNumber: '31000123450011908', bankAccount: '2022101006789 (HDFC)', managerId: 1
-    },
-    {
-      id: 6, name: 'Sam Contractor', role: 'Maintenance Helper', department: 'Operations', status: 'Active', empType: 'Contract', email: 'sam@contractor.com',
-      grossSalary: 0, dayRate: 1200, category: 'Contractual Worker', empCode: 'AW-CON-001', joiningDate: '05-Sep-2023', grade: 'C1', biometricId: 6,
-      uanNumber: 'N/A', esicNumber: 'N/A', bankAccount: '7088101009012 (BOI)', managerId: 2
-    },
-    {
-      id: 7, name: 'Frank Miller', role: 'Machine Operator', department: 'Production', status: 'Active', empType: 'Permanent', email: 'frank@company.com',
-      grossSalary: 18500, category: 'On role worker', empCode: 'AW-PRO-701', joiningDate: 'Dr-Feb-2024', grade: 'C1', biometricId: 7,
-      uanNumber: '100012347010', esicNumber: '31000987650011005', bankAccount: '3022101007777 (SBI)', hasESIC: true, managerId: 2
-    },
+      id: 1, name: 'Saurabh Bhagwat', role: 'System Administrator', department: 'Management', status: 'Active', empType: 'Permanent', email: 'saurabh@accuweigh.com',
+      grossSalary: 250000, category: 'Staff Employee', empCode: 'AW-MGMT-001', joiningDate: '01-Jan-2024', grade: 'E1', biometricId: 1,
+      uanNumber: '100000000001', esicNumber: '31000000000000001', bankAccount: 'XXXXXXXXXXXX (HDFC)', managerId: null
+    }
   ]),
 
   getEmployeeById: (id) => dataService.getEmployees().find(e => e.id === Number(id)),
@@ -324,36 +274,12 @@ export const dataService = {
   },
 
   // ── Advances & Loans ─────────────────────────────────────────────────
-  getAdvanceHistory: () => getJSON(KEYS.ADVANCE_HISTORY, [
-    { id: 101, empId: 4, type: 'Personal Advance', issueDate: '2025-10-15', amount: 50000, installments: 10, status: 'Active' },
-    { id: 102, empId: 2, type: 'Official Site Advance', issueDate: '2026-03-20', amount: 15500, installments: 1, status: 'Active', siteDetails: { 'Material Purchase': 10000, 'Lodging & Boarding Charges': 5500 } },
-    { id: 103, empId: 1, type: 'Personal Advance', issueDate: '2025-05-10', amount: 30000, installments: 6, status: 'Settled' },
-    { id: 104, empId: 7, type: 'Official Site Advance', issueDate: '2026-01-05', amount: 8000, installments: 1, status: 'Settled', siteDetails: { 'Ticket Charges': 5000, 'Local Conveyance': 3000 } },
-    { id: 105, empId: 3, type: 'Personal Advance', issueDate: '2026-02-12', amount: 20000, installments: 5, status: 'Active' },
-    { id: 106, empId: 1, type: 'Official Site Advance', issueDate: '2026-04-01', amount: 12000, installments: 1, status: 'Active', siteDetails: { 'Material Purchase': 12000 } }
-  ]),
+  getAdvanceHistory: () => getJSON(KEYS.ADVANCE_HISTORY, []),
 
   saveAdvanceHistory: (history) => saveJSON(KEYS.ADVANCE_HISTORY, history),
 
   // ── Payroll ──────────────────────────────────────────────────────────
-  getPayrollHistory: () => getJSON(KEYS.PAYROLL_HISTORY, [
-    // Month 0 (Jan)
-    { id: 1, empId: 1, month: 0, year: 2026, gross: 120000, basic: 60000, deductions: { pf: 1800, esic: 0, pt: 200, tds: 4167, advance: 0, total: 6167 }, netPay: 113833 },
-    { id: 2, empId: 4, month: 0, year: 2026, gross: 95000, basic: 47500, deductions: { pf: 1800, esic: 0, pt: 200, tds: 2083, advance: 5000, total: 9083 }, netPay: 85917 },
-    { id: 3, empId: 2, month: 0, year: 2026, gross: 30000, basic: 15000, deductions: { pf: 1800, esic: 225, pt: 200, tds: 0, advance: 0, total: 2225 }, netPay: 27775 },
-    // Month 1 (Feb)
-    { id: 4, empId: 1, month: 1, year: 2026, gross: 120000, basic: 60000, deductions: { pf: 1800, esic: 0, pt: 200, tds: 4167, advance: 0, total: 6167 }, netPay: 113833 },
-    { id: 5, empId: 4, month: 1, year: 2026, gross: 95000, basic: 47500, deductions: { pf: 1800, esic: 0, pt: 200, tds: 2083, advance: 5000, total: 9083 }, netPay: 85917 },
-    { id: 6, empId: 2, month: 1, year: 2026, gross: 30000, basic: 15000, deductions: { pf: 1800, esic: 225, pt: 200, tds: 0, advance: 0, total: 2225 }, netPay: 27775 },
-    // Month 2 (Mar)
-    { id: 7, empId: 1, month: 2, year: 2026, gross: 120000, basic: 60000, deductions: { pf: 1800, esic: 0, pt: 200, tds: 4167, advance: 0, total: 6167 }, netPay: 113833 },
-    { id: 8, empId: 4, month: 2, year: 2026, gross: 95000, basic: 47500, deductions: { pf: 1800, esic: 0, pt: 200, tds: 2083, advance: 5000, total: 9083 }, netPay: 85917 },
-    { id: 9, empId: 2, month: 2, year: 2026, gross: 30000, basic: 15000, deductions: { pf: 1800, esic: 225, pt: 200, tds: 0, advance: 0, total: 2225 }, netPay: 27775 },
-    // Month 3 (Apr)
-    { id: 10, empId: 1, month: 3, year: 2026, gross: 120000, basic: 60000, deductions: { pf: 1800, esic: 0, pt: 200, tds: 4167, advance: 0, total: 6167 }, netPay: 113833 },
-    { id: 11, empId: 4, month: 3, year: 2026, gross: 95000, basic: 47500, deductions: { pf: 1800, esic: 0, pt: 200, tds: 2083, advance: 5000, total: 9083 }, netPay: 85917 },
-    { id: 12, empId: 2, month: 3, year: 2026, gross: 30000, basic: 15000, deductions: { pf: 1800, esic: 225, pt: 200, tds: 0, advance: 0, total: 2225 }, netPay: 27775 },
-  ]),
+  getPayrollHistory: () => getJSON(KEYS.PAYROLL_HISTORY, []),
 
   savePayrollHistory: (history) => saveJSON(KEYS.PAYROLL_HISTORY, history),
 
@@ -393,20 +319,7 @@ export const dataService = {
   },
 
   // ── Expenses & Site Analytics ──────────────────────────────────────────
-  getExpenses: () => getJSON(KEYS.EXPENSES, [
-    { id: 401, date: '2026-04-03', name: 'Alice Smith', empId: 1, department: 'Engineering', site: 'Mumbai Hub', category: 'Travel / Tickets', amount: 3500, status: 'Pending', paymentMode: 'Card', description: 'Flight for client site visit', linkedAdvance: 'ADV-004 (Site)', attachments: 1 },
-    { id: 402, date: '2026-03-29', name: 'Bob Johnson', empId: 2, department: 'Product', site: 'Delhi Installation', category: 'Accommodation', amount: 8000, status: 'Approved', paymentMode: 'Company Account', description: 'Hotel stay for 2 nights', linkedAdvance: 'None', attachments: 2 },
-    { id: 403, date: '2026-03-15', name: 'Charlie Davis', empId: 3, department: 'Human Resources', site: 'HQ Corporate', category: 'Miscellaneous', amount: 15500, status: 'Approved', paymentMode: 'Cash', description: 'Office supplies for recruitment drive', linkedAdvance: 'ADV-001 (Site)', attachments: 1 },
-    { id: 404, date: '2026-02-10', name: 'Diana King', empId: 4, department: 'Design', site: 'Chennai R&D', category: 'Local Conveyance', amount: 1200, status: 'Approved', paymentMode: 'UPI', description: 'Auto/Taxi for site commute', linkedAdvance: 'None', attachments: 0 },
-    { id: 405, date: '2026-02-18', name: 'Frank Miller', empId: 7, department: 'Production', site: 'Mumbai Hub', category: 'Miscellaneous', amount: 25000, status: 'Approved', paymentMode: 'Company Account', description: 'Raw material emergency purchase', linkedAdvance: 'None', attachments: 3 },
-    { id: 406, date: '2026-01-05', name: 'Bob Johnson', empId: 2, department: 'Product', site: 'Delhi Installation', category: 'Travel / Tickets', amount: 4500, status: 'Approved', paymentMode: 'Card', description: 'Train tickets for Delhi site', linkedAdvance: 'None', attachments: 1 },
-    { id: 407, date: '2026-04-10', name: 'Sam Contractor', empId: 6, department: 'Operations', site: 'Mumbai Hub', category: 'Food', amount: 5000, status: 'Rejected', paymentMode: 'Cash', description: 'Party snacks (Personal Expense)', linkedAdvance: 'None', attachments: 1 },
-    { id: 408, date: '2026-03-22', name: 'Alice Smith', empId: 1, department: 'Engineering', site: 'Chennai R&D', category: 'Food', amount: 1800, status: 'Approved', paymentMode: 'UPI', description: 'Lunch with on-site vendors', linkedAdvance: 'None', attachments: 0 },
-    { id: 409, date: '2025-12-15', name: 'Diana King', empId: 4, department: 'Design', site: 'HQ Corporate', category: 'Miscellaneous', amount: 9500, status: 'Approved', paymentMode: 'Card', description: 'Premium font licenses', linkedAdvance: 'None', attachments: 1 },
-    { id: 410, date: '2026-04-12', name: 'Frank Miller', empId: 7, department: 'Production', site: 'Delhi Installation', category: 'Miscellaneous', amount: 32000, status: 'Pending', paymentMode: 'Company Account', description: 'Machine parts replacement', linkedAdvance: 'None', attachments: 2 },
-    { id: 411, date: '2026-03-10', name: 'Alice Smith', empId: 1, department: 'Engineering', site: 'Bangalore Site', category: 'Travel / Tickets', amount: 12500, status: 'Approved', paymentMode: 'Card', description: 'Flight to Bangalore for setup', linkedAdvance: 'None', attachments: 1 },
-    { id: 412, date: '2026-03-12', name: 'Alice Smith', empId: 1, department: 'Engineering', site: 'Bangalore Site', category: 'Accommodation', amount: 15000, status: 'Approved', paymentMode: 'Company Account', description: 'Hotel stay (Bangalore)', linkedAdvance: 'None', attachments: 1 }
-  ]),
+  getExpenses: () => getJSON(KEYS.EXPENSES, []),
   saveExpenses: (list) => saveJSON(KEYS.EXPENSES, list),
 
   deleteExpense: (id) => {
@@ -450,46 +363,7 @@ export const dataService = {
   },
 
   // ── Exit & Off-boarding ──────────────────────────────────────────────
-  getExitRecords: () => {
-    let list = getJSON(KEYS.EXITS, []);
-    if(list.length === 0) {
-      const master = dataService.getHandoverMaster();
-      list = [
-        { 
-          id: 'EX-001', 
-          empId: 5, 
-          name: 'Evan Wright', 
-          department: 'Engineering',
-          exitType: 'Resignation', 
-          initDate: '2026-03-15', 
-          lwd: '2026-05-15', 
-          noticePeriod: 60,
-          reason: 'Better Opportunity',
-          status: 'Clearance',
-          stage: 2,
-          handover: master.map(m => ({ ...m, status: 'Pending', remarks: '', verifiedAt: null })),
-          overrides: []
-        },
-        { 
-          id: 'EX-002', 
-          empId: 3, 
-          name: 'Charlie Davis', 
-          department: 'Human Resources',
-          exitType: 'Termination', 
-          initDate: '2026-04-01', 
-          lwd: '2026-04-01', 
-          noticePeriod: 0,
-          reason: 'Performance Issues',
-          status: 'FnF Pending',
-          stage: 3,
-          handover: master.map(m => ({ ...m, status: 'Completed', remarks: 'Auto-cleared', verifiedAt: '2026-04-01' })),
-          overrides: []
-        }
-      ];
-      saveJSON(KEYS.EXITS, list);
-    }
-    return list;
-  },
+  getExitRecords: () => getJSON(KEYS.EXITS, []),
   
   saveExitRecords: (list) => saveJSON(KEYS.EXITS, list),
 

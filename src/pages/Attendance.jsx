@@ -141,9 +141,14 @@ const Attendance = () => {
   const [records,     setRecords]     = useState(dataService.getAttendance());
   const [syncLoading,   setSyncLoading]   = useState(false);
   const [showBioConfig, setShowBioConfig] = useState(false);
-  const [bioConfig,     setBioConfig]     = useState(dataService.getBiometricConfig());
+  const [bioConfig,     setBioConfig]     = useState(dataService.getBiometricConfig() || { ip: '192.168.1.201', port: '4370', isEnabled: true });
 
   useEffect(() => {
+    if (!bioConfig.isEnabled) {
+      setDevices([]);
+      return;
+    }
+
     BiometricService.getDeviceStatus(bioConfig.ip, bioConfig.port).then(d => setDevices(d));
     
     // Subscribe to Push events for real-time reflection
@@ -277,7 +282,7 @@ const Attendance = () => {
         {/* Biometric Controls */}
         {!isEmployee && (
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-            {devices[0] && (
+            {bioConfig.isEnabled && devices[0] && (
                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', padding: '0.4rem 0.6rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px' }}>
                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: devices[0].status === 'Online' ? 'var(--color-success)' : 'var(--color-danger)' }}></div>
                   <span style={{ fontWeight: '600' }}>X2008: {devices[0].status}</span>
@@ -293,7 +298,7 @@ const Attendance = () => {
             <button 
               className={`btn ${syncLoading ? 'btn-ghost' : 'btn-primary'}`} 
               onClick={handleBioSync}
-              disabled={syncLoading}
+              disabled={syncLoading || !bioConfig.isEnabled}
             >
               <Activity size={18} className={syncLoading ? 'animate-spin' : ''} />
               {syncLoading ? 'Connecting...' : 'Pull Hardware Data'}
@@ -548,27 +553,45 @@ const Attendance = () => {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <div className="form-group">
-                <label className="form-label">Terminal IP Address *</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  value={bioConfig.ip} 
-                  placeholder="e.g. 192.168.1.201"
-                  onChange={(e) => setBioConfig({...bioConfig, ip: e.target.value})}
-                  style={{ width: '100%', marginTop: '0.4rem', borderColor: !bioConfig.ip ? 'var(--color-danger)' : 'var(--color-border)' }} 
-                />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', backgroundColor: 'var(--color-background)', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                <div>
+                  <p style={{ margin: 0, fontWeight: '700', fontSize: '0.9rem' }}>Master Biometric Integration</p>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Toggle entire hardware sync on/off</p>
+                </div>
+                <div 
+                  onClick={() => setBioConfig({ ...bioConfig, isEnabled: !bioConfig.isEnabled })}
+                  style={{ 
+                    width: '48px', height: '26px', borderRadius: '13px', padding: '2px', cursor: 'pointer', transition: 'all 0.2s',
+                    backgroundColor: bioConfig.isEnabled ? 'var(--color-success)' : '#cbd5e1',
+                    display: 'flex', justifyContent: bioConfig.isEnabled ? 'flex-end' : 'flex-start'
+                  }}>
+                  <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+                </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">Communication Port *</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  value={bioConfig.port} 
-                  placeholder="e.g. 4370"
-                  onChange={(e) => setBioConfig({...bioConfig, port: e.target.value})}
-                  style={{ width: '100%', marginTop: '0.4rem', borderColor: !bioConfig.port ? 'var(--color-danger)' : 'var(--color-border)' }} 
-                />
+
+              <div style={{ opacity: bioConfig.isEnabled ? 1 : 0.5, pointerEvents: bioConfig.isEnabled ? 'auto' : 'none', transition: 'all 0.3s' }}>
+                <div className="form-group">
+                  <label className="form-label">Terminal IP Address *</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    value={bioConfig.ip} 
+                    placeholder="e.g. 192.168.1.201"
+                    onChange={(e) => setBioConfig({...bioConfig, ip: e.target.value})}
+                    style={{ width: '100%', marginTop: '0.4rem', borderColor: !bioConfig.ip ? 'var(--color-danger)' : 'var(--color-border)' }} 
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Communication Port *</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    value={bioConfig.port} 
+                    placeholder="e.g. 4370"
+                    onChange={(e) => setBioConfig({...bioConfig, port: e.target.value})}
+                    style={{ width: '100%', marginTop: '0.4rem', borderColor: !bioConfig.port ? 'var(--color-danger)' : 'var(--color-border)' }} 
+                  />
+                </div>
               </div>
             </div>
 
@@ -579,7 +602,6 @@ const Attendance = () => {
                 onClick={() => {
                 dataService.saveBiometricConfig(bioConfig);
                 setShowBioConfig(false);
-                alert('Biometric hardware configuration saved successfully.');
               }}>Save Configuration</button>
             </div>
           </div>
