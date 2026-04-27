@@ -5,20 +5,22 @@ import {
   FolderOpen, ChevronLeft, LayoutDashboard
 } from 'lucide-react';
 
-const MobileMenu = ({ onNavigate }) => {
-  const menuItems = [
-    { id: 'home', label: 'Dashboard', icon: LayoutDashboard, color: '#6366f1' },
-    { id: 'directory', label: 'Directory', icon: Users, color: '#2563eb' },
-    { id: 'leaves', label: 'Leaves', icon: Calendar, color: '#10b981' },
-    { id: 'attendance', label: 'Attendance', icon: Clock, color: '#f59e0b' },
-    { id: 'loans', label: 'Loans & Advances', icon: Banknote, color: '#8b5cf6' },
-    { id: 'expenses', label: 'Expenses', icon: Receipt, color: '#ec4899' },
-    { id: 'holidays', label: 'Holiday List', icon: Map, color: '#f43f5e' },
-    { id: 'training', label: 'Growth & Training', icon: GraduationCap, color: '#06b6d4' },
-    { id: 'compliance', label: 'Compliance', icon: ShieldCheck, color: '#14b8a6' },
-    { id: 'policies', label: 'HR Policies', icon: FileText, color: '#475569' },
-    { id: 'documents', label: 'My Documents', icon: FolderOpen, color: '#0f172a' },
+const MobileMenu = ({ onNavigate, userRole }) => {
+  const allItems = [
+    { id: 'home', label: 'Dashboard', icon: LayoutDashboard, color: '#6366f1', roles: ['management', 'employee'] },
+    { id: 'directory', label: 'Directory', icon: Users, color: '#2563eb', roles: ['management', 'employee'] },
+    { id: 'leaves', label: 'Leaves', icon: Calendar, color: '#10b981', roles: ['management', 'employee'] },
+    { id: 'attendance', label: 'Attendance', icon: Clock, color: '#f59e0b', roles: ['employee'] },
+    { id: 'loans', label: 'Loans & Advances', icon: Banknote, color: '#8b5cf6', roles: ['employee'] },
+    { id: 'expenses', label: 'Expenses', icon: Receipt, color: '#ec4899', roles: ['employee'] },
+    { id: 'holidays', label: 'Holiday List', icon: Map, color: '#f43f5e', roles: ['management', 'employee'] },
+    { id: 'training', label: 'Growth & Training', icon: GraduationCap, color: '#06b6d4', roles: ['employee'] },
+    { id: 'compliance', label: 'Compliance', icon: ShieldCheck, color: '#14b8a6', roles: ['management', 'employee'] },
+    { id: 'policies', label: 'HR Policies', icon: FileText, color: '#475569', roles: ['management', 'employee'] },
+    { id: 'documents', label: 'My Documents', icon: FolderOpen, color: '#0f172a', roles: ['employee'] },
   ];
+
+  const menuItems = allItems.filter(item => item.roles.includes(userRole || 'employee'));
 
   return (
     <div className="animate-slide-up" style={{ position: 'relative', overflow: 'hidden', paddingBottom: '100px' }}>

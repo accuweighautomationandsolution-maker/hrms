@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
-import { Clock, Calendar, Wallet, Award, ChevronRight, Bell } from 'lucide-react';
+import { Clock, Calendar, Wallet, Award, ChevronRight, Bell, Menu as MenuIcon } from 'lucide-react';
 import { dataService } from '../../../src/utils/dataService';
 import { authService } from '../../../src/utils/authService';
 
-const MobileDashboard = ({ onNavigate }) => {
+const MobileDashboard = ({ onNavigate, onMenuToggle }) => {
   const user = authService.getCurrentUser();
   const emp = dataService.getEmployeeById(user?.id);
   
@@ -28,20 +28,23 @@ const MobileDashboard = ({ onNavigate }) => {
 
       <div className="mobile-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ 
-            width: '45px', 
-            height: '45px', 
-            borderRadius: '15px', 
-            background: 'linear-gradient(135deg, var(--m-primary), var(--m-primary-dark))',
-            color: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: '800',
-            boxShadow: '0 8px 15px rgba(79, 70, 229, 0.3)'
-          }}>
-            {emp?.name?.split(' ').map(n => n[0]).join('') || 'SB'}
-          </div>
+          <button 
+            onClick={onMenuToggle}
+            style={{ 
+              width: '45px', 
+              height: '45px', 
+              borderRadius: '15px', 
+              background: 'white', 
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: 'var(--m-card-shadow)',
+              cursor: 'pointer'
+            }}
+          >
+            <MenuIcon size={20} color="var(--m-text)" />
+          </button>
           <div>
             <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '700', color: 'var(--m-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Hello,</p>
             <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '900', color: 'var(--m-text)' }}>{emp?.name?.split(' ')[0] || 'Employee'}</h2>
