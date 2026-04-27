@@ -442,7 +442,7 @@ const Attendance = () => {
                         )}
                         {rec?.punchIn && rec?.punchOut && (
                           <span style={{ fontSize: '0.6rem', color: st === 'holiday-worked' ? 'var(--color-warning)' : 'var(--color-text-muted)', fontWeight: st === 'holiday-worked' ? '700' : '400' }}>
-                            {st === 'holiday-worked' ? `OT: ${calcNetOT(rec.punchIn, rec.punchOut)}` : diffHHMM(rec.punchIn, rec.punchOut).text}
+                            {st === 'holiday-worked' ? `OT: ${calcNetOT(rec.punchIn, rec.punchOut)}` : diffHHMM(rec.punchIn, rec.punchOut)?.text || '—'}
                           </span>
                         )}
                         {st === 'absent' && (
