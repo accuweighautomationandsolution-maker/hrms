@@ -22,7 +22,7 @@ const ExitManagement = () => {
     // ── Application Stage ──────────────────────────────────────────────────
     const [exits, setExits] = useState(dataService.getExitRecords());
     const [employees, setEmployees] = useState(dataService.getEmployees());
-    const [advances] = useState(dataService.getAdvanceLoans ? dataService.getAdvanceLoans() : []);
+    const [advances] = useState(dataService.getAdvanceHistory ? dataService.getAdvanceHistory() : []);
     const [expenses] = useState(dataService.getExpenses());
     const [leaves] = useState(dataService.getLeaveBalances());
     const [gratConfig, setGratConfig] = useState(dataService.getGratuityConfig());

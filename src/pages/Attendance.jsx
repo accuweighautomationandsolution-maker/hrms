@@ -40,7 +40,7 @@ const buildCalendar = (year, month) => {
   return days;
 };
 
-const EMPLOYEES_LIST = dataService.getEmployees();
+// const EMPLOYEES_LIST = dataService.getEmployees(); // Moved into component for better reactivity
 
 const BADGE_COLOR = {
   'Staff Employee':    'badge-primary',
@@ -134,7 +134,11 @@ const Attendance = () => {
   const now      = new Date();
   const [year,  setYear]  = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
-  const [selectedEmp, setSelectedEmp] = useState(isEmployee ? dataService.getEmployeeById(currentUser?.id) : EMPLOYEES_LIST[0]);
+  const employeesList = useMemo(() => dataService.getEmployees(), []);
+  const [selectedEmp, setSelectedEmp] = useState(() => {
+    if (isEmployee) return dataService.getEmployeeById(currentUser?.id);
+    return employeesList.length > 0 ? employeesList[0] : null;
+  });
   const [searchQ,     setSearchQ]     = useState('');
   const [punchModal,  setPunchModal]  = useState(null); // { day, ... }
   const [devices,     setDevices]     = useState([]);
@@ -251,7 +255,7 @@ const Attendance = () => {
     'future':        { bg: 'transparent',            border: 'var(--color-border)',  color: 'var(--color-text-muted)' },
   };
 
-  const filteredEmps = EMPLOYEES_LIST.filter(e =>
+  const filteredEmps = employeesList.filter(e =>
     e.name.toLowerCase().includes(searchQ.toLowerCase())
   );
 

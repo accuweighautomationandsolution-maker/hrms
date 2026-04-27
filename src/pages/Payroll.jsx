@@ -6,7 +6,7 @@ import { dataService } from '../utils/dataService';
 import { useNotification } from '../context/NotificationContext';
 import { generatePDF } from '../utils/exportUtils';
 
-const EMPLOYEES_DATA = dataService.getEmployees();
+// const EMPLOYEES_DATA = dataService.getEmployees(); // Removed to ensure reactivity within the component
 
 const NOW = new Date();
 const CUR_YR = NOW.getFullYear();
@@ -363,10 +363,8 @@ const Payroll = () => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const employeesWithPayroll = useMemo(() => {
-    return EMPLOYEES_DATA.map(emp => {
+    return dataService.getEmployees().map(emp => {
       const daysPresent = dataService.getPresentDaysCount(emp.id, CUR_MO, CUR_YR);
-      // For Staff/On-role: Calculate based on actual attendance relative to 30 days
-      // For Contractual: Calculation is handled inside their specific logic but we store the context here too
       return {
         ...emp,
         daysPresent,

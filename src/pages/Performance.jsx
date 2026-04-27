@@ -267,13 +267,13 @@ const Performance = () => {
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '400px', overflowY: 'auto' }}>
-              {viewingRecord.history.length === 0 ? (
+              {viewingRecord?.history?.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>
                    <p>No historical feedback records found.</p>
-                   <button className="btn btn-primary btn-sm" onClick={() => { setViewingRecord(null); setFeedbackConfig({ isOpen: true, empId: viewingRecord.emp.id, type: 'Appraisal Review' }); }}>Generate First Review</button>
+                   <button className="btn btn-primary btn-sm" onClick={() => { setViewingRecord(null); setFeedbackConfig({ isOpen: true, empId: viewingRecord?.emp?.id, type: 'Appraisal Review' }); }}>Generate First Review</button>
                 </div>
               ) : (
-                viewingRecord.history.map(h => (
+                viewingRecord?.history?.map(h => (
                   <div key={h.id} style={{ padding: '1.25rem', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', borderRadius: '12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
                       <span className="badge badge-primary">{h.reviewType}</span>

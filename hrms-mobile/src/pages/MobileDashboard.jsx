@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Clock, Calendar, Wallet, Award, ChevronRight, Bell } from 'lucide-react';
-import { dataService } from '../../utils/dataService';
-import { authService } from '../../utils/authService';
+import { dataService } from '../../../src/utils/dataService';
+import { authService } from '../../../src/utils/authService';
 
 const MobileDashboard = ({ onNavigate }) => {
   const user = authService.getCurrentUser();
