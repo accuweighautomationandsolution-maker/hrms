@@ -106,7 +106,8 @@ const MobileMenu = ({ onNavigate, userRole }) => {
           marginTop: '2.5rem', 
           background: 'linear-gradient(135deg, var(--m-primary), var(--m-primary-dark))', 
           border: 'none',
-          padding: '2rem'
+          padding: '2rem',
+          boxShadow: '0 15px 30px rgba(37, 99, 235, 0.2)'
         }}>
            <h4 style={{ color: 'white', margin: '0 0 0.5rem 0', fontSize: '1.1rem', fontWeight: '800' }}>Expert Support</h4>
            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', margin: 0, lineHeight: 1.5 }}>Connect with HR for personalized guidance and support.</p>

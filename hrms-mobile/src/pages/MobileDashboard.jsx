@@ -68,12 +68,13 @@ const MobileDashboard = ({ onNavigate, onMenuToggle }) => {
       <div className="mobile-container">
         {/* Main Action Card */}
         <div className="m-card" style={{ 
-          background: 'linear-gradient(135deg, #0f172a, #1e293b)', 
+          background: 'linear-gradient(135deg, var(--m-primary), var(--m-primary-dark))', 
           color: 'white', 
           padding: '2rem',
           position: 'relative',
           overflow: 'hidden',
-          border: 'none'
+          border: 'none',
+          boxShadow: '0 15px 30px rgba(37, 99, 235, 0.2)'
         }}>
           <div style={{ position: 'absolute', top: '-20px', right: '-20px', width: '120px', height: '120px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%' }}></div>
           <div style={{ position: 'relative', zIndex: 1 }}>
@@ -148,17 +149,17 @@ const MobileDashboard = ({ onNavigate, onMenuToggle }) => {
 
         {/* Upcoming Holiday */}
         <div className="m-card" style={{ 
-          background: 'linear-gradient(135deg, #fef2f2, #fff1f2)', 
-          border: '1px solid rgba(244, 63, 94, 0.1)',
+          background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', 
+          border: '1px solid rgba(37, 99, 235, 0.1)',
           padding: '1.25rem'
         }}>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(244, 63, 94, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Calendar size={20} color="var(--m-accent)" />
+            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(37, 99, 235, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Calendar size={20} color="var(--m-primary)" />
             </div>
             <div style={{ flex: 1 }}>
-              <p style={{ margin: 0, fontSize: '0.7rem', fontWeight: '800', color: 'var(--m-accent)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Next Holiday</p>
-              <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '700', color: '#9f1239' }}>{stats.upcomingHoliday}</p>
+              <p style={{ margin: 0, fontSize: '0.7rem', fontWeight: '800', color: 'var(--m-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Next Holiday</p>
+              <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '700', color: 'var(--m-primary-dark)' }}>{stats.upcomingHoliday}</p>
             </div>
           </div>
         </div>
