@@ -115,9 +115,7 @@ export const dataService = {
   },
 
   // ── Leaves ─────────────────────────────────────────────────────────────────
-  getLeaveBalances: () => getJSON(KEYS.LEAVES, {
-    1: { Sick: 5, Casual: 10, Paid: 15 }
-  }),
+  getLeaveBalances: () => getJSON(KEYS.LEAVES, {}),
 
   getEmployeeBalance: (empId, type = 'total') => {
     const bals = dataService.getLeaveBalances()[empId] || { Sick: 0, Casual: 0, Paid: 0 };
