@@ -13,6 +13,10 @@ const Sidebar = ({ userRole }) => {
       </div>
 
       <nav className="sidebar-nav">
+        <Link to="/mobile-preview" className="nav-item" style={{ background: 'var(--color-primary)', color: 'white', margin: '10px', borderRadius: '8px' }}>
+          <Smartphone size={20} />
+          <span style={{ fontWeight: '800' }}>MOBILE APP PREVIEW</span>
+        </Link>
         <Link to="/" className={`nav-item ${location.pathname === '/' ? 'active' : ''}`}>
           <LayoutDashboard size={20} />
           <span>Dashboard</span>
