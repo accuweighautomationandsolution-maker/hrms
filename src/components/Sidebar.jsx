@@ -17,6 +17,10 @@ const Sidebar = ({ userRole }) => {
           <LayoutDashboard size={20} />
           <span>Dashboard</span>
         </Link>
+        <Link to="/mobile-preview" className={`nav-item ${location.pathname === '/mobile-preview' ? 'active' : ''}`} style={{ backgroundColor: 'rgba(37, 99, 235, 0.08)', borderRadius: '8px', marginBottom: '1rem' }}>
+          <Smartphone size={20} color="var(--color-primary)" />
+          <span style={{ fontWeight: '700', color: 'var(--color-primary)' }}>Mobile App Preview</span>
+        </Link>
         <Link to="/directory" className={`nav-item ${location.pathname === '/directory' ? 'active' : ''}`}>
           <Users size={20} />
           <span>Employee Directory</span>
@@ -179,10 +183,6 @@ const Sidebar = ({ userRole }) => {
             </Link>
           </>
         )}
-        <Link to="/mobile-preview" className={`nav-item ${location.pathname === '/mobile-preview' ? 'active' : ''}`} style={{ marginTop: '1rem', borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
-          <Smartphone size={20} color="var(--color-primary)" />
-          <span style={{ fontWeight: '700', color: 'var(--color-primary)' }}>Mobile Employee App</span>
-        </Link>
       </nav>
 
       <div className="sidebar-footer" style={{ marginTop: 'auto', padding: '1.5rem', borderTop: '1px solid var(--color-border)' }}>
