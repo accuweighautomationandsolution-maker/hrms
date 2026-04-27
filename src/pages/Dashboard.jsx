@@ -5,7 +5,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { dataService } from '../utils/dataService';
-import { Plus, Edit, Trash2, MessageSquareShare, ShieldCheck, Zap, ChevronRight, ExternalLink } from 'lucide-react';
+import { Plus, Edit, Trash2, MessageSquareShare, ShieldCheck, Zap, ChevronRight, ExternalLink, Smartphone } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import FeedbackPortal from '../components/FeedbackPortal';
 import RichTextEditor from '../components/RichTextEditor';
@@ -301,6 +301,29 @@ const Dashboard = ({ userRole }) => {
 
         {/* Sidebar Right Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          
+          <Link to="/mobile-preview" className="card" style={{ 
+            background: 'linear-gradient(135deg, var(--color-primary), #1e40af)', 
+            color: 'white', 
+            textDecoration: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '1.5rem',
+            border: 'none',
+            boxShadow: '0 10px 15px -3px rgba(37, 99, 235, 0.25)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ background: 'rgba(255,255,255,0.2)', padding: '0.75rem', borderRadius: '12px' }}>
+                <Smartphone size={24} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: '800' }}>Mobile App Preview</h3>
+                <p style={{ margin: 0, fontSize: '0.75rem', opacity: 0.9 }}>Try the employee experience</p>
+              </div>
+            </div>
+            <ChevronRight size={20} style={{ opacity: 0.7 }} />
+          </Link>
           
           <div className="card">
             <h2 style={{ fontSize: '1.125rem', marginBottom: '1.5rem' }}>{isEmployee ? 'My Performance Pulse' : 'Avg Company Performance Pulse'}</h2>
