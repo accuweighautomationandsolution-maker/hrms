@@ -105,7 +105,6 @@ export const dataService = {
     return getJSON(KEYS.LEAVES, {});
   },
 
-  },
 
   // ── Notices ─────────────────────────────────────────────────────────────
   getNotices: async () => {
@@ -230,8 +229,7 @@ export const dataService = {
 
   saveLeaveRequests: async (reqs) => saveJSON(KEYS.LEAVE_RECS, reqs),
 
-  getReportRangeData: (empId, startDate, endDate) => {
-    const attendance = dataService.getAttendance();
+  getReportRangeData: (empId, startDate, endDate, attendance) => {
     const start = new Date(startDate);
     const end = new Date(endDate);
     const results = [];
@@ -271,11 +269,10 @@ export const dataService = {
   saveBiometricConfig: (config) => saveJSON(KEYS.BIO_CONFIG, config),
 
 
-  getEmployeeById: (id) => dataService.getEmployees().find(e => e.id === Number(id)),
 
-  getLeavesByCriteria: (filters = {}) => {
-    let employees = dataService.getEmployees();
-    const allLeaves = dataService.getLeaveRequests();
+  getLeavesByCriteria: async (filters = {}) => {
+    let employees = await dataService.getEmployees();
+    const allLeaves = await dataService.getLeaveRequests();
     
     // 1. Filter employees by scope
     if (filters.managerId) {
@@ -361,8 +358,8 @@ export const dataService = {
   getApprovalLogs: () => getJSON(KEYS.APPROVAL_LOGS, []),
   saveApprovalLogs: (list) => saveJSON(KEYS.APPROVAL_LOGS, list),
 
-  getBudgetUtilization: (department) => {
-    const employees = dataService.getEmployees()
+  getBudgetUtilization: async (department) => {
+    const employees = (await dataService.getEmployees())
       .filter(e => e.department === department && e.status !== 'Inactive');
     
     let totalUtilized = 0;
@@ -501,18 +498,18 @@ export const dataService = {
   },
 
   // ── Scoped/Personal Data Fetchers ────────────────────────────────────
-  getPersonalAdvances: (userId) => {
-    const all = dataService.getAdvanceHistory();
+  getPersonalAdvances: async (userId) => {
+    const all = await dataService.getAdvanceHistory();
     return all.filter(a => a.empId === Number(userId));
   },
 
-  getPersonalExpenses: (userId) => {
-    const all = dataService.getExpenses();
+  getPersonalExpenses: async (userId) => {
+    const all = await dataService.getExpenses();
     return all.filter(e => e.empId === Number(userId));
   },
 
-  getPersonalNotices: (userId) => {
-    const all = dataService.getNotices();
+  getPersonalNotices: async (userId) => {
+    const all = await dataService.getNotices();
     // Notices are public if no targetedUserId, or if specifically targeted
     return all.filter(n => !n.targetUserId || n.targetUserId === Number(userId));
   },

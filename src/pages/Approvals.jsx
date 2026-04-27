@@ -41,27 +41,70 @@ const INITIAL_REQUESTS = [
 ];
 
 const Approvals = () => {
-  const [requests, setRequests] = useState(INITIAL_REQUESTS);
+  const [requests, setRequests] = useState([]);
+  const [manpowerReqs, setManpowerReqs] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [reloads, setReloads] = useState(0);
 
-  const manpowerReqs = useMemo(() => dataService.getManpowerRequests(), [reloads]);
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [hiring, leaves] = await Promise.all([
+          dataService.getManpowerRequests(),
+          dataService.getLeaveRequests()
+        ]);
+        setManpowerReqs(hiring);
+        
+        // Filter pending leaves for manager view
+        const pendingLeaves = leaves.filter(l => l.status === 'Pending').map(l => ({
+            id: l.id,
+            empName: l.name,
+            empId: l.empId,
+            role: 'Employee', 
+            type: l.type,
+            duration: `${l.startDate} - ${l.endDate}`,
+            days: l.days,
+            reason: l.reason,
+            balanceRemaining: 0, 
+            status: l.status
+        }));
+        setRequests(pendingLeaves);
+      } catch (err) {
+        console.error("Failed to load approvals data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [reloads]);
 
-  const handleAction = (id, action) => {
+  const handleAction = async (id, action) => {
+    // In a real app, this would update the leave status in Supabase
+    // For now, we update local state or call a service if it exists
     setRequests(prev => prev.map(req => 
       req.id === id ? { ...req, status: action } : req
     ));
   };
 
-  const handleHiringAction = (id, action) => {
-    const list = dataService.getManpowerRequests();
+  const handleHiringAction = async (id, action) => {
+    const list = await dataService.getManpowerRequests();
     const updated = list.map(r => r.id === id ? { ...r, status: action } : r);
-    dataService.saveManpowerRequests(updated);
+    await dataService.saveManpowerRequests(updated);
     setReloads(r => r+1);
   };
 
   const pendingRequests = requests.filter(r => r.status === 'Pending');
   const actionedRequests = requests.filter(r => r.status !== 'Pending');
   const pendingHires = manpowerReqs.filter(r => r.status === 'Pending Approval');
+
+  if (loading) {
+    return (
+      <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container">

@@ -28,12 +28,36 @@ const DocumentHub = () => {
     const [isPreviewing, setIsPreviewing] = useState(false);
     
     // Data states
-    const [templates] = useState(dataService.getLetterTemplates());
-    const [candidates, setCandidates] = useState(dataService.getCandidates());
-    const [employees] = useState(dataService.getEmployees());
-    const [documents, setDocuments] = useState(dataService.getEmployeeDocs());
+    const [templates, setTemplates] = useState([]);
+    const [candidates, setCandidates] = useState([]);
+    const [employees, setEmployees] = useState([]);
+    const [documents, setDocuments] = useState([]);
+    const [loading, setLoading] = useState(true);
     
     const previewRef = useRef(null);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const [tempsData, cansData, empsData, docsData] = await Promise.all([
+                    dataService.getLetterTemplates(),
+                    dataService.getCandidates(),
+                    dataService.getEmployees(),
+                    dataService.getEmployeeDocs()
+                ]);
+                setTemplates(tempsData);
+                setCandidates(cansData);
+                setEmployees(empsData);
+                setDocuments(docsData);
+            } catch (err) {
+                console.error("Failed to load document hub data:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
 
     // Filter Logic
     const generationQueue = useMemo(() => {
@@ -139,6 +163,14 @@ const DocumentHub = () => {
         };
         input.click();
     };
+
+    if (loading) {
+        return (
+            <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+            </div>
+        );
+    }
 
     return (
         <div className="page-container">

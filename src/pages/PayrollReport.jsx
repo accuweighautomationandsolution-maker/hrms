@@ -52,8 +52,28 @@ const PayrollReport = () => {
     const [showEmailModal, setShowEmailModal] = useState(false);
     
     // Data Loading
-    const allPayroll = useMemo(() => dataService.getPayrollHistory(), []);
-    const employees = useMemo(() => dataService.getEmployees(), []);
+    const [allPayroll, setAllPayroll] = useState([]);
+    const [employees, setEmployees] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const [payrollData, empsData] = await Promise.all([
+                    dataService.getPayrollHistory(),
+                    dataService.getEmployees()
+                ]);
+                setAllPayroll(payrollData);
+                setEmployees(empsData);
+            } catch (err) {
+                console.error("Failed to load payroll report data:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
 
     // Active Months Array computation
     const activeMonths = useMemo(() => {
@@ -170,6 +190,14 @@ const PayrollReport = () => {
             XLSX.writeFile(workbook, `Payroll_Report_${periodType}_${year}.xlsx`);
         }
     };
+
+    if (loading) {
+        return (
+            <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+            </div>
+        );
+    }
 
     return (
         <div className="page-container">

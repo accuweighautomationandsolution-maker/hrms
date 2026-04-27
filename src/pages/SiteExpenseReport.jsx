@@ -18,10 +18,31 @@ const formatCurrency = (amount) => new Intl.NumberFormat('en-IN', { style: 'curr
 
 const SiteExpenseReport = () => {
     // ── Application State ──────────────────────────────────────────────────
-    const [rawExpenses, setRawExpenses] = useState(dataService.getExpenses());
+    const [rawExpenses, setRawExpenses] = useState([]);
+    const [employeesList, setEmployeesList] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('analytics'); // 'analytics', 'ledger', 'submit'
     const [selectedSiteModal, setSelectedSiteModal] = useState(null); // Site name for drill-down
-    
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const [expData, empsData] = await Promise.all([
+                    dataService.getExpenses(),
+                    dataService.getEmployees()
+                ]);
+                setRawExpenses(expData);
+                setEmployeesList(empsData);
+            } catch (err) {
+                console.error("Failed to load site expense data:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
     // Filters & UI State
     const [filterSite, setFilterSite] = useState('All Sites');
     const [filterCat, setFilterCat] = useState('All Categories');
@@ -42,8 +63,14 @@ const SiteExpenseReport = () => {
     // ── Derived Data & Filtering ───────────────────────────────────────────
     const uniqueSites = useMemo(() => [...new Set(rawExpenses.map(r => r.site))].sort(), [rawExpenses]);
     const uniqueCategories = useMemo(() => [...new Set(rawExpenses.map(r => r.category))].sort(), [rawExpenses]);
-    const employeesList = useMemo(() => dataService.getEmployees(), []);
 
+    if (loading) {
+        return (
+            <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+            </div>
+        );
+    }
     const filteredData = useMemo(() => {
         let data = [...rawExpenses];
         if (filterSite !== 'All Sites') data = data.filter(r => r.site === filterSite);
@@ -103,13 +130,19 @@ const SiteExpenseReport = () => {
     }, [filteredData]);
 
     // ── Handlers ────────────────────────────────────────────────────────────
-    const updateExpenseStatus = (id, newStatus) => {
-        const updated = rawExpenses.map(r => r.id === id ? { ...r, status: newStatus } : r);
-        setRawExpenses(updated);
-        dataService.saveExpenses(updated);
+    const updateStatus = async (id, status) => {
+        const updated = rawExpenses.map(r => r.id === id ? { ...r, status } : r);
+        const saved = await dataService.saveExpenses(updated);
+        setRawExpenses(saved);
     };
 
-    const handleFormSubmit = (e) => {
+    const deleteExpense = async (id) => {
+        if (!window.confirm('Are you sure you want to delete this expense record?')) return;
+        const updated = await dataService.deleteExpense(id);
+        setRawExpenses(updated);
+    };
+
+    const handleFormSubmit = async (e) => {
         e.preventDefault();
         const emp = employeesList.find(emp => emp.id === Number(formData.empId));
         const newExpense = {
@@ -122,9 +155,8 @@ const SiteExpenseReport = () => {
             status: 'Pending',
             attachments: 0
         };
-        const updated = [newExpense, ...rawExpenses];
+        const updated = await dataService.saveExpenses([newExpense, ...rawExpenses]);
         setRawExpenses(updated);
-        dataService.saveExpenses(updated);
         setActiveTab('ledger');
         setFormData({ empId: '', date: new Date().toISOString().split('T')[0], site: '', category: 'Travel / Tickets', amount: '', paymentMode: 'Card', description: '' });
     };
@@ -366,8 +398,8 @@ const SiteExpenseReport = () => {
                                                 <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
                                                     {r.status === 'Pending' ? (
                                                         <>
-                                                            <button onClick={() => updateExpenseStatus(r.id, 'Approved')} className="btn btn-outline" style={{ padding: '0.4rem', color: 'var(--color-success)', borderColor: 'var(--color-success)' }} title="Approve"><CheckCircle size={14} /></button>
-                                                            <button onClick={() => updateExpenseStatus(r.id, 'Rejected')} className="btn btn-outline" style={{ padding: '0.4rem', color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }} title="Reject"><XCircle size={14} /></button>
+                                                            <button onClick={() => updateStatus(r.id, 'Approved')} className="btn btn-outline" style={{ padding: '0.4rem', color: 'var(--color-success)', borderColor: 'var(--color-success)' }} title="Approve"><CheckCircle size={14} /></button>
+                                                            <button onClick={() => updateStatus(r.id, 'Rejected')} className="btn btn-outline" style={{ padding: '0.4rem', color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }} title="Reject"><XCircle size={14} /></button>
                                                         </>
                                                     ) : (
                                                         <button className="btn btn-ghost" style={{ padding: '0.4rem' }}><Eye size={14} /></button>

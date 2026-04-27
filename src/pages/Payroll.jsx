@@ -62,9 +62,8 @@ const HolidayPanel = ({ year, month, workedDays, holidayList, onToggle }) => {
 
 // ── Contractual Payout Modal ───────────────────────────────────────────────
 const ContractualPayslipModal = ({ employee, onClose }) => {
-  const presentDaysCount = dataService.getPresentDaysCount(employee.id, CUR_MO, CUR_YR);
-  const [daysPresent, setDaysPresent] = useState(presentDaysCount || 0);
-  const [balanceLeaves, setBalanceLeaves] = useState(dataService.getEmployeeBalance(employee.id));
+  const [daysPresent, setDaysPresent] = useState(employee.daysPresent || 0);
+  const [balanceLeaves, setBalanceLeaves] = useState(employee.balanceLeaves);
   const [otHours, setOtHours] = useState('0');
   const [shiftHours, setShiftHours] = useState('9.5');
   const [otHourlyRate, setOtHourlyRate] = useState(
@@ -363,6 +362,8 @@ const Payroll = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [holidayList, setHolidayList] = useState([]);
+  const [attendanceMap, setAttendanceMap] = useState({});
+  const [balanceMap, setBalanceMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [holidayWorked, setHolidayWorked] = useState([]); // List of day numbers
 
@@ -374,8 +375,22 @@ const Payroll = () => {
           dataService.getEmployees(),
           dataService.getCustomHolidays()
         ]);
+        
+        const attMap = {};
+        const balMap = {};
+        await Promise.all(emps.map(async (emp) => {
+          const [count, balance] = await Promise.all([
+            dataService.getPresentDaysCount(emp.id, CUR_MO, CUR_YR),
+            dataService.getEmployeeBalance(emp.id)
+          ]);
+          attMap[emp.id] = count;
+          balMap[emp.id] = balance;
+        }));
+
         setEmployees(emps);
         setHolidayList(hols);
+        setAttendanceMap(attMap);
+        setBalanceMap(balMap);
       } catch (err) {
         console.error("Failed to load payroll data:", err);
       } finally {
@@ -387,16 +402,17 @@ const Payroll = () => {
 
   const employeesWithPayroll = useMemo(() => {
     return employees.map(emp => {
-      const daysPresent = dataService.getPresentDaysCount(emp.id, CUR_MO, CUR_YR);
+      const daysPresent = attendanceMap[emp.id] || 0;
       return {
         ...emp,
         daysPresent,
+        balanceLeaves: balanceMap[emp.id],
         payrollContext: emp.category !== 'Contractual Worker'
           ? calculateSalaryComponents(emp.grossSalary, true, emp.advanceLoanEMI || 0, emp.category, daysPresent, 30)
           : null
       };
     });
-  }, [employees]);
+  }, [employees, attendanceMap, balanceMap]);
 
   const isContractual = selectedEmployee?.category === 'Contractual Worker';
 
@@ -407,7 +423,7 @@ const Payroll = () => {
       const ctx = emp.payrollContext;
       
       if (isC) {
-        const presentDays = dataService.getPresentDaysCount(emp.id, CUR_MO, CUR_YR);
+        const presentDays = emp.daysPresent;
         const basePay = Math.round((Number(emp.dayRate) || 0) * presentDays);
         rawData.push({
           "Emp Code": emp.empCode, "Name": emp.name, "Category": emp.category, "UAN": emp.uanNumber || 'N/A', "Bank A/c": emp.bankAccount,

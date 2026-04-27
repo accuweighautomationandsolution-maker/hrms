@@ -14,8 +14,10 @@ import { authService } from '../utils/authService';
 
 const MyDocuments = () => {
     const currentUser = authService.getCurrentUser();
-    const [docs] = useState(dataService.getEmployeeDocs(currentUser.id));
     const [searchTerm, setSearchTerm] = useState('');
+    const [docs, setDocs] = useState([]);
+    const [activeEmp, setActiveEmp] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     const filteredDocs = useMemo(() => {
         return docs.filter(d => 
@@ -23,7 +25,33 @@ const MyDocuments = () => {
         );
     }, [docs, searchTerm]);
 
-    const activeEmp = dataService.getEmployees().find(e => e.id === currentUser.id);
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const [docsData, empsData] = await Promise.all([
+                    dataService.getEmployeeDocs(currentUser.id),
+                    dataService.getEmployees()
+                ]);
+                setDocs(docsData);
+                const emp = empsData.find(e => e.id === currentUser.id);
+                setActiveEmp(emp);
+            } catch (err) {
+                console.error("Failed to load personal documents:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, [currentUser.id]);
+
+    if (loading) {
+        return (
+            <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+            </div>
+        );
+    }
 
     return (
         <div className="page-container">

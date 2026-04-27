@@ -14,7 +14,31 @@ const PFReport = () => {
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [showEmailModal, setShowEmailModal] = useState(false);
 
-    const employees = dataService.getEmployees().filter(e => e.hasPF !== false && e.uanNumber !== 'N/A');
+    const [employees, setEmployees] = useState([]);
+    const [presentDaysMap, setPresentDaysMap] = useState({});
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const emps = (await dataService.getEmployees()).filter(e => e.hasPF !== false && e.uanNumber !== 'N/A');
+                
+                const dayCounts = {};
+                await Promise.all(emps.map(async (emp) => {
+                    dayCounts[emp.id] = await dataService.getPresentDaysCount(emp.id, month, year);
+                }));
+                
+                setEmployees(emps);
+                setPresentDaysMap(dayCounts);
+            } catch (err) {
+                console.error("Failed to load PF report data:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, [month, year]);
 
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -23,7 +47,7 @@ const PFReport = () => {
         
         return list.map(emp => {
             const daysInMonth = new Date(year, month + 1, 0).getDate();
-            const presentDays = dataService.getPresentDaysCount(emp.id, month, year);
+            const presentDays = presentDaysMap[emp.id] || 0;
             const ncpDays = daysInMonth - presentDays;
             
             // Re-calculate based on actual days worked for precision
@@ -107,6 +131,14 @@ const PFReport = () => {
             XLSX.writeFile(workbook, `PF_ECR_${monthNames[month]}_${year}.xlsx`);
         }
     };
+
+    if (loading) {
+        return (
+            <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+            </div>
+        );
+    }
 
     return (
         <div className="page-container">

@@ -17,9 +17,25 @@ import { Link, useNavigate } from 'react-router-dom';
 
 const Recruitment = () => {
     const navigate = useNavigate();
-    const [candidates, setCandidates] = useState(dataService.getCandidates());
+    const [candidates, setCandidates] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('All');
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchCandidates = async () => {
+            setLoading(true);
+            try {
+                const data = await dataService.getCandidates();
+                setCandidates(data);
+            } catch (err) {
+                console.error("Failed to load candidates:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchCandidates();
+    }, []);
 
     const stats = useMemo(() => {
         return {
@@ -39,13 +55,13 @@ const Recruitment = () => {
         });
     }, [candidates, searchTerm, filterStatus]);
 
-    const updateStatus = (id, newStatus) => {
+    const updateStatus = async (id, newStatus) => {
         const updated = candidates.map(c => {
             if (c.id === id) return { ...c, status: newStatus };
             return c;
         });
         setCandidates(updated);
-        dataService.saveCandidates(updated);
+        await dataService.saveCandidates(updated);
     };
 
     const onboardCandidate = (candidate) => {
@@ -73,6 +89,14 @@ const Recruitment = () => {
             default: return 'default';
         }
     };
+
+    if (loading) {
+        return (
+            <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+            </div>
+        );
+    }
 
     return (
         <div className="page-container">

@@ -44,8 +44,28 @@ const AdvanceReport = () => {
     const [showEmailModal, setShowEmailModal] = useState(false);
     
     // Data Loading
-    const allAdvances = useMemo(() => dataService.getAdvanceHistory(), []);
-    const employees = useMemo(() => dataService.getEmployees(), []);
+    const [allAdvances, setAllAdvances] = useState([]);
+    const [employees, setEmployees] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const [advData, empsData] = await Promise.all([
+                    dataService.getAdvanceHistory(),
+                    dataService.getEmployees()
+                ]);
+                setAllAdvances(advData);
+                setEmployees(empsData);
+            } catch (err) {
+                console.error("Failed to load advance report data:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
 
     // Filter Logic
     const reportData = useMemo(() => {
@@ -146,6 +166,14 @@ const AdvanceReport = () => {
             XLSX.writeFile(workbook, `Advance_Report_${year}.xlsx`);
         }
     };
+
+    if (loading) {
+        return (
+            <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+            </div>
+        );
+    }
 
     return (
         <div className="page-container">

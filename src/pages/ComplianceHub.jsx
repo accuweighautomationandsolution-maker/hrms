@@ -14,8 +14,9 @@ const ComplianceHub = ({ userRole }) => {
   const [selectedUpdate, setSelectedUpdate] = useState(null);
   const [selectedManual, setSelectedManual] = useState(null);
 
-  const [updates, setUpdates] = useState(dataService.getStatutoryUpdates());
-  const [manuals, setManuals] = useState(dataService.getComplianceManuals());
+  const [updates, setUpdates] = useState([]);
+  const [manuals, setManuals] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(null); // { type, item }
   const [viewHistoryManual, setViewHistoryManual] = useState(null);
 
@@ -24,29 +25,56 @@ const ComplianceHub = ({ userRole }) => {
     title: '', category: 'PF', priority: 'Informational', summary: '', details: '', refLink: '', tags: ''
   });
 
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [updatesData, manualsData] = await Promise.all([
+          dataService.getStatutoryUpdates(),
+          dataService.getComplianceManuals()
+        ]);
+        setUpdates(updatesData);
+        setManuals(manualsData);
+      } catch (err) {
+        console.error("Failed to load compliance data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
   const categories = ['All', 'PF', 'ESIC', 'Income Tax', 'Labour Law'];
 
-  const handleSaveUpdate = () => {
+  if (loading) {
+    return (
+      <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+      </div>
+    );
+  }
+
+  const handleSaveUpdate = async () => {
     if (!formData.title || !formData.summary) return;
     const formattedUpdate = {
       ...formData,
       date: new Date().toISOString().split('T')[0],
       tags: formData.tags.split(',').map(t => t.trim()).filter(t => t)
     };
-    const newList = dataService.saveStatutoryUpdate(formattedUpdate);
+    const newList = await dataService.saveStatutoryUpdate(formattedUpdate);
     setUpdates(newList);
     setFormData({ title: '', category: 'PF', priority: 'Informational', summary: '', details: '', refLink: '', tags: '' });
   };
 
-  const handleDeleteUpdate = (id) => {
+  const handleDeleteUpdate = async (id) => {
     if (window.confirm('Are you sure you want to delete this statutory update?')) {
-      const newList = dataService.deleteStatutoryUpdate(id);
+      const newList = await dataService.deleteStatutoryUpdate(id);
       setUpdates(newList);
     }
   };
 
-  const handleSaveManual = (m) => {
-    const newList = dataService.saveComplianceManual(m);
+  const handleSaveManual = async (m) => {
+    const newList = await dataService.saveComplianceManual(m);
     setManuals(newList);
   };
 

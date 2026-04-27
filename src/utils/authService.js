@@ -145,7 +145,7 @@ export const authService = {
     // Constant-time comparison simulation
     if (user.passwordHash === inputHash) {
       // Success
-      const empRecord = dataService.getEmployeeById(user.id);
+      const empRecord = await dataService.getEmployeeById(user.id);
       const session = {
         id: user.id,
         email: user.email,

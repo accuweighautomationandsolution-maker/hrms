@@ -16,23 +16,44 @@ const ESICReport = () => {
 
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-    // Filter employees who have ESIC enabled (or have an IP number and aren't explicitly excluded)
-    const employees = dataService.getEmployees().filter(e => {
-        const hasIp = e.esicIp || (e.esicNumber && e.esicNumber !== 'N/A');
-        return e.hasESIC !== false && hasIp;
-    });
+    const [employees, setEmployees] = useState([]);
+    const [attendanceRecords, setAttendanceRecords] = useState({});
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const [empsData, attData] = await Promise.all([
+                    dataService.getEmployees(),
+                    dataService.getAttendance()
+                ]);
+                const filteredEmps = empsData.filter(e => {
+                    const hasIp = e.esicIp || (e.esicNumber && e.esicNumber !== 'N/A');
+                    return e.hasESIC !== false && hasIp;
+                });
+                setEmployees(filteredEmps);
+                setAttendanceRecords(attData);
+            } catch (err) {
+                console.error("Failed to load ESIC report data:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
 
     const reportData = useMemo(() => {
         const list = selectedEmpId === 'all' ? employees : employees.filter(e => e.id === Number(selectedEmpId));
         
         return list.map(emp => {
             const daysInMonth = new Date(year, month + 1, 0).getDate();
-            const presentDays = dataService.getPresentDaysCount(emp.id, month, year);
+            const presentDays = dataService.getPresentDaysCount(emp.id, month, year, attendanceRecords);
             
             // Re-calculate based on actual days worked for precision
             const components = calculateSalaryComponents(emp.grossSalary || emp.dayRate || 0, true, 0, emp.category, presentDays, daysInMonth);
             
-            // Map status to ESIC Reason Codes (Image 2 Instructions)
+            // Map status to ESIC Reason Codes
             let reasonCode = 0;
             if (presentDays === 0) {
                 if (emp.status === 'On Leave') reasonCode = 1;
@@ -42,9 +63,9 @@ const ESICReport = () => {
 
             return {
                 id: emp.id,
-                name: emp.name.toUpperCase().replace(/[^A-Z ]/g, ''), // Strict Image constraint: Only alphabets and space
+                name: emp.name.toUpperCase().replace(/[^A-Z ]/g, ''), // Strict Image constraint
                 ipNumber: emp.esicIp || emp.esicNumber || '0000000000',
-                workingDays: Math.ceil(presentDays > 0 ? presentDays : 0), // Base cases
+                workingDays: Math.ceil(presentDays > 0 ? presentDays : 0),
                 monthlyWages: Math.round(components.earnings.totalEarnings), 
                 eeContri: components.esicReport.eeShare,
                 erContri: components.esicReport.erShare,
@@ -52,7 +73,7 @@ const ESICReport = () => {
                 lastWorkingDay: emp.status === 'Inactive' ? emp.exitDate || '' : ''
             };
         }).filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    }, [selectedEmpId, year, month, employees, searchTerm]);
+    }, [selectedEmpId, year, month, employees, attendanceRecords, searchTerm]);
 
     const totals = useMemo(() => {
         return reportData.reduce((acc, curr) => ({
@@ -90,6 +111,14 @@ const ESICReport = () => {
             XLSX.writeFile(workbook, `ESIC_Contribution_${monthNames[month]}_${year}.xlsx`);
         }
     };
+
+    if (loading) {
+        return (
+            <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+            </div>
+        );
+    }
 
     return (
         <div className="page-container">

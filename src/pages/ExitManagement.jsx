@@ -20,13 +20,46 @@ const DEPT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06
 
 const ExitManagement = () => {
     // ── Application Stage ──────────────────────────────────────────────────
-    const [exits, setExits] = useState(dataService.getExitRecords());
-    const [employees, setEmployees] = useState(dataService.getEmployees());
-    const [advances] = useState(dataService.getAdvanceHistory ? dataService.getAdvanceHistory() : []);
-    const [expenses] = useState(dataService.getExpenses());
-    const [leaves] = useState(dataService.getLeaveBalances());
-    const [gratConfig, setGratConfig] = useState(dataService.getGratuityConfig());
-    const [hoMaster, setHoMaster] = useState(dataService.getHandoverMaster());
+    const [exits, setExits] = useState([]);
+    const [employees, setEmployees] = useState([]);
+    const [advances, setAdvances] = useState([]);
+    const [expenses, setExpenses] = useState([]);
+    const [leaves, setLeaves] = useState({});
+    const [gratConfig, setGratConfig] = useState({});
+    const [hoMaster, setHoMaster] = useState([]);
+    const [bonusConfig, setBonusConfig] = useState({});
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const [exitData, empsData, advData, expData, leaveData, gratData, hoData, bonusData] = await Promise.all([
+                    dataService.getExitRecords(),
+                    dataService.getEmployees(),
+                    dataService.getAdvanceHistory ? dataService.getAdvanceHistory() : Promise.resolve([]),
+                    dataService.getExpenses(),
+                    dataService.getLeaveBalances(),
+                    dataService.getGratuityConfig(),
+                    dataService.getHandoverMaster(),
+                    dataService.getBonusConfig()
+                ]);
+                setExits(exitData);
+                setEmployees(empsData);
+                setAdvances(advData);
+                setExpenses(expData);
+                setLeaves(leaveData);
+                setGratConfig(gratData);
+                setHoMaster(hoData);
+                setBonusConfig(bonusData);
+            } catch (err) {
+                console.error("Failed to load exit management data:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
     
     const [activeTab, setActiveTab] = useState('dashboard');
     const [selectedExit, setSelectedExit] = useState(null);
@@ -42,7 +75,6 @@ const ExitManagement = () => {
     const [initiateModal, setInitiateModal] = useState(false);
     const [fnfModal, setFnfModal] = useState(false);
     const [overrideModal, setOverrideModal] = useState(false);
-    const [bonusConfig] = useState(dataService.getBonusConfig());
     const [proofModal, setProofModal] = useState(null); // { exitId, itemId }
     
     // Initiate Form State
@@ -52,6 +84,14 @@ const ExitManagement = () => {
     const [initNotice, setInitNotice] = useState(30);
     const [initLwd, setInitLwd] = useState('');
     const [initReason, setInitReason] = useState('');
+
+    if (loading) {
+        return (
+            <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+            </div>
+        );
+    }
 
     // Config: Add Item State
     const [newItem, setNewItem] = useState({ label: '', category: 'Work', mandatory: true });
@@ -99,12 +139,13 @@ const ExitManagement = () => {
     }, [exits]);
 
     // ── Handlers ─────────────────────────────────────────────────────────────
-    const handleInitiateSubmit = () => {
-        if (!initEmpId) return;
+    const handleInitiateSubmit = async () => {
+        if (!initEmpId || !initLwd) return;
         const emp = employees.find(e => e.id === Number(initEmpId));
-        const masterHandover = dataService.getHandoverMaster();
+        const masterHandover = await dataService.getHandoverMaster();
+        
         const newRecord = {
-            id: `EX-00${exits.length + 1}`,
+            id: Date.now(),
             empId: emp.id,
             name: emp.name,
             department: emp.department,
@@ -119,122 +160,123 @@ const ExitManagement = () => {
             overrides: [],
             activity: [{ date: new Date().toISOString(), action: 'Separation Initiated', user: 'HR System' }]
         };
-        const updated = [...exits, newRecord];
+        const updated = await dataService.saveExitRecords([...exits, newRecord]);
         setExits(updated);
-        dataService.saveExitRecords(updated);
         setInitiateModal(false);
     };
 
-    const updateHandoverStatus = (exitId, itemId, newStatus) => {
-        const updated = exits.map(ex => {
-            if (ex.id === exitId) {
-                const item = ex.handover.find(h => h.id === itemId);
-                // Enforcement: Proof required for completion of mandatory items
-                if (newStatus === 'Completed' && item.mandatory && !item.proof) {
-                    alert(`Action Restricted: '${item.label}' is a Mandatory item. Please upload proof/attachment first.`);
-                    return ex;
-                }
+    const updateHandoverStatus = async (exitId, itemId, newStatus) => {
+        const exit = exits.find(ex => ex.id === exitId);
+        if (!exit) return;
 
-                const newHO = ex.handover.map(h => h.id === itemId ? { ...h, status: newStatus, verifiedAt: new Date().toISOString() } : h);
-                const allMandatoryCleared = newHO.filter(h => h.mandatory).every(h => h.status === 'Completed');
-                let newStage = ex.stage;
-                let newOverallStatus = ex.status;
-                if (allMandatoryCleared) {
-                    newStage = 3;
-                    newOverallStatus = 'FnF Pending';
-                } else if (ex.stage >= 3) {
-                    newStage = 2;
-                    newOverallStatus = 'Clearance';
-                }
+        const item = exit.handover.find(h => h.id === itemId);
+        // Enforcement: Proof required for completion of mandatory items
+        if (newStatus === 'Completed' && item.mandatory && !item.proof) {
+            alert(`Action Restricted: '${item.label}' is a Mandatory item. Please upload proof/attachment first.`);
+            return;
+        }
 
-                const act = { 
-                    date: new Date().toISOString(), 
-                    action: `${item.label} set to ${newStatus}`, 
-                    user: 'Reporting Manager' 
-                };
+        const newHO = exit.handover.map(h => h.id === itemId ? { ...h, status: newStatus, verifiedAt: new Date().toISOString() } : h);
+        const allMandatoryCleared = newHO.filter(h => h.mandatory).every(h => h.status === 'Completed');
+        
+        let newStage = exit.stage;
+        let newOverallStatus = exit.status;
+        if (allMandatoryCleared) {
+            newStage = 3;
+            newOverallStatus = 'FnF Pending';
+        } else if (exit.stage >= 3) {
+            newStage = 2;
+            newOverallStatus = 'Clearance';
+        }
 
-                return { ...ex, handover: newHO, stage: newStage, status: newOverallStatus, activity: [act, ...(ex.activity || [])] };
-            }
-            return ex;
-        });
-        setExits(updated);
-        dataService.saveExitRecords(updated);
+        const act = { 
+            date: new Date().toISOString(), 
+            action: `${item.label} set to ${newStatus}`, 
+            user: 'Reporting Manager' 
+        };
+
+        const updatedRecord = { ...exit, handover: newHO, stage: newStage, status: newOverallStatus, activity: [act, ...(exit.activity || [])] };
+        const updatedList = exits.map(ex => ex.id === exitId ? updatedRecord : ex);
+        
+        await dataService.saveExitRecords(updatedList);
+        setExits(updatedList);
         if (selectedExit && selectedExit.id === exitId) {
-            setSelectedExit(updated.find(ex => ex.id === exitId));
+            setSelectedExit(updatedRecord);
         }
     };
 
-    const attachProofToItem = (exitId, itemId, proofName) => {
-        const updated = exits.map(ex => {
-            if (ex.id === exitId) {
-                const newHO = ex.handover.map(h => h.id === itemId ? { ...h, proof: proofName } : h);
-                const act = { date: new Date().toISOString(), action: `Attached proof: ${proofName}`, user: 'System' };
-                return { ...ex, handover: newHO, activity: [act, ...(ex.activity || [])] };
-            }
-            return ex;
-        });
-        setExits(updated);
-        dataService.saveExitRecords(updated);
+    const attachProofToItem = async (exitId, itemId, proofName) => {
+        const exit = exits.find(ex => ex.id === exitId);
+        if (!exit) return;
+
+        const newHO = exit.handover.map(h => h.id === itemId ? { ...h, proof: proofName } : h);
+        const act = { date: new Date().toISOString(), action: `Attached proof: ${proofName}`, user: 'System' };
+        
+        const updatedRecord = { ...exit, handover: newHO, activity: [act, ...(exit.activity || [])] };
+        const updatedList = exits.map(ex => ex.id === exitId ? updatedRecord : ex);
+        
+        await dataService.saveExitRecords(updatedList);
+        setExits(updatedList);
         if (selectedExit && selectedExit.id === exitId) {
-            setSelectedExit(updated.find(ex => ex.id === exitId));
+            setSelectedExit(updatedRecord);
         }
         setProofModal(null);
     };
 
-    const handleOverrideClearance = (justification) => {
+    const handleOverrideClearance = async (justification) => {
         if (!selectedExit || !justification) return;
-        const updated = exits.map(ex => {
-            if (ex.id === selectedExit.id) {
-                const act = { date: new Date().toISOString(), action: 'Compliance Bypass Authorized', user: 'HR Admin', remark: justification };
-                return {
-                    ...ex,
-                    stage: 3,
-                    status: 'FnF Pending',
-                    overrides: [...(ex.overrides || []), { 
-                        date: new Date().toISOString(), 
-                        user: 'HR Admin', 
-                        justification,
-                        reason: 'Management Risk Acceptance'
-                    }],
-                    activity: [act, ...(ex.activity || [])]
-                };
-            }
-            return ex;
-        });
-        setExits(updated);
-        dataService.saveExitRecords(updated);
-        setSelectedExit(updated.find(ex => ex.id === selectedExit.id));
+        
+        const act = { date: new Date().toISOString(), action: 'Compliance Bypass Authorized', user: 'HR Admin', remark: justification };
+        const updatedRecord = {
+            ...selectedExit,
+            stage: 3,
+            status: 'FnF Pending',
+            overrides: [...(selectedExit.overrides || []), { 
+                date: new Date().toISOString(), 
+                user: 'HR Admin', 
+                justification,
+                reason: 'Management Risk Acceptance'
+            }],
+            activity: [act, ...(selectedExit.activity || [])]
+        };
+        
+        const updatedList = exits.map(ex => ex.id === selectedExit.id ? updatedRecord : ex);
+        await dataService.saveExitRecords(updatedList);
+        setExits(updatedList);
+        setSelectedExit(updatedRecord);
         setOverrideModal(false);
     };
 
-    const deleteExitRecord = (id) => {
+    const deleteExitRecord = async (id) => {
         if (window.confirm('CRITICAL ACTION: This will permanently purge the separation record and all handover data. Proceed?')) {
-            const updated = dataService.deleteExitRecord(id);
+            const updated = await dataService.deleteExitRecord(id);
             setExits(updated);
             if (selectedExit && selectedExit.id === id) setSelectedExit(null);
         }
     };
 
-    const completeFnF = (exitObj) => {
-        dataService.completeFnFSystemProcess(exitObj.empId);
-        const emps = dataService.getEmployees();
+    const completeFnF = async (exitObj) => {
+        await dataService.completeFnFSystemProcess(exitObj.empId);
+        const [emps, updatedExits] = await Promise.all([
+            dataService.getEmployees(),
+            dataService.getExitRecords()
+        ]);
         setEmployees(emps);
-        const updatedExits = dataService.getExitRecords();
         setExits(updatedExits);
         setFnfModal(false);
         setSelectedExit(null);
     };
 
     // ── Config Handlers ──────────────────────
-    const handleAddItem = () => {
+    const handleAddItem = async () => {
         if (!newItem.label) return;
-        const upd = dataService.addHandoverItem(newItem);
+        const upd = await dataService.addHandoverItem(newItem);
         setHoMaster(upd);
         setNewItem({ label: '', category: 'Work', mandatory: true });
     };
 
-    const handleDeleteItem = (id) => {
-        const upd = dataService.deleteHandoverItem(id);
+    const handleDeleteItem = async (id) => {
+        const upd = await dataService.deleteHandoverItem(id);
         setHoMaster(upd);
     };
 

@@ -33,44 +33,55 @@ import {
 const formatCurrency = (i) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(i);
 
 const BudgetControl = () => {
-    const [budgets, setBudgets] = useState(dataService.getDeptBudgets());
+    const [budgets, setBudgets] = useState([]);
+    const [enrichedBudgets, setEnrichedBudgets] = useState([]);
+    const [summary, setSummary] = useState({ totalCompanyBudget: 0, totalCompanyUtilized: 0, deptsOverBudget: 0 });
     const [isEditing, setIsEditing] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [showEmailModal, setShowEmailModal] = useState(false);
     
-    
-    // Calculate live utilization mapping
-    const metrics = useMemo(() => {
-        let totalCompanyBudget = 0;
-        let totalCompanyUtilized = 0;
-        let deptsOverBudget = 0;
-
-        const enrichedBudgets = budgets.map(b => {
-            const utilized = dataService.getBudgetUtilization(b.department);
-            const percentage = b.totalBudget > 0 ? (utilized / b.totalBudget) * 100 : 0;
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            const budgetData = await dataService.getDeptBudgets();
+            setBudgets(budgetData);
             
-            totalCompanyBudget += b.totalBudget;
-            totalCompanyUtilized += utilized;
-            if (percentage > 100 + Number(b.buffer)) {
-                deptsOverBudget++;
-            }
+            let totalCompanyBudget = 0;
+            let totalCompanyUtilized = 0;
+            let deptsOverBudget = 0;
 
-            return {
-                ...b,
-                utilized,
-                available: Math.max(0, b.totalBudget - utilized),
-                percentage: percentage.toFixed(1),
-                status: percentage <= 70 ? 'green' : percentage <= 90 ? 'yellow' : 'red'
-            };
-        });
+            const enriched = await Promise.all(budgetData.map(async b => {
+                const utilized = await dataService.getBudgetUtilization(b.department);
+                const percentage = b.totalBudget > 0 ? (utilized / b.totalBudget) * 100 : 0;
+                
+                totalCompanyBudget += b.totalBudget;
+                totalCompanyUtilized += utilized;
+                if (percentage > 100 + Number(b.buffer)) {
+                    deptsOverBudget++;
+                }
 
-        return {
-            enrichedBudgets,
-            totalCompanyBudget,
-            totalCompanyUtilized,
-            deptsOverBudget
-        };
-    }, [budgets]);
+                return {
+                    ...b,
+                    utilized,
+                    available: Math.max(0, b.totalBudget - utilized),
+                    percentage: percentage.toFixed(1),
+                    status: percentage <= 70 ? 'green' : percentage <= 90 ? 'yellow' : 'red'
+                };
+            }));
+
+            setEnrichedBudgets(enriched);
+            setSummary({ totalCompanyBudget, totalCompanyUtilized, deptsOverBudget });
+        } catch (err) {
+            console.error("Failed to load budget data:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadData();
+    }, []);
 
     const handleBudgetChange = (idx, field, val) => {
         const copy = [...budgets];
@@ -88,14 +99,15 @@ const BudgetControl = () => {
         setBudgets(copy);
     };
 
-    const handleSave = () => {
-        dataService.saveDeptBudgets(budgets);
+    const handleSave = async () => {
+        await dataService.saveDeptBudgets(budgets);
         setIsEditing(false);
+        loadData();
         alert('Budget parameters successfully updated.');
     };
 
     const handleExport = (format) => {
-        const rawData = metrics.enrichedBudgets.map(b => ({
+        const rawData = enrichedBudgets.map(b => ({
             "Department Name": b.department,
             "Financial Category": b.type,
             "Total Allocated Limit": b.totalBudget,
@@ -136,6 +148,14 @@ const BudgetControl = () => {
         setIsEditing(true);
     };
 
+    if (loading) {
+        return (
+            <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+            </div>
+        );
+    }
+
     return (
         <div className="page-container">
             <div className="page-header" style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -175,7 +195,7 @@ const BudgetControl = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
                             <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>Company Global Headcount Budget</div>
-                            <div style={{ fontSize: '1.75rem', fontWeight: 'bold' }}>{formatCurrency(metrics.totalCompanyBudget)}</div>
+                            <div style={{ fontSize: '1.75rem', fontWeight: 'bold' }}>{formatCurrency(summary.totalCompanyBudget)}</div>
                         </div>
                         <Building2 size={32} color="var(--color-primary)" opacity={0.2} />
                     </div>
@@ -184,7 +204,7 @@ const BudgetControl = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
                             <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>Total Utilization (Live Employee Set)</div>
-                            <div style={{ fontSize: '1.75rem', fontWeight: 'bold', color: 'var(--color-warning)' }}>{formatCurrency(metrics.totalCompanyUtilized)}</div>
+                            <div style={{ fontSize: '1.75rem', fontWeight: 'bold', color: 'var(--color-warning)' }}>{formatCurrency(summary.totalCompanyUtilized)}</div>
                         </div>
                         <TrendingUp size={32} color="var(--color-warning)" opacity={0.3} />
                     </div>
@@ -193,11 +213,11 @@ const BudgetControl = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
                             <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>Departments Over-Budget</div>
-                            <div style={{ fontSize: '1.75rem', fontWeight: 'bold', color: metrics.deptsOverBudget > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
-                                {metrics.deptsOverBudget}
+                            <div style={{ fontSize: '1.75rem', fontWeight: 'bold', color: summary.deptsOverBudget > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
+                                {summary.deptsOverBudget}
                             </div>
                         </div>
-                        {metrics.deptsOverBudget > 0 ? <AlertTriangle size={32} color="var(--color-danger)" opacity={0.4} /> : <TrendingDown size={32} color="var(--color-success)" opacity={0.4} />}
+                        {summary.deptsOverBudget > 0 ? <AlertTriangle size={32} color="var(--color-danger)" opacity={0.4} /> : <TrendingDown size={32} color="var(--color-success)" opacity={0.4} />}
                     </div>
                 </div>
             </div>
@@ -207,7 +227,7 @@ const BudgetControl = () => {
                 <h3 style={{ marginBottom: '1.5rem', fontSize: '1.1rem' }}>Utilization Matrix</h3>
                 <div style={{ height: '350px' }}>
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={metrics.enrichedBudgets} layout="vertical" margin={{ top: 5, right: 30, left: 50, bottom: 5 }}>
+                        <BarChart data={enrichedBudgets} layout="vertical" margin={{ top: 5, right: 30, left: 50, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                             <XAxis type="number" tickFormatter={(v) => `₹${v/100000}L`} />
                             <YAxis dataKey="department" type="category" width={100} fontSize={12} />
@@ -244,7 +264,7 @@ const BudgetControl = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {metrics.enrichedBudgets.map((dept, idx) => (
+                            {enrichedBudgets.map((dept, idx) => (
                                 <tr key={dept.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                                     <td style={{ padding: '1rem' }}>
                                         {isEditing ? (

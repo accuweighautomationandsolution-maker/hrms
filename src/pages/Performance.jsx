@@ -65,12 +65,32 @@ const Performance = () => {
   const [viewingRecord, setViewingRecord] = useState(null);
   const [feedbackConfig, setFeedbackConfig] = useState({ isOpen: false, empId: null, type: 'Appraisal Review' });
 
-  const allActiveData = useMemo(() => {
-    const activeEmployees = dataService.getEmployees().filter(e => e.status !== 'Terminated' && e.status !== 'Resigned');
-    return activeEmployees.map(emp => {
-      const metrics = MOCK_PERFORMANCE_METRICS[emp.id] || { lastMonthly: null, lastHalfYearly: null, lastAnnual: null, status: 'Not Scheduled' };
-      return { ...emp, dept: emp.department, ...metrics };
-    });
+  const [allActiveData, setAllActiveData] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [empsData, deptsData] = await Promise.all([
+          dataService.getEmployees(),
+          dataService.getDepartments()
+        ]);
+        const activeEmployees = empsData.filter(e => e.status !== 'Terminated' && e.status !== 'Resigned');
+        const mappedData = activeEmployees.map(emp => {
+          const metrics = MOCK_PERFORMANCE_METRICS[emp.id] || { lastMonthly: null, lastHalfYearly: null, lastAnnual: null, status: 'Not Scheduled' };
+          return { ...emp, dept: emp.department, ...metrics };
+        });
+        setAllActiveData(mappedData);
+        setDepartments(deptsData);
+      } catch (err) {
+        console.error("Failed to load performance data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
   const stats = useMemo(() => {
@@ -87,14 +107,21 @@ const Performance = () => {
   }, [allActiveData]);
 
   const chartData = useMemo(() => {
-    const depts = dataService.getDepartments();
-    return depts.map(d => {
+    return departments.map(d => {
       const deptEmps = allActiveData.filter(e => e.dept === d);
       const scores = deptEmps.map(e => e.lastHalfYearly || e.lastMonthly).filter(s => s !== null);
       const avg = scores.length > 0 ? Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)) : 0;
       return { department: d, score: avg, color: DEPARTMENT_COLORS[d] || '#94a3b8' };
     }).filter(d => d.score > 0 || allActiveData.some(e => e.dept === d.department));
-  }, [allActiveData]);
+  }, [allActiveData, departments]);
+
+  if (loading) {
+    return (
+      <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+      </div>
+    );
+  }
 
   const filteredData = useMemo(() => {
     return allActiveData.filter(emp => {
@@ -109,14 +136,24 @@ const Performance = () => {
     alert("Generating encrypted PDF Performance Report for all departments... \nSuccess! 'HRMS_Performance_Audit_2026.pdf' has been dispatched to your email.");
   };
 
-  const openRecord = (empId) => {
-    const history = dataService.getFeedbackHistory(empId);
-    const emp = dataService.getEmployeeById(empId);
+  const openRecord = async (empId) => {
+    const [history, emp] = await Promise.all([
+      dataService.getFeedbackHistory(empId),
+      dataService.getEmployeeById(empId)
+    ]);
     if (!emp) return;
     
     const metrics = MOCK_PERFORMANCE_METRICS[empId] || { lastMonthly: null, lastHalfYearly: null, lastAnnual: null, status: 'Not Scheduled' };
     setViewingRecord({ emp: { ...emp, dept: emp.department, ...metrics }, history });
   };
+
+  if (loading) {
+    return (
+      <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container">

@@ -31,10 +31,11 @@ const Advances = () => {
   const isEmployee = userRole === 'employee';
 
   const [showModal, setShowModal] = useState(false);
-  const [advances, setAdvances] = useState(dataService.getAdvanceHistory());
+  const [advances, setAdvances] = useState([]);
+  const [employeesList, setEmployeesList] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Missing states
   const [selectedEmpId, setSelectedEmpId] = useState(isEmployee ? currentUser.id : '');
   const [advanceType, setAdvanceType] = useState('Personal Advance');
   const [amount, setAmount] = useState('');
@@ -43,12 +44,31 @@ const Advances = () => {
     Object.fromEntries(CATEGORIES.map(c => [c.key, { enabled: false, amount: '' }]))
   );
 
-  const employeesList = dataService.getEmployees();
-  
-  const activeEmployees = employeesList.filter(e => 
-    e.status === 'Active' && 
-    (isEmployee ? (e.id === Number(currentUser.id)) : true)
-  );
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [advData, empsData] = await Promise.all([
+          dataService.getAdvanceHistory(),
+          dataService.getEmployees()
+        ]);
+        setAdvances(advData);
+        setEmployeesList(empsData);
+      } catch (err) {
+        console.error("Failed to load advances data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const activeEmployees = useMemo(() => {
+    return employeesList.filter(e => 
+      e.status === 'Active' && 
+      (isEmployee ? (e.id === Number(currentUser.id)) : true)
+    );
+  }, [employeesList, isEmployee, currentUser.id]);
 
   const filteredEmployees = useMemo(() => {
     return activeEmployees.filter(e => 
@@ -115,22 +135,20 @@ const Advances = () => {
 
     // Create Historical Record
     const history = dataService.getAdvanceHistory();
-    const newRecord = {
-      id: Date.now(),
-      empId: Number(selectedEmpId),
-      empName: employeesList.find(e => e.id === Number(selectedEmpId))?.name,
+
+    const emp = employeesList.find(e => e.id === Number(selectedEmpId));
+    const totalAmount = advanceType === 'Personal Advance' ? Number(amount) : calculateSiteTotal();
+
+    const newAdvance = {
+      id: `ADV-${Date.now()}`,
+      empId: emp.id,
+      empName: emp.name,
       type: advanceType,
-      issueDate: new Date().toISOString().split('T')[0],
-      amount: advanceType === 'Personal Advance' ? Number(amount) : calculateSiteTotal(),
-      installments: advanceType === 'Personal Advance' ? Number(installments) : 1,
+      amount: totalAmount,
+      installments: Number(installments),
       emi: emi,
+      date: new Date().toISOString().split('T')[0],
       status: 'Active',
-    };
-    if (advanceType === 'Official Site Advance') {
-      const details = {};
-      CATEGORIES.forEach(c => {
-         if (siteExpenses[c.key].enabled && siteExpenses[c.key].amount) {
-            details[c.label] = Number(siteExpenses[c.key].amount);
          }
       });
       newRecord.siteDetails = details;
@@ -185,6 +203,14 @@ const Advances = () => {
   const displayHistory = useMemo(() => {
     return advances.filter(h => isEmployee ? (h.empId === Number(currentUser?.id)) : true);
   }, [advances, isEmployee, currentUser?.id]);
+
+  if (loading) {
+    return (
+      <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container">

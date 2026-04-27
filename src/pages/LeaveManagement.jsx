@@ -23,6 +23,7 @@ const LeaveManagement = () => {
   const isEmployee = userRole === 'employee';
 
   const [requests, setRequests] = useState([]);
+  const [balances, setBalances] = useState({ Paid: 0, Sick: 0, Casual: 0 });
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -30,14 +31,21 @@ const LeaveManagement = () => {
     const fetchLeaves = async () => {
       setLoading(true);
       try {
-        const all = await dataService.getLeaveRequests();
+        const [all, paidBal, sickBal, casualBal] = await Promise.all([
+          dataService.getLeaveRequests(),
+          dataService.getEmployeeBalance(isEmployee ? currentUser.id : 1, 'Paid'),
+          dataService.getEmployeeBalance(isEmployee ? currentUser.id : 1, 'Sick'),
+          dataService.getEmployeeBalance(isEmployee ? currentUser.id : 1, 'Casual')
+        ]);
+        
         if (isEmployee) {
           setRequests(all.filter(r => r.empId === Number(currentUser.id)));
         } else {
           setRequests(all);
         }
+        setBalances({ Paid: paidBal, Sick: sickBal, Casual: casualBal });
       } catch (err) {
-        console.error("Failed to load leave requests:", err);
+        console.error("Failed to load leave data:", err);
       } finally {
         setLoading(false);
       }
@@ -108,9 +116,9 @@ const LeaveManagement = () => {
       </div>
 
       <div className="grid-3" style={{ marginBottom: '2rem' }}>
-        <SummaryCard title="Annual Leave Balance" value={dataService.getEmployeeBalance(isEmployee ? currentUser.id : 1, 'Paid')} colorClass="bg-blue-500" />
-        <SummaryCard title="Sick Leave Balance" value={dataService.getEmployeeBalance(isEmployee ? currentUser.id : 1, 'Sick')} colorClass="bg-emerald-500" />
-        <SummaryCard title="Casual Leave Balance" value={dataService.getEmployeeBalance(isEmployee ? currentUser.id : 1, 'Casual')} colorClass="bg-amber-500" />
+        <SummaryCard title="Annual Leave Balance" value={balances.Paid} colorClass="bg-blue-500" />
+        <SummaryCard title="Sick Leave Balance" value={balances.Sick} colorClass="bg-emerald-500" />
+        <SummaryCard title="Casual Leave Balance" value={balances.Casual} colorClass="bg-amber-500" />
       </div>
       
       {/* We need some utility classes here for the inline bg colors */}
@@ -209,8 +217,31 @@ const LeaveManagement = () => {
               <button className="btn btn-outline" onClick={() => setShowModal(false)}>Cancel</button>
               <button className="btn btn-primary" 
                 disabled={!startDate || !endDate || !reason.trim() || (new Date(startDate) > new Date(endDate))}
-                onClick={() => {
-                  alert('Leave request submitted!');
+                onClick={async () => {
+                  const start = new Date(startDate);
+                  const end = new Date(endDate);
+                  const diffTime = Math.abs(end - start);
+                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                  
+                  const newRequest = {
+                    id: Date.now(),
+                    empId: currentUser.id,
+                    name: currentUser.name,
+                    type: leaveType,
+                    startDate,
+                    endDate,
+                    duration: `${startDate} - ${endDate}`,
+                    days: diffDays,
+                    reason,
+                    status: 'Pending',
+                    appliedDate: new Date().toISOString().split('T')[0]
+                  };
+                  
+                  const existing = await dataService.getLeaveRequests();
+                  await dataService.saveLeaveRequests([...existing, newRequest]);
+                  
+                  setRequests(prev => [...prev, newRequest]);
+                  alert('Leave request submitted successfully!');
                   setShowModal(false);
                   setStartDate(''); setEndDate(''); setReason('');
                 }}>Submit Request</button>

@@ -49,11 +49,27 @@ const Expenses = () => {
     { id: Date.now(), date: new Date().toISOString().split('T')[0], category: '', amount: '', description: '', attachment: null }
   ]);
 
-  const expenseRecords = useMemo(() => dataService.getExpenses(), [reloads]);
-  
-  const activeAdvances = useMemo(() => {
-    // Only site advances with remaining balance
-    return dataService.getAdvanceHistory().filter(a => a.type === 'Official Site Advance' && a.status === 'Active');
+  const [expenseRecords, setExpenseRecords] = useState([]);
+  const [activeAdvances, setActiveAdvances] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [records, advances] = await Promise.all([
+          dataService.getExpenses(),
+          dataService.getAdvanceHistory()
+        ]);
+        setExpenseRecords(records);
+        setActiveAdvances(advances.filter(a => a.type === 'Official Site Advance' && a.status === 'Active'));
+      } catch (err) {
+        console.error("Failed to load expenses:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
   }, [reloads]);
 
   const filteredExpenses = useMemo(() => {
@@ -77,27 +93,28 @@ const Expenses = () => {
     setExpenseItems(expenseItems.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
 
-  const handleDeleteExpense = (id) => {
+  const handleDeleteExpense = async (id) => {
     if (window.confirm('Are you sure you want to delete this expense record?')) {
-        const updated = dataService.deleteExpense(id);
+        await dataService.deleteExpense(id);
         setReloads(r => r + 1);
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if(!targetSite) {
         alert("Please select a Target Site/Project for this expense report.");
         return;
     }
 
-    const currentUserName = dataService.getCurrentUserName ? dataService.getCurrentUserName() : 'Employee User';
+    const currentUser = authService.getCurrentUser();
+    const currentUserName = currentUser ? currentUser.name : 'Employee User';
 
     const newEntries = expenseItems.map(item => ({
         id: Date.now() + Math.floor(Math.random() * 1000),
         date: item.date,
         name: currentUserName,
-        empId: 1, 
-        department: 'Engineering',
+        empId: currentUser ? currentUser.id : 1, 
+        department: currentUser ? currentUser.department : 'Engineering',
         site: targetSite,
         category: item.category || 'Others',
         amount: Number(item.amount) || 0,
@@ -106,14 +123,22 @@ const Expenses = () => {
         attachments: item.attachment ? 1 : 0
     }));
 
-    const existing = dataService.getExpenses();
-    dataService.saveExpenses([...newEntries, ...existing]);
+    const existing = await dataService.getExpenses();
+    await dataService.saveExpenses([...newEntries, ...existing]);
 
     setShowModal(false);
     setReloads(r => r+1);
     setExpenseItems([{ id: Date.now(), date: new Date().toISOString().split('T')[0], category: '', amount: '', description: '', attachment: null }]);
     setTargetSite('');
   };
+
+  if (loading) {
+    return (
+      <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+      </div>
+    );
+  }
 
   const pendingCount = expenseRecords.filter(r => r.status === 'Pending').length;
   const totalReimbursed = expenseRecords.filter(r => r.status === 'Approved' && r.linkedAdvance === 'None').reduce((sum, r) => sum + r.amount, 0);

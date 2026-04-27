@@ -43,9 +43,20 @@ const UserManagement = () => {
     }));
   };
 
-  const loadData = () => {
-    setUsers(authService.getUsers());
-    setLogs(authService.getLogs());
+  const loadData = async () => {
+    setLoading(true);
+    try {
+        const [uList, lList] = await Promise.all([
+            authService.getUsers(),
+            authService.getLogs()
+        ]);
+        setUsers(uList);
+        setLogs(lList);
+    } catch (err) {
+        console.error("Failed to load user management data:", err);
+    } finally {
+        setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -65,8 +76,8 @@ const UserManagement = () => {
     }
   };
 
-  const handleToggleStatus = (userId, currentStatus) => {
-    authService.updateUserStatus(userId, !currentStatus);
+  const handleToggleStatus = async (userId, currentStatus) => {
+    await authService.updateUserStatus(userId, !currentStatus);
     loadData();
   };
 
@@ -83,12 +94,20 @@ const UserManagement = () => {
     }
   };
 
-  const handleRoleChange = (userId, newRole) => {
+  const handleRoleChange = async (userId, newRole) => {
     if(window.confirm(`Are you sure you want to change this user's access role?`)) {
-      authService.updateUserRole(userId, newRole);
+      await authService.updateUserRole(userId, newRole);
       loadData();
     }
   };
+
+  if (loading) {
+    return (
+      <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+      </div>
+    );
+  }
 
   const filteredUsers = users.filter((u) => {
     const matchesSearch = u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||

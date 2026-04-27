@@ -53,7 +53,32 @@ const AttendanceReport = () => {
     
     const [searchTerm, setSearchTerm] = useState('');
     
-    const employees = dataService.getEmployees();
+    const [employees, setEmployees] = useState([]);
+    const [leaveRequests, setLeaveRequests] = useState([]);
+    const [attendanceRecords, setAttendanceRecords] = useState({});
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const [emps, leaves, att] = await Promise.all([
+                    dataService.getEmployees(),
+                    dataService.getLeaveRequests(),
+                    dataService.getAttendance()
+                ]);
+                setEmployees(emps);
+                setLeaveRequests(leaves);
+                setAttendanceRecords(att);
+            } catch (err) {
+                console.error("Failed to load attendance report data:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
     const dateRange = useMemo(() => {
@@ -80,10 +105,9 @@ const AttendanceReport = () => {
             : employees.filter(e => e.id === Number(selectedEmpId));
             
         const results = [];
-        const leaveRequests = dataService.getLeaveRequests();
-
+        
         emps.forEach(emp => {
-            const rawData = dataService.getReportRangeData(emp.id, dateRange.start, dateRange.end);
+            const rawData = dataService.getReportRangeData(emp.id, dateRange.start, dateRange.end, attendanceRecords);
             
             const logs = rawData.map(day => {
                 // Check if on leave
@@ -172,6 +196,14 @@ const AttendanceReport = () => {
         }
     };
 
+    if (loading) {
+        return (
+            <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+            </div>
+        );
+    }
+
     return (
         <div className="page-container" style={{ position: 'relative' }}>
             <div className="page-header">
@@ -191,13 +223,8 @@ const AttendanceReport = () => {
                                    <button className="btn btn-ghost" style={{ justifyContent: 'flex-start', padding: '0.5rem' }} onClick={() => { generatePDF('attendance-report-capture', `Attendance_Report_${year}.pdf`); setShowExportMenu(false) }}><Printer size={16} style={{ marginRight: '0.5rem' }} /> Professional PDF</button>
                                    <button className="btn btn-ghost" style={{ justifyContent: 'flex-start', padding: '0.5rem' }} onClick={() => { setShowEmailModal(true); setShowExportMenu(false) }}><Mail size={16} style={{ marginRight: '0.5rem' }} /> Email Report</button>
                               </div>
-                          )}
-                     </div>
-                </div>
-            </div>
-
-            <div id="attendance-report-capture">
-            <div className="card" style={{ marginBottom: '2rem' }}>
+        <div className="page-container">
+            <div className="page-header" style={{ marginBottom: '1.5rem' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
                     {!isEmployee && (
                       <div>

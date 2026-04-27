@@ -18,13 +18,35 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 const BonusManagement = () => {
     // ── Application Stage ──────────────────────────────────────────────────
     const { showNotification } = useNotification();
-    const [employees] = useState(dataService.getEmployees());
-    const [config, setConfig] = useState(dataService.getBonusConfig());
+    const [employees, setEmployees] = useState([]);
+    const [config, setConfig] = useState({});
     const [activeTab, setActiveTab] = useState('dashboard');
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-    const [payouts, setPayouts] = useState(dataService.getBonusPayments());
+    const [payouts, setPayouts] = useState([]);
     const [isDisbursing, setIsDisbursing] = useState(false);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const [empsData, configData, paymentsData] = await Promise.all([
+                    dataService.getEmployees(),
+                    dataService.getBonusConfig(),
+                    dataService.getBonusPayments()
+                ]);
+                setEmployees(empsData);
+                setConfig(configData);
+                setPayouts(paymentsData);
+            } catch (err) {
+                console.error("Failed to load bonus data:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
 
     // ── Data Aggregations ──────────────────────────────────────────────────
     const accruals = useMemo(() => {
@@ -72,13 +94,13 @@ const BonusManagement = () => {
     ];
 
     // ── Handlers ──────────────────────────────────────────────────────────
-    const handleSaveConfig = (newConf) => {
-        dataService.saveBonusConfig(newConf);
+    const handleSaveConfig = async (newConf) => {
+        await dataService.saveBonusConfig(newConf);
         setConfig(newConf);
         showNotification('Statutory bonus configuration updated.', 'success');
     };
 
-    const handleDisburse = () => {
+    const handleDisburse = async () => {
         const eligible = accruals.filter(a => a.eligible);
         if (eligible.length === 0) {
             showNotification('No eligible employees for bonus disbursal.', 'error');
@@ -87,22 +109,28 @@ const BonusManagement = () => {
 
         if (window.confirm(`Are you sure you want to disburse ₹${stats.totalLiability.toLocaleString()} as bonus for ${selectedMonth+1}/${selectedYear}?`)) {
             setIsDisbursing(true);
-            setTimeout(() => {
-                eligible.forEach(e => {
-                    dataService.saveBonusPayment({
-                        empId: e.id,
-                        empName: e.name,
-                        amount: e.amount,
-                        month: selectedMonth,
-                        year: selectedYear,
-                        basis: e.basis,
-                        percentage: e.percentage
-                    });
-                });
-                setPayouts(dataService.getBonusPayments());
-                setIsDisbursing(false);
+            try {
+                const newPayments = eligible.map(e => ({
+                    id: `BON-${Date.now()}-${e.id}`,
+                    empId: e.id,
+                    empName: e.name,
+                    amount: e.amount,
+                    month: selectedMonth,
+                    year: selectedYear,
+                    basis: e.basis,
+                    percentage: e.percentage,
+                    status: 'Paid',
+                    payoutDate: new Date().toISOString().split('T')[0]
+                }));
+                
+                const updated = await dataService.saveBonusPayments([...newPayments, ...payouts]);
+                setPayouts(updated);
                 showNotification(`Monthly Bonus for ${selectedMonth+1}/${selectedYear} disbursed successfully.`, 'success');
-            }, 1000);
+            } catch (err) {
+                showNotification('Disbursement failed.', 'error');
+            } finally {
+                setIsDisbursing(false);
+            }
         }
     };
 
@@ -123,6 +151,14 @@ const BonusManagement = () => {
         XLSX.utils.book_append_sheet(workbook, worksheet, "BonusReport");
         XLSX.writeFile(workbook, `Bonus_Accrual_${selectedYear}.xlsx`);
     };
+
+    if (loading) {
+        return (
+            <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+            </div>
+        );
+    }
 
     return (
         <div className="page-container">

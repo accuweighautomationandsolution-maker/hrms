@@ -98,11 +98,27 @@ const HolidayList = ({ userRole }) => {
   const isManagement = userRole === 'management';
   const now = new Date();
   const [year,    setYear]    = useState(now.getFullYear());
-  const [customs, setCustoms] = useState(dataService.getCustomHolidays());
+  const [customs, setCustoms] = useState([]);
   const [modal,   setModal]   = useState(null); // null | { mode:'add' } | { mode:'edit', id }
   const [filterType, setFilterType] = useState('All');
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchHolidays = async () => {
+      setLoading(true);
+      try {
+        const data = await dataService.getCustomHolidays();
+        setCustoms(data);
+      } catch (err) {
+        console.error("Failed to load holidays:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchHolidays();
+  }, []);
 
   // All weekly holidays for the full year (all 12 months)
   const weeklyHolidays = useMemo(() => {
@@ -150,27 +166,35 @@ const HolidayList = ({ userRole }) => {
     return map;
   }, [allHolidays]);
 
-  const handleAdd = (data) => {
+  const handleAdd = async (data) => {
     const newList = [...customs, { ...data, id: Date.now() }];
     setCustoms(newList);
-    dataService.saveCustomHolidays(newList);
+    await dataService.saveCustomHolidays(newList);
     setModal(null);
   };
 
-  const handleEdit = (data) => {
+  const handleEdit = async (data) => {
     const newList = customs.map(h => h.id === modal.id ? { ...h, ...data } : h);
     setCustoms(newList);
-    dataService.saveCustomHolidays(newList);
+    await dataService.saveCustomHolidays(newList);
     setModal(null);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Remove this holiday from the list?')) {
       const newList = customs.filter(h => h.id !== id);
       setCustoms(newList);
-      dataService.saveCustomHolidays(newList);
+      await dataService.saveCustomHolidays(newList);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+      </div>
+    );
+  }
 
   const totalCustom = yearCustoms.length;
   const totalWeekly = weeklyHolidays.length;

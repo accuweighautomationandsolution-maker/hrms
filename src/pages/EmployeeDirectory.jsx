@@ -122,9 +122,9 @@ const EmployeeDirectory = ({ userRole }) => {
     setErrorMsg('');
   };
 
-  const handleEditEmployee = (emp) => {
+  const handleEditEmployee = async (emp) => {
     const names = (emp.name || '').split(' ');
-    const salary = dataService.getSalaryStructure(emp.id);
+    const salary = await dataService.getSalaryStructure(emp.id);
     setForm(prev => ({
       ...prev,
       id: emp.id,
@@ -139,10 +139,10 @@ const EmployeeDirectory = ({ userRole }) => {
       contact: emp.contact || '',
       role: emp.role || '',
       department: emp.department || '',
-      joinDate: emp.joiningDate ? new Date(emp.joiningDate).toISOString().split('T')[0] : '',
+      joinDate: emp.joiningDate || '',
       presAddress: emp.presAddress || '',
       permAddress: emp.permAddress || '',
-      sameAsPresent: !!(emp.presAddress && emp.presAddress === emp.permAddress),
+      sameAsPresent: emp.presAddress === emp.permAddress,
       hasPF: !!emp.uanNumber,
       uan: emp.uanNumber || '',
       pfMemberId: emp.pfMemberId || '',
@@ -172,9 +172,9 @@ const EmployeeDirectory = ({ userRole }) => {
     setShowModal(true);
   };
 
-  const handleDeleteEmployee = (id) => {
+  const handleDeleteEmployee = async (id) => {
     if (window.confirm('Are you sure you want to PERMANENTLY delete this employee record? This action is logged.')) {
-      const updated = dataService.deleteEmployee(id);
+      const updated = await dataService.deleteEmployee(id);
       setEmployees(updated);
       showNotification('Employee record purged successfully.', 'success');
     }
@@ -208,7 +208,7 @@ const EmployeeDirectory = ({ userRole }) => {
     (!form.hasESIC || form.esicIp)
   );
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!isFormValid) {
       setErrorMsg('CRITICAL: All compulsory fields marked with * must be filled in all sections before onboarding.');
       showNotification('Validation Failed: Compulsory fields missing.', 'error');
@@ -216,7 +216,7 @@ const EmployeeDirectory = ({ userRole }) => {
     }
     
     const empData = {
-      id: form.id,
+      id: form.id || Date.now(),
       name: `${form.firstName} ${form.middleName ? form.middleName + ' ' : ''}${form.lastName}`.trim(),
       email: form.email,
       role: form.role || 'Associate',
@@ -249,24 +249,28 @@ const EmployeeDirectory = ({ userRole }) => {
       hasMediclaim: form.hasMediclaim,
       mediclaimPolicies: form.hasMediclaim ? form.mediclaimPolicies : [],
       hasTermInsurance: form.hasTermInsurance,
-      termInsurancePolicies: form.hasTermInsurance ? form.termInsurancePolicies : []
+      termInsurancePolicies: form.hasTermInsurance ? form.termInsurancePolicies : [],
+      documents: uploadedFiles,
+      salaryConfig: form.salaryConfig,
+      grossSalary: form.salaryConfig?.targetSalary || 0
     };
 
-    const savedEmp = dataService.saveEmployee(empData);
+    const savedEmp = await dataService.saveEmployee(empData);
     
-    // Logic: If salaryConfig exists, save it linked to the (potentially new) emp ID
     if (form.salaryConfig) {
-      dataService.saveSalaryStructure(savedEmp.id, {
+      await dataService.saveSalaryStructure(savedEmp.id, {
         ...form.salaryConfig,
         empId: savedEmp.id,
         candidateName: savedEmp.name
       });
     }
 
-    setEmployees(dataService.getEmployees());
+    const emps = await dataService.getEmployees();
+    setEmployees(emps);
     showNotification(`Employee ${form.id ? 'Updated' : 'Onboarded'} Successfully!`, 'success');
     setShowModal(false);
     resetForm();
+  };
   };
 
   const TabButton = ({ num, label, icon: Icon }) => (
@@ -351,7 +355,7 @@ const EmployeeDirectory = ({ userRole }) => {
             <thead>
               <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Name</th>
-                <th style={{ padding: '1rem', fontWeight: '500' }}>Code</th>
+                <th style={{ padding: '1rem', fontWeight: '500' }}>Employee Code</th>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Role</th>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Department</th>
                 {isEmployee && <th style={{ padding: '1rem', fontWeight: '500' }}>Contact Number</th>}
@@ -363,6 +367,7 @@ const EmployeeDirectory = ({ userRole }) => {
               {employees.filter(e => 
                 e.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                 (e.empCode && e.empCode.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (e.biometricCode && e.biometricCode.toLowerCase().includes(searchTerm.toLowerCase())) ||
                 e.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 e.department.toLowerCase().includes(searchTerm.toLowerCase())
               ).map((emp) => (
@@ -378,7 +383,10 @@ const EmployeeDirectory = ({ userRole }) => {
                       </div>
                     </div>
                   </td>
-                  <td style={{ padding: '1rem', color: 'var(--color-text-main)', fontWeight: '600' }}>{emp.empCode}</td>
+                  <td style={{ padding: '1rem' }}>
+                    <div style={{ fontWeight: '600', color: 'var(--color-text-main)' }}>{emp.empCode}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Bio: {emp.biometricCode}</div>
+                  </td>
                   <td style={{ padding: '1rem', color: 'var(--color-text-main)' }}>{emp.role}</td>
                   <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{emp.department}</td>
                   {isEmployee && <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{emp.contact || '+91 98' + Math.floor(10000000 + Math.random() * 90000000)}</td>}

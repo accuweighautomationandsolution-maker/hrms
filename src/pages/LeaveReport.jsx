@@ -46,29 +46,43 @@ const LeaveReport = () => {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
 
-  const employees = dataService.getEmployees();
-  const departments = [...new Set(employees.map(e => e.department))];
-  
-  // Use actual logged-in user instead of hardcoded
+  const [employees, setEmployees] = useState([]);
+  const [filteredData, setFilteredData] = useState({ leaves: [], employees: [] });
+  const [analytics, setAnalytics] = useState({ typeDistribution: {}, statusBreakdown: { Approved: 0, Pending: 0, Rejected: 0 }, monthlyTrend: {}, totalDays: 0 });
+  const [loading, setLoading] = useState(true);
+
   const currentUser = authService.getCurrentUser();
   const userRole = authService.getUserRole();
   const isEmployee = userRole === 'employee';
   const currentUserId = currentUser ? currentUser.id : 1; 
 
-  const filteredData = useMemo(() => {
-    const filters = {
-      departments: selectedDepts,
-      empId: isEmployee ? currentUserId : empId,
-      managerId: (!isEmployee && scope === 'team') ? currentUserId : null
-    };
+  const loadReport = async () => {
+    setLoading(true);
+    try {
+      const emps = await dataService.getEmployees();
+      setEmployees(emps);
 
-    // Note: In real app, we'd also pass date range based on 'period'
-    return dataService.getLeavesByCriteria(filters);
-  }, [selectedDepts, empId, scope]);
+      const filters = {
+        departments: selectedDepts,
+        empId: isEmployee ? currentUserId : empId,
+        managerId: (!isEmployee && scope === 'team') ? currentUserId : null
+      };
 
-  const analytics = useMemo(() => {
-    return dataService.getLeaveAnalytics(filteredData.leaves);
-  }, [filteredData]);
+      const data = await dataService.getLeavesByCriteria(filters);
+      setFilteredData(data);
+      setAnalytics(dataService.getLeaveAnalytics(data.leaves));
+    } catch (err) {
+      console.error("Failed to load leave report data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadReport();
+  }, [selectedDepts, empId, scope, isEmployee, currentUserId]);
+
+  const departments = useMemo(() => [...new Set(employees.map(e => e.department))], [employees]);
 
   // Transform Type Distribution for Pie Chart
   const pieData = Object.entries(analytics.typeDistribution).map(([name, value]) => ({ name, value }));
@@ -114,6 +128,14 @@ const LeaveReport = () => {
         XLSX.writeFile(workbook, `Leave_Report_${period}_${new Date().toISOString().split('T')[0]}.xlsx`);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container">

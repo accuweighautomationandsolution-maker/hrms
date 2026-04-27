@@ -23,12 +23,15 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     // Determine the ID to fetch for (from props, location state, or passedState)
     const effectiveEmpId = empId || (location.state && location.state.empId);
     
-    if (effectiveEmpId && !isEmbedded) {
-      const existing = dataService.getSalaryStructure(effectiveEmpId);
-      if (existing) {
-        setForm(prev => ({ ...prev, ...existing }));
+    const fetchExisting = async () => {
+      if (effectiveEmpId && !isEmbedded) {
+        const existing = await dataService.getSalaryStructure(effectiveEmpId);
+        if (existing) {
+          setForm(prev => ({ ...prev, ...existing }));
+        }
       }
-    }
+    };
+    fetchExisting();
 
     if (!isEmbedded && location.state && location.state.isAppraisal) {
       setIsAppraisal(true);

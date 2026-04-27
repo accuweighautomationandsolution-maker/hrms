@@ -15,21 +15,25 @@ const PolicyManagement = ({ userRole }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [policies, setPolicies] = useState([]);
   const [acks, setAcks] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [newPolicy, setNewPolicy] = useState({ title: '', category: 'HR Policies', version: '1.0', effectiveDate: '' });
   const [selectedFile, setSelectedFile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [pList, aList] = await Promise.all([
+        const [pList, aList, eList] = await Promise.all([
           dataService.getPolicies(),
-          dataService.getAcknowledgments()
+          dataService.getAcknowledgments(),
+          dataService.getEmployees()
         ]);
         setPolicies(pList);
         setAcks(aList);
+        setEmployees(eList);
       } catch (err) {
         console.error("Failed to fetch policies:", err);
       } finally {
@@ -46,12 +50,13 @@ const PolicyManagement = ({ userRole }) => {
     );
   }, [policies, searchQuery]);
 
-  const currentUserId = 1; // Alice Smith (Simulated Context)
-  const isAcknowledged = (policyId) => acks.some(a => a.policyId === policyId && a.empId === currentUserId);
+  const user = authService.getCurrentUser();
+  const isAcknowledged = (policyId) => acks.some(a => a.policyId === policyId && a.empId === user?.id);
 
-  const handleAcknowledge = (policyId) => {
-    const newAck = { policyId, empId: currentUserId, empName: 'Alice Smith' };
-    const newList = dataService.saveAcknowledgment(newAck);
+  const handleAcknowledge = async (policyId) => {
+    const user = authService.getCurrentUser();
+    const newAck = { policyId, empId: user.id, empName: user.name };
+    const newList = await dataService.saveAcknowledgment(newAck);
     setAcks(newList);
     showNotification('Policy acknowledged successfully.', 'success');
   };
@@ -106,11 +111,12 @@ const PolicyManagement = ({ userRole }) => {
     }
   };
 
-  const handleDeletePolicy = (id) => {
-    if (window.confirm('Delete this policy? This will remove all associated acknowledgment logs.')) {
-      const updated = dataService.deletePolicy(id);
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this policy?')) {
+      const updated = policies.filter(p => p.id !== id);
+      await dataService.savePolicies(updated);
       setPolicies(updated);
-      showNotification('Policy deleted successfully.', 'success');
+      showNotification('Policy deleted.', 'success');
     }
   };
 
@@ -132,7 +138,7 @@ const PolicyManagement = ({ userRole }) => {
   };
 
   const getAckStats = (policyId) => {
-    const totalEmps = dataService.getEmployees().length;
+    const totalEmps = employees.length;
     const signedCount = acks.filter(a => a.policyId === policyId).length;
     return {
       signed: signedCount,
@@ -140,6 +146,14 @@ const PolicyManagement = ({ userRole }) => {
       percentage: totalEmps > 0 ? Math.round((signedCount / totalEmps) * 100) : 0
     };
   };
+
+  if (loading) {
+    return (
+      <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container">
@@ -306,7 +320,7 @@ const PolicyManagement = ({ userRole }) => {
                 </tr>
               </thead>
               <tbody>
-                {dataService.getEmployees().map(emp => (
+                {employees.map(emp => (
                   <tr key={emp.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                     <td style={{ padding: '1rem', fontWeight: 'bold' }}>{emp.name}</td>
                     <td style={{ padding: '1rem', fontSize: '0.875rem' }}>{emp.department}</td>

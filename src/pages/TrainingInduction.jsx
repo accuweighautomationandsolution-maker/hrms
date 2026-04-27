@@ -22,6 +22,7 @@ const TrainingInduction = ({ userRole }) => {
   });
 
   const [loading, setLoading] = useState(true);
+  const [inductionTasksMap, setInductionTasksMap] = useState({});
 
   useEffect(() => {
     const fetchData = async () => {
@@ -33,6 +34,12 @@ const TrainingInduction = ({ userRole }) => {
         ]);
         setRecords(trainingData);
         setEmployees(employeeData);
+
+        const taskMap = {};
+        await Promise.all(employeeData.map(async (emp) => {
+          taskMap[emp.id] = await dataService.getInductionTasks(emp.id);
+        }));
+        setInductionTasksMap(taskMap);
       } catch (err) {
         console.error("Failed to load growth data:", err);
       } finally {
@@ -113,6 +120,14 @@ const TrainingInduction = ({ userRole }) => {
           <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 1rem' }}></div>
           <p style={{ color: 'var(--color-text-muted)', fontWeight: '500' }}>Loading growth tracker...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
       </div>
     );
   }
@@ -220,9 +235,9 @@ const TrainingInduction = ({ userRole }) => {
                 .filter(emp => isEmployee ? emp.id === authService.getCurrentUser()?.id : true)
                 .slice(0, 6)
                 .map(emp => {
-                const tasks = dataService.getInductionTasks(emp.id);
+                const tasks = inductionTasksMap[emp.id] || [];
                 const completed = tasks.filter(t => t.status === 'Completed').length;
-                const progress = Math.round((completed / tasks.length) * 100);
+                const progress = tasks.length > 0 ? Math.round((completed / tasks.length) * 100) : 0;
 
                 return (
                   <div key={emp.id} className="card" style={{ border: '1px solid var(--color-border)', margin: 0 }}>

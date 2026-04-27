@@ -20,8 +20,35 @@ const HiringRequests = () => {
     const [reloads, setReloads] = useState(0); 
     const handleRefresh = () => setReloads(r => r+1);
 
-    const requestsData = useMemo(() => dataService.getManpowerRequests(), [reloads]);
-    const budgetsData = useMemo(() => dataService.getDeptBudgets(), [reloads]);
+    const [requestsData, setRequestsData] = useState([]);
+    const [budgetsData, setBudgetsData] = useState([]);
+    const [utilizationMap, setUtilizationMap] = useState({});
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const [reqs, budgets] = await Promise.all([
+                    dataService.getManpowerRequests(),
+                    dataService.getDeptBudgets()
+                ]);
+                setRequestsData(reqs);
+                setBudgetsData(budgets);
+
+                const uMap = {};
+                await Promise.all(budgets.map(async (b) => {
+                    uMap[b.department] = await dataService.getBudgetUtilization(b.department);
+                }));
+                setUtilizationMap(uMap);
+            } catch (err) {
+                console.error("Failed to load hiring data:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, [reloads]);
     
     // Live Prediction calculation
     const budgetContext = useMemo(() => {
@@ -29,7 +56,7 @@ const HiringRequests = () => {
         const targetBudget = budgetsData.find(b => b.department === department);
         if (!targetBudget) return null;
 
-        const utilized = dataService.getBudgetUtilization(department);
+        const utilized = utilizationMap[department] || 0;
         const projectedCTC = Number(proposedCTC) || 0;
         const newTotal = utilized + projectedCTC;
         
@@ -48,7 +75,7 @@ const HiringRequests = () => {
         };
     }, [department, proposedCTC, budgetsData, reloads]);
 
-    const submitRequest = () => {
+    const submitRequest = async () => {
         if (!department || !role || !proposedCTC || !justification) {
             alert('Please fill out all requisition fields.');
             return;
@@ -70,26 +97,33 @@ const HiringRequests = () => {
             breachAmount: (budgetContext && budgetContext.isExceeded) ? budgetContext.breachAmount : 0
         };
 
-        const existing = dataService.getManpowerRequests();
-        dataService.saveManpowerRequests([newReq, ...existing]);
-
-        alert((budgetContext && budgetContext.isExceeded) ? 'Requisition sent for Director Approval.' : 'Requisition Auto-Approved (Within Limits).');
+        const existing = await dataService.getManpowerRequests();
+        await dataService.saveManpowerRequests([newReq, ...existing]);
         
-        setDepartment('');
+        // Reset
         setRole('');
         setProposedCTC('');
         setJustification('');
         handleRefresh();
+        alert('Requisition processed successfully.');
     };
 
-    const deleteRequest = (id) => {
+    const deleteRequest = async (id) => {
         if (window.confirm('Are you sure you want to delete this requisition record?')) {
-            const existing = dataService.getManpowerRequests();
+            const existing = await dataService.getManpowerRequests();
             const filtered = existing.filter(r => r.id !== id);
-            dataService.saveManpowerRequests(filtered);
+            await dataService.saveManpowerRequests(filtered);
             handleRefresh();
         }
     };
+
+    if (loading) {
+        return (
+            <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+            </div>
+        );
+    }
 
     return (
         <div className="page-container">

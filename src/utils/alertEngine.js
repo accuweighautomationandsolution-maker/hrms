@@ -4,7 +4,7 @@ export const alertEngine = {
   /**
    * Generates a list of smart alerts for the current user based on calendar and personal data
    */
-  getDashboardAlerts: (user) => {
+  getDashboardAlerts: async (user) => {
     if (!user) return [];
     const alerts = [];
     const today = new Date();
@@ -18,8 +18,8 @@ export const alertEngine = {
     const daysUntilSalary = salaryDay - currentDay;
     
     // Check if user has active advances
-    const advances = dataService.getPersonalAdvances(user.id);
-    const hasUnpaidAdvance = advances.some(a => a.status === 'Approved' || a.status === 'Partially Paid');
+    const advances = await dataService.getPersonalAdvances(user.id);
+    const hasUnpaidAdvance = (advances || []).some(a => a.status === 'Approved' || a.status === 'Partially Paid');
 
     if (hasUnpaidAdvance && daysUntilSalary <= 7 && daysUntilSalary >= 0) {
       alerts.push({
@@ -33,12 +33,10 @@ export const alertEngine = {
     }
 
     // 2. Expense Submission Reminder (Day 6 onwards)
-    // Threshold is configurable, using Day 6 as default
     const expenseTriggerDay = 6;
     if (currentDay >= expenseTriggerDay) {
-        // Only show if user hasn't submitted expenses for this month yet
-        const expenses = dataService.getPersonalExpenses(user.id);
-        const thisMonthSubmitted = expenses.some(e => {
+        const expenses = await dataService.getPersonalExpenses(user.id);
+        const thisMonthSubmitted = (expenses || []).some(e => {
             const expDate = new Date(e.date);
             return expDate.getMonth() === currentMonth && expDate.getFullYear() === currentYear;
         });
@@ -55,10 +53,13 @@ export const alertEngine = {
     }
 
     // 3. Notice/Memo Unread Alert
-    const notices = dataService.getPersonalNotices(user.id);
-    const unreadNotices = notices.filter(n => {
-        const acks = dataService.getAcknowledgments(); // Reusing policy acks for notices or specific ones
-        const isAcked = acks.some(a => a.type === 'NOTICE' && a.itemId === n.id && a.empId === user.id);
+    const [notices, acks] = await Promise.all([
+        dataService.getPersonalNotices(user.id),
+        dataService.getAcknowledgments()
+    ]);
+
+    const unreadNotices = (notices || []).filter(n => {
+        const isAcked = (acks || []).some(a => a.type === 'NOTICE' && a.itemId === n.id && a.empId === user.id);
         return n.priority === 'Critical' && !isAcked;
     });
 

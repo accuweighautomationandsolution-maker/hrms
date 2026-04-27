@@ -25,7 +25,23 @@ const VARIABLE_TAGS = [
 ];
 
 const LetterTemplates = () => {
-    const [templates, setTemplates] = useState(dataService.getLetterTemplates());
+    const [templates, setTemplates] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchTemplates = async () => {
+            setLoading(true);
+            try {
+                const data = await dataService.getLetterTemplates();
+                setTemplates(data || []);
+            } catch (err) {
+                console.error("Failed to load templates:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchTemplates();
+    }, []);
     const [selectedTemplate, setSelectedTemplate] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState({ type: '', subject: '', content: '' });
@@ -41,7 +57,7 @@ const LetterTemplates = () => {
         setIsEditing(true);
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!editForm.type || !editForm.subject || !editForm.content) {
             alert('Please fill all template fields.');
             return;
@@ -55,18 +71,26 @@ const LetterTemplates = () => {
         }
 
         setTemplates(newList);
-        dataService.saveLetterTemplates(newList);
+        await dataService.saveLetterTemplates(newList);
         setIsEditing(false);
         alert('Template saved successfully.');
     };
 
-    const deleteTemplate = (id) => {
+    const deleteTemplate = async (id) => {
         if (window.confirm('Delete this template permanently?')) {
             const newList = templates.filter(t => t.id !== id);
             setTemplates(newList);
-            dataService.saveLetterTemplates(newList);
+            await dataService.saveLetterTemplates(newList);
         }
     };
+
+    if (loading) {
+        return (
+            <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+            </div>
+        );
+    }
 
     const insertTag = (tag) => {
         // Simple append for now, more advanced would be cursor position insertion

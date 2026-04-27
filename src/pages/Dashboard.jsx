@@ -51,14 +51,15 @@ const Dashboard = ({ userRole }) => {
   const isEmployee = userRole === 'employee';
 
   // Handle Notice/Memo Acknowledgment
-  const acknowledgeNoticeAlert = (alertId, itemId) => {
+  const acknowledgeNoticeAlert = async (alertId, itemId) => {
     dataService.saveAcknowledgment({
       type: 'NOTICE',
       itemId: itemId,
       empId: currentUser.id,
       empName: currentUser.name
     });
-    setSmartAlerts(alertEngine.getDashboardAlerts(currentUser));
+    const alerts = await alertEngine.getDashboardAlerts(currentUser);
+    setSmartAlerts(alerts);
   };
 
   const getInitialBulletin = () => {
@@ -110,19 +111,20 @@ const Dashboard = ({ userRole }) => {
         // Transform upcoming holidays into notice-like items for the timeline
         const now = new Date();
         const upcomingHolidays = holidayList
-          .filter(h => new Date(h.date) >= now)
+          .filter(h => new Date(h.fromDate) >= now)
           .map(h => ({
             id: `holiday-${h.id}`,
             title: `Holiday: ${h.name}`,
             content: `Company-wide holiday observed for ${h.name}.`,
-            date: h.date,
+            date: h.fromDate,
             type: 'Holiday',
             isSystem: true
           }));
 
         setNotices([...upcomingHolidays, ...noticesList].sort((a, b) => new Date(b.date) - new Date(a.date)));
         setProbations(probationList);
-        setSmartAlerts(alertEngine.getDashboardAlerts(currentUser));
+        const alerts = await alertEngine.getDashboardAlerts(currentUser);
+        setSmartAlerts(alerts);
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
       } finally {
@@ -140,23 +142,64 @@ const Dashboard = ({ userRole }) => {
   const [feedbackConfig, setFeedbackConfig] = useState({ isOpen: false, empId: null, type: 'Probation Completion' });
 
 
-  const saveNotice = (item) => {
+  const saveNotice = async (item) => {
+    const existingNotices = await dataService.getNotices();
     const newNotices = item.id 
-      ? notices.map(n => n.id === item.id ? item : n)
-      : [...notices, { ...item, id: Date.now(), date: new Date().toISOString().slice(0, 10), author: 'HR Admin' }];
-    setNotices(newNotices);
-    dataService.saveNotices(newNotices);
+      ? existingNotices.map(n => n.id === item.id ? item : n)
+      : [...existingNotices, { ...item, id: Date.now(), date: new Date().toISOString().slice(0, 10), author: 'HR Admin' }];
+    
+    await dataService.saveNotices(newNotices);
+    
+    // Refresh local display (including holidays)
+    const holidays = await dataService.getCustomHolidays();
+    const now = new Date();
+    const upcomingHolidays = holidays
+      .filter(h => new Date(h.fromDate) >= now)
+      .map(h => ({
+        id: `holiday-${h.id}`,
+        title: `Holiday: ${h.name}`,
+        content: `Company-wide holiday observed for ${h.name}.`,
+        date: h.fromDate,
+        type: 'Holiday',
+        isSystem: true
+      }));
+    
+    setNotices([...upcomingHolidays, ...newNotices].sort((a, b) => new Date(b.date) - new Date(a.date)));
     setNoticeModal(null);
   };
 
-  const deleteNotice = (id) => {
-    const filtered = notices.filter(n => n.id !== id);
-    setNotices(filtered);
-    dataService.saveNotices(filtered);
+  const deleteNotice = async (id) => {
+    const existing = await dataService.getNotices();
+    const filtered = existing.filter(n => n.id !== id);
+    await dataService.saveNotices(filtered);
+    
+    // Refresh local display
+    const holidays = await dataService.getCustomHolidays();
+    const now = new Date();
+    const upcomingHolidays = holidays
+      .filter(h => new Date(h.fromDate) >= now)
+      .map(h => ({
+        id: `holiday-${h.id}`,
+        title: `Holiday: ${h.name}`,
+        content: `Company-wide holiday observed for ${h.name}.`,
+        date: h.fromDate,
+        type: 'Holiday',
+        isSystem: true
+      }));
+    
+    setNotices([...upcomingHolidays, ...filtered].sort((a, b) => new Date(b.date) - new Date(a.date)));
   };
 
   const now = new Date();
   const isExpired = now < new Date(bulletin.activation) || now > new Date(bulletin.expiry);
+
+  if (loading) {
+    return (
+      <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container" style={{ position: 'relative' }}>

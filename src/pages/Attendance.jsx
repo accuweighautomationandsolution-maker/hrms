@@ -212,11 +212,6 @@ const Attendance = () => {
     return () => unsubscribe();
   }, [bioConfig]);
 
-  // Persist records when they change (Side Effect)
-  useEffect(() => {
-    dataService.saveAttendance(records);
-  }, [records]);
-
   const holidays   = useMemo(() => getHolidayDates(year, month, holidayList), [year, month, holidayList]);
   const holidaySet = useMemo(() => new Set(holidays.map(h => h.day)), [holidays]);
   const holTypeMap = useMemo(() => Object.fromEntries(holidays.map(h => [h.day, h.type])), [holidays]);
@@ -239,7 +234,7 @@ const Attendance = () => {
         };
       });
       setRecords(newRecords);
-      dataService.saveAttendance(newRecords);
+      await dataService.saveAttendance(newRecords);
       alert(`${logs.length} logs successfully synchronized from Identix Device.`);
     } catch (err) {
       alert('Failed to connect to Biometric Device. Please check IP/Port settings.');
@@ -250,14 +245,14 @@ const Attendance = () => {
 
   const getRecord = (empId, day) => records[key(empId, day)] || null;
 
-  const saveRecord = ({ punchIn, punchOut, remark, source }) => {
+  const saveRecord = async ({ punchIn, punchOut, remark, source }) => {
     const { empId, day } = punchModal;
     const newRecords = {
       ...records,
       [key(empId, day)]: { punchIn, punchOut, remark, source }
     };
     setRecords(newRecords);
-    dataService.saveAttendance(newRecords);
+    await dataService.saveAttendance(newRecords);
     setPunchModal(null);
   };
 
