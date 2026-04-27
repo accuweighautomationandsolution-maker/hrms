@@ -21,24 +21,36 @@ const MobileMenu = ({ onNavigate }) => {
   ];
 
   return (
-    <div className="animate-slide-up">
-      <div className="mobile-header">
+    <div className="animate-slide-up" style={{ position: 'relative', overflow: 'hidden', paddingBottom: '100px' }}>
+      <div className="bg-blob" style={{ top: '-50px', right: '-50px' }}></div>
+      
+      <div className="mobile-header" style={{ background: 'transparent' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <button 
             onClick={() => onNavigate('home')} 
-            style={{ background: 'none', border: 'none', padding: 0, color: 'var(--m-text-muted)' }}
+            style={{ 
+              width: '40px', 
+              height: '40px', 
+              borderRadius: '12px', 
+              background: 'white', 
+              border: 'none', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              boxShadow: '0 4px 10px rgba(0,0,0,0.05)'
+            }}
           >
-            <ChevronLeft size={24} />
+            <ChevronLeft size={20} color="var(--m-text)" />
           </button>
-          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800' }}>Menu</h2>
+          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '900', color: 'var(--m-text)' }}>Explore</h2>
         </div>
       </div>
 
       <div className="mobile-container">
         <div style={{ 
           display: 'grid', 
-          gridTemplateColumns: 'repeat(3, 1fr)', 
-          gap: '1rem',
+          gridTemplateColumns: 'repeat(2, 1fr)', 
+          gap: '1.25rem',
           marginTop: '0.5rem'
         }}>
           {menuItems.map((item) => (
@@ -48,37 +60,38 @@ const MobileMenu = ({ onNavigate }) => {
               style={{
                 display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.75rem',
-                padding: '1.25rem 0.5rem',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: '1rem',
+                padding: '1.5rem',
                 background: 'white',
-                borderRadius: '20px',
-                border: '1px solid #f1f5f9',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)',
+                borderRadius: '24px',
+                border: '1px solid rgba(0,0,0,0.02)',
+                boxShadow: 'var(--m-card-shadow)',
                 cursor: 'pointer',
+                textAlign: 'left',
+                height: '140px',
                 transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
               onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
               onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
             >
               <div style={{ 
-                width: '48px', 
-                height: '48px', 
-                borderRadius: '14px', 
+                width: '42px', 
+                height: '42px', 
+                borderRadius: '12px', 
                 background: `${item.color}15`, 
                 color: item.color,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
-                <item.icon size={24} />
+                <item.icon size={22} />
               </div>
               <span style={{ 
-                fontSize: '0.7rem', 
-                fontWeight: '700', 
-                color: '#334155',
-                textAlign: 'center',
+                fontSize: '0.85rem', 
+                fontWeight: '800', 
+                color: '#1e293b',
                 lineHeight: 1.2
               }}>
                 {item.label}
@@ -87,11 +100,16 @@ const MobileMenu = ({ onNavigate }) => {
           ))}
         </div>
 
-        <div className="m-card" style={{ marginTop: '2rem', background: 'linear-gradient(135deg, #0f172a, #334155)', border: 'none' }}>
-           <h4 style={{ color: 'white', margin: '0 0 0.5rem 0' }}>Help & Support</h4>
-           <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', margin: 0 }}>Need assistance? Reach out to HR or check the FAQ.</p>
-           <button className="m-btn" style={{ background: 'rgba(255,255,255,0.1)', color: 'white', marginTop: '1rem', border: '1px solid rgba(255,255,255,0.2)' }}>
-             Contact Support
+        <div className="m-card" style={{ 
+          marginTop: '2.5rem', 
+          background: 'linear-gradient(135deg, var(--m-primary), var(--m-primary-dark))', 
+          border: 'none',
+          padding: '2rem'
+        }}>
+           <h4 style={{ color: 'white', margin: '0 0 0.5rem 0', fontSize: '1.1rem', fontWeight: '800' }}>Expert Support</h4>
+           <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', margin: 0, lineHeight: 1.5 }}>Connect with HR for personalized guidance and support.</p>
+           <button className="m-btn" style={{ background: 'white', color: 'var(--m-primary)', marginTop: '1.5rem', fontWeight: '800' }}>
+             Talk to HR
            </button>
         </div>
       </div>

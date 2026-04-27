@@ -13,18 +13,31 @@ const EmployeeDirectory = ({ onNavigate }) => {
 
   return (
     <div className="animate-slide-up">
-      <div className="mobile-header">
+      <div className="mobile-header" style={{ background: 'transparent' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <button onClick={() => onNavigate('menu')} style={{ background: 'none', border: 'none', padding: 0 }}>
-            <ChevronLeft size={24} />
+          <button 
+            onClick={() => onNavigate('menu')} 
+            style={{ 
+              width: '40px', 
+              height: '40px', 
+              borderRadius: '12px', 
+              background: 'white', 
+              border: 'none', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              boxShadow: '0 4px 10px rgba(0,0,0,0.05)'
+            }}
+          >
+            <ChevronLeft size={20} color="var(--m-text)" />
           </button>
-          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800' }}>Directory</h2>
+          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '900' }}>Directory</h2>
         </div>
       </div>
 
       <div className="mobile-container">
-        <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
-          <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--m-text-muted)' }} />
+        <div style={{ position: 'relative', marginBottom: '2rem' }}>
+          <Search size={18} style={{ position: 'absolute', left: '1.25rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--m-text-muted)' }} />
           <input 
             type="text" 
             placeholder="Search colleagues..." 
@@ -32,12 +45,13 @@ const EmployeeDirectory = ({ onNavigate }) => {
             onChange={(e) => setSearchQ(e.target.value)}
             style={{ 
               width: '100%', 
-              padding: '1rem 1rem 1rem 3rem', 
-              borderRadius: '14px', 
-              border: '1px solid #e2e8f0',
+              padding: '1.1rem 1rem 1.1rem 3.25rem', 
+              borderRadius: '20px', 
+              border: 'none',
               fontSize: '0.95rem',
               outline: 'none',
-              background: 'white'
+              background: 'white',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.04)'
             }} 
           />
         </div>
