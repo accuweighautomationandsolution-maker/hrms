@@ -39,31 +39,25 @@ const StatCard = ({ title, value, icon: Icon, colorClass }) => (
 
 const Dashboard = ({ userRole }) => {
   const currentUser = authService.getCurrentUser();
-  const [smartAlerts, setSmartAlerts] = useState(alertEngine.getDashboardAlerts(currentUser));
+  const [smartAlerts, setSmartAlerts] = useState([]);
+  const [personalAttendance, setPersonalAttendance] = useState(null);
+  const [todayStatus, setTodayStatus] = useState(null);
+  const [personalTrajectory, setPersonalTrajectory] = useState([]);
+  const [notices, setNotices] = useState([]);
+  const [probations, setProbations] = useState([]);
+  const [dashboardStats, setDashboardStats] = useState({ totalEmployees: 0, presentToday: 0, onLeave: 0 });
+  const [loading, setLoading] = useState(true);
+
   const isEmployee = userRole === 'employee';
-
-  const [personalAttendance, setPersonalAttendance] = useState(
-    isEmployee ? dataService.getPersonalAttendanceSummary(currentUser.id, new Date().getMonth(), new Date().getFullYear()) : null
-  );
-  
-  const [todayStatus, setTodayStatus] = useState(
-    isEmployee ? dataService.getTodayAttendanceStatus(currentUser.id) : null
-  );
-
-  const [personalTrajectory, setPersonalTrajectory] = useState(
-    isEmployee ? dataService.getPersonalAttendanceTrajectory(currentUser.id) : null
-  );
 
   // Handle Notice/Memo Acknowledgment
   const acknowledgeNoticeAlert = (alertId, itemId) => {
-    // Save to policy acks with type 'NOTICE'
     dataService.saveAcknowledgment({
       type: 'NOTICE',
       itemId: itemId,
       empId: currentUser.id,
       empName: currentUser.name
     });
-    // Refresh alerts to clear the dismissed one
     setSmartAlerts(alertEngine.getDashboardAlerts(currentUser));
   };
 
@@ -72,22 +66,17 @@ const Dashboard = ({ userRole }) => {
     if (saved) {
       try { return JSON.parse(saved); } catch(e) {}
     }
-    
-    const defaultActivation = new Date();
     const defaultExpiry = new Date();
     defaultExpiry.setDate(defaultExpiry.getDate() + 7);
-
     return {
       text: "🚨 <span style='color: var(--color-danger); font-weight: bold;'>URGENT:</span> Q1 Performance Appraisals & Self-Evaluations must be completed by Friday. &nbsp;&nbsp;&nbsp;&nbsp; ✦ &nbsp;&nbsp;&nbsp;&nbsp; ✅ <span style='color: var(--color-success); font-weight: bold;'>HOLIDAY DECLARED:</span> April 14th will be a company-wide holiday for Ambedkar Jayanti.",
       speed: 25,
-      activation: defaultActivation.toISOString().slice(0, 16),
+      activation: new Date().toISOString().slice(0, 16),
       expiry: defaultExpiry.toISOString().slice(0, 16)
     };
   };
 
   const [bulletin, setBulletinState] = useState(getInitialBulletin);
-
-  // Sync to database/localstorage on save
   const setBulletin = (newConfig) => {
     localStorage.setItem('hrms_bulletin_config', JSON.stringify(newConfig));
     setBulletinState(newConfig);
@@ -96,8 +85,53 @@ const Dashboard = ({ userRole }) => {
   const [showConfig, setShowConfig] = useState(false);
   const [tempConfig, setTempConfig] = useState(bulletin);
 
-  const [notices, setNotices] = useState(dataService.getNotices());
-  const [probations, setProbations] = useState(dataService.getUpcomingProbations());
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const stats = await dataService.getDashboardStats();
+        setDashboardStats(stats);
+
+        if (isEmployee) {
+          const attendance = await dataService.getPersonalAttendanceSummary(currentUser.id, new Date().getMonth(), new Date().getFullYear());
+          setPersonalAttendance(attendance);
+          const status = await dataService.getTodayAttendanceStatus(currentUser.id);
+          setTodayStatus(status);
+          const trajectory = await dataService.getPersonalAttendanceTrajectory(currentUser.id);
+          setPersonalTrajectory(trajectory);
+        }
+
+        const [noticesList, probationList, holidayList] = await Promise.all([
+          dataService.getNotices(),
+          dataService.getUpcomingProbations(),
+          dataService.getCustomHolidays()
+        ]);
+
+        // Transform upcoming holidays into notice-like items for the timeline
+        const now = new Date();
+        const upcomingHolidays = holidayList
+          .filter(h => new Date(h.date) >= now)
+          .map(h => ({
+            id: `holiday-${h.id}`,
+            title: `Holiday: ${h.name}`,
+            content: `Company-wide holiday observed for ${h.name}.`,
+            date: h.date,
+            type: 'Holiday',
+            isSystem: true
+          }));
+
+        setNotices([...upcomingHolidays, ...noticesList].sort((a, b) => new Date(b.date) - new Date(a.date)));
+        setProbations(probationList);
+        setSmartAlerts(alertEngine.getDashboardAlerts(currentUser));
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [currentUser.id, isEmployee]);
+
   const [noticeModal, setNoticeModal] = useState(null); // { title, content } for editing
   const [viewingNotice, setViewingNotice] = useState(null);
   const [tickerSpeed, setTickerSpeed] = useState(25); // seconds per loop
@@ -123,7 +157,6 @@ const Dashboard = ({ userRole }) => {
 
   const now = new Date();
   const isExpired = now < new Date(bulletin.activation) || now > new Date(bulletin.expiry);
-  const dashboardStats = dataService.getDashboardStats();
 
   return (
     <div className="page-container" style={{ position: 'relative' }}>
@@ -250,7 +283,20 @@ const Dashboard = ({ userRole }) => {
                 {[...notices, ...notices].map((n, idx) => (
                   <div key={`${n.id}-${idx}`} className="notice-item" onClick={() => setViewingNotice(n)} style={{ cursor: 'pointer' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                      <h4 style={{ margin: 0, color: 'var(--color-primary)' }}>{n.title}</h4>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <h4 style={{ margin: 0, color: 'var(--color-primary)' }}>{n.title}</h4>
+                        {n.type === 'Holiday' && (
+                          <span style={{ 
+                            backgroundColor: 'var(--color-success)', 
+                            color: 'white', 
+                            fontSize: '0.65rem', 
+                            padding: '0.15rem 0.5rem', 
+                            borderRadius: '10px', 
+                            fontWeight: 'bold',
+                            textTransform: 'uppercase'
+                          }}>Holiday</span>
+                        )}
+                      </div>
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{n.date}</span>
                         {userRole === 'management' && (

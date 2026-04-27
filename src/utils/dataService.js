@@ -1,7 +1,4 @@
-/**
- * DataService.js
- * Simulated backend for persisting HRMS data to LocalStorage.
- */
+import { supabase } from './supabaseClient';
 
 const KEYS = {
   ATTENDANCE: 'hrms_attendance_records',
@@ -48,56 +45,100 @@ const getJSON = (key, def = {}) => {
 const saveJSON = (key, val) => localStorage.setItem(key, JSON.stringify(val));
 
 export const dataService = {
+  // ── Sync Helper (Internal) ────────────────────────────────────────────────
+  _getLocalJSON: getJSON,
+
+  // ── Employees ─────────────────────────────────────────────────────────────
+  getEmployees: async () => {
+    if (supabase) {
+      const { data, error } = await supabase.from('employees').select('*');
+      if (!error) return data;
+      console.error('Supabase Error:', error);
+    }
+    return getJSON(KEYS.EMPLOYEES, []);
+  },
+
+  getEmployeeById: async (id) => {
+    if (supabase) {
+      const { data, error } = await supabase.from('employees').select('*').eq('id', id).single();
+      if (!error) return data;
+    }
+    const employees = getJSON(KEYS.EMPLOYEES, []);
+    return employees.find(e => String(e.id) === String(id));
+  },
+
   // ── Attendance ─────────────────────────────────────────────────────────────
-  getAttendance: () => {
-    return getJSON(KEYS.ATTENDANCE);
-  },
-  
-  saveAttendance: (records) => saveJSON(KEYS.ATTENDANCE, records),
-
-  getPresentDaysCount: (empId, month, year) => {
-    const records = getJSON(KEYS.ATTENDANCE);
-    let count = 0;
-    // Iterate through all days of the month
-    for (let day = 1; day <= 31; day++) {
-       const key = `${empId}_${year}_${month}_${day}`;
-       const rec = records[key];
-       if (rec && rec.punchIn) count++; 
+  getAttendance: async () => {
+    if (supabase) {
+      const { data, error } = await supabase.from('attendance').select('*');
+      if (!error) return data;
     }
-    return count;
+    return getJSON(KEYS.ATTENDANCE, {});
   },
 
-  getPersonalAttendanceSummary: (userId, month, year) => {
-    const records = getJSON(KEYS.ATTENDANCE);
-    let present = 0;
-    let absent = 0;
-    let leave = 0;
-    
-    const leaveRequests = dataService.getLeaveRequests();
-    
-    // Iterate through days of the specified month/year
-    for (let day = 1; day <= 31; day++) {
-       const key = `${userId}_${year}_${month}_${day}`;
-       const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-       const rec = records[key];
-       
-       if (rec && rec.punchIn) {
-         present++;
-       } else {
-         const onLeave = leaveRequests.find(l => l.empId === Number(userId) && l.status === 'Approved' && dateStr >= l.startDate && dateStr <= l.endDate);
-         if (onLeave) leave++;
-         else absent++;
-       }
+  getTodayAttendanceStatus: async (userId) => {
+    if (supabase) {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase.from('attendance').select('*').eq('emp_id', userId).eq('date', today).single();
+      if (!error && data) return data;
     }
-    return { present, absent, leave };
-  },
-
-  getTodayAttendanceStatus: (userId) => {
     const now = new Date();
     const key = `${userId}_${now.getFullYear()}_${now.getMonth()}_${now.getDate()}`;
     const records = getJSON(KEYS.ATTENDANCE);
     return records[key] || { punchIn: null, punchOut: null, status: 'Not Marked' };
   },
+  
+  saveAttendance: async (records) => {
+    saveJSON(KEYS.ATTENDANCE, records);
+  },
+
+  // ── Leave Management ──────────────────────────────────────────────────────
+  getLeaveRequests: async () => {
+    if (supabase) {
+      const { data, error } = await supabase.from('leave_requests').select('*, employees(name)');
+      if (!error) return data;
+    }
+    return getJSON(KEYS.LEAVE_RECS, []);
+  },
+
+  getLeaveBalances: async () => {
+    return getJSON(KEYS.LEAVES, {});
+  },
+
+  // ── Dashboard Stats ───────────────────────────────────────────────────────
+  getDashboardStats: async () => {
+    const employees = await dataService.getEmployees();
+    const attendance = await dataService.getAttendance();
+    const leaves = await dataService.getLeaveRequests();
+
+    const activeEmp = employees.filter(e => e.status === 'Active');
+    const today = new Date().toISOString().split('T')[0];
+    
+    return {
+      totalEmployees: activeEmp.length || 0,
+      presentToday: Object.values(attendance).filter(r => r.date === today && r.punchIn).length || 0,
+      onLeave: leaves.filter(l => l.status === 'Approved' && today >= l.startDate && today <= l.endDate).length || 0
+    };
+  },
+
+  // ── Notices ─────────────────────────────────────────────────────────────
+  getNotices: async () => {
+    if (supabase) {
+      const { data, error } = await supabase.from('notices').select('*').order('created_at', { ascending: false });
+      if (!error) return data;
+    }
+    return getJSON(KEYS.NOTICES, []);
+  },
+
+  getCustomHolidays: async () => {
+    if (supabase) {
+      const { data, error } = await supabase.from('holidays').select('*').order('date', { ascending: true });
+      if (!error) return data;
+    }
+    return getJSON(KEYS.HOLIDAYS, []);
+  },
+
+
 
   getPersonalAttendanceTrajectory: (userId) => {
     return [];
