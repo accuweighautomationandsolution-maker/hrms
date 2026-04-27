@@ -134,7 +134,7 @@ const Attendance = () => {
   const now      = new Date();
   const [year,  setYear]  = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
-  const [selectedEmp, setSelectedEmp] = useState(isEmployee ? dataService.getEmployeeById(currentUser.id) : EMPLOYEES_LIST[0]);
+  const [selectedEmp, setSelectedEmp] = useState(isEmployee ? dataService.getEmployeeById(currentUser?.id) : EMPLOYEES_LIST[0]);
   const [searchQ,     setSearchQ]     = useState('');
   const [punchModal,  setPunchModal]  = useState(null); // { day, ... }
   const [devices,     setDevices]     = useState([]);
@@ -158,7 +158,7 @@ const Attendance = () => {
       
       setRecords(prev => {
         const existing = prev[punchKey] || {};
-        const updated = {
+        return {
           ...prev,
           [punchKey]: {
             ...existing,
@@ -168,13 +168,16 @@ const Attendance = () => {
             source: 'Biometric (Push)'
           }
         };
-        dataService.saveAttendance(updated);
-        return updated;
       });
     });
 
     return () => unsubscribe();
   }, [bioConfig]);
+
+  // Persist records when they change (Side Effect)
+  useEffect(() => {
+    dataService.saveAttendance(records);
+  }, [records]);
 
   const holidays   = useMemo(() => getHolidayDates(year, month, dataService.getCustomHolidays()), [year, month]);
   const holidaySet = useMemo(() => new Set(holidays.map(h => h.day)), [holidays]);
@@ -314,8 +317,8 @@ const Attendance = () => {
               {filteredEmps.map(emp => (
                 <button key={emp.id} onClick={() => setSelectedEmp(emp)}
                   style={{ textAlign: 'left', padding: '0.75rem', borderRadius: '8px', border: '1px solid', cursor: 'pointer', transition: 'all 0.15s',
-                    borderColor:       selectedEmp.id === emp.id ? 'var(--color-primary)' : 'transparent',
-                    backgroundColor:   selectedEmp.id === emp.id ? 'rgba(37,99,235,0.08)' : 'transparent',
+                    borderColor:       selectedEmp?.id === emp.id ? 'var(--color-primary)' : 'transparent',
+                    backgroundColor:   selectedEmp?.id === emp.id ? 'rgba(37,99,235,0.08)' : 'transparent',
                   }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <p style={{ margin: 0, fontWeight: '600', fontSize: '0.875rem', color: 'var(--color-text-main)' }}>{emp.name}</p>
