@@ -45,6 +45,55 @@ const getJSON = (key, def = {}) => {
 
 const saveJSON = (key, val) => localStorage.setItem(key, JSON.stringify(val));
 
+// ── Supabase JSONB Sync Helpers ────────────────────────────────────────────
+// Generic read: fetches all rows from a JSONB table, falls back to localStorage
+const sbGetAll = async (table, localKey, defaultVal = []) => {
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from(table).select('id, data').order('created_at', { ascending: false });
+      if (!error && data) {
+        const records = data.map(r => r.data);
+        saveJSON(localKey, records); // keep local cache fresh
+        return records;
+      }
+    } catch (e) { console.warn(`sbGetAll(${table}) failed, using cache.`, e); }
+  }
+  return getJSON(localKey, defaultVal);
+};
+
+// Generic write: upserts all records, deletes removed ones, updates localStorage
+const sbSaveAll = async (table, localKey, list) => {
+  saveJSON(localKey, list); // always update local cache
+  if (!supabase) return list;
+  try {
+    const rows = list.map(r => ({ id: String(r.id), data: r }));
+    if (rows.length > 0) {
+      const { error } = await supabase.from(table).upsert(rows, { onConflict: 'id' });
+      if (error) { console.error(`sbSaveAll upsert(${table}):`, error); return list; }
+    }
+    // Delete rows that were removed from the list
+    const { data: existing } = await supabase.from(table).select('id');
+    if (existing) {
+      const currentIds = new Set(rows.map(r => r.id));
+      const toDelete = existing.filter(r => !currentIds.has(r.id)).map(r => r.id);
+      if (toDelete.length > 0) {
+        await supabase.from(table).delete().in('id', toDelete);
+      }
+    }
+  } catch (e) { console.warn(`sbSaveAll(${table}) failed.`, e); }
+  return list;
+};
+
+// Generic single delete from a JSONB table
+const sbDelete = async (table, localKey, id, filteredList) => {
+  saveJSON(localKey, filteredList);
+  if (supabase) {
+    try { await supabase.from(table).delete().eq('id', String(id)); }
+    catch (e) { console.warn(`sbDelete(${table}, ${id}) failed.`, e); }
+  }
+  return filteredList;
+};
+
 export const dataService = {
   // ── Sync Helper (Internal) ────────────────────────────────────────────────
   _getLocalJSON: getJSON,
@@ -360,17 +409,17 @@ export const dataService = {
   },
 
   // ── Advances & Loans ─────────────────────────────────────────────────
-  getAdvanceHistory: () => getJSON(KEYS.ADVANCE_HISTORY, []),
+  getAdvanceHistory: async () => sbGetAll('advances', KEYS.ADVANCE_HISTORY, []),
 
-  saveAdvanceHistory: (history) => saveJSON(KEYS.ADVANCE_HISTORY, history),
+  saveAdvanceHistory: async (history) => sbSaveAll('advances', KEYS.ADVANCE_HISTORY, history),
 
   // ── Payroll ──────────────────────────────────────────────────────────
-  getPayrollHistory: () => getJSON(KEYS.PAYROLL_HISTORY, []),
+  getPayrollHistory: async () => sbGetAll('payroll_history', KEYS.PAYROLL_HISTORY, []),
 
-  savePayrollHistory: (history) => saveJSON(KEYS.PAYROLL_HISTORY, history),
+  savePayrollHistory: async (history) => sbSaveAll('payroll_history', KEYS.PAYROLL_HISTORY, history),
 
-  getSalaryByMonth: (month, year) => {
-    const history = dataService.getPayrollHistory();
+  getSalaryByMonth: async (month, year) => {
+    const history = await dataService.getPayrollHistory();
     return history.filter(h => h.month === month && h.year === year);
   },
 
@@ -405,12 +454,46 @@ export const dataService = {
   },
 
   // ── Expenses & Site Analytics ──────────────────────────────────────────
-  getExpenses: () => getJSON(KEYS.EXPENSES, []),
-  saveExpenses: (list) => saveJSON(KEYS.EXPENSES, list),
+  getExpenses: async () => {
+    if (supabase) {
+      try {
+        const { data, error } = await supabase.from('expenses').select('*').order('created_at', { ascending: false });
+        if (!error && data) {
+          saveJSON(KEYS.EXPENSES, data);
+          return data;
+        }
+      } catch (e) { console.warn('getExpenses Supabase failed, using cache.', e); }
+    }
+    return getJSON(KEYS.EXPENSES, []);
+  },
 
-  deleteExpense: (id) => {
-    const list = dataService.getExpenses().filter(e => e.id !== id);
+  saveExpenses: async (list) => {
     saveJSON(KEYS.EXPENSES, list);
+    if (!supabase) return list;
+    try {
+      if (list.length > 0) {
+        const { error } = await supabase.from('expenses').upsert(list, { onConflict: 'id' });
+        if (error) { console.error('saveExpenses upsert:', error); return list; }
+      }
+      const { data: existing } = await supabase.from('expenses').select('id');
+      if (existing) {
+        const currentIds = new Set(list.map(r => r.id));
+        const toDelete = existing.filter(r => !currentIds.has(r.id)).map(r => r.id);
+        if (toDelete.length > 0) {
+          await supabase.from('expenses').delete().in('id', toDelete);
+        }
+      }
+    } catch (e) { console.warn('saveExpenses Supabase failed.', e); }
+    return list;
+  },
+
+  deleteExpense: async (id) => {
+    const list = (await dataService.getExpenses()).filter(e => e.id !== id);
+    saveJSON(KEYS.EXPENSES, list);
+    if (supabase) {
+      try { await supabase.from('expenses').delete().eq('id', id); }
+      catch (e) { console.warn('deleteExpense Supabase failed.', e); }
+    }
     return list;
   },
 
@@ -449,31 +532,30 @@ export const dataService = {
   },
 
   // ── Exit & Off-boarding ──────────────────────────────────────────────
-  getExitRecords: () => getJSON(KEYS.EXITS, []),
-  
-  saveExitRecords: (list) => saveJSON(KEYS.EXITS, list),
+  getExitRecords: async () => sbGetAll('exit_records', KEYS.EXITS, []),
 
-  deleteExitRecord: (id) => {
-    const list = dataService.getExitRecords().filter(ex => ex.id !== id);
-    saveJSON(KEYS.EXITS, list);
-    return list;
+  saveExitRecords: async (list) => sbSaveAll('exit_records', KEYS.EXITS, list),
+
+  deleteExitRecord: async (id) => {
+    const list = (await dataService.getExitRecords()).filter(ex => ex.id !== id);
+    return sbDelete('exit_records', KEYS.EXITS, id, list);
   },
 
-  completeFnFSystemProcess: (empId) => {
+  completeFnFSystemProcess: async (empId) => {
     // 1. Move to Inactive
-    const emps = dataService.getEmployees();
+    const emps = await dataService.getEmployees();
     const eidx = emps.findIndex(e => e.id === empId);
     if(eidx > -1) {
       emps[eidx].status = 'Inactive';
-      saveJSON(KEYS.EMPLOYEES, emps);
+      dataService.saveEmployees(emps);
     }
     // 2. Mark Exit completed
-    const exits = dataService.getExitRecords();
+    const exits = await dataService.getExitRecords();
     const xidx = exits.findIndex(ex => ex.empId === empId);
     if(xidx > -1) {
       exits[xidx].status = 'Completed';
       exits[xidx].stage = 4;
-      saveJSON(KEYS.EXITS, exits);
+      await dataService.saveExitRecords(exits);
     }
   },
 
@@ -510,8 +592,8 @@ export const dataService = {
   }),
   saveBonusConfig: (conf) => saveJSON(KEYS.BONUS_CONFIG, conf),
 
-  getBonusPayments: () => getJSON(KEYS.BONUS_PAYMENTS, []),
-  saveBonusPayments: (list) => saveJSON(KEYS.BONUS_PAYMENTS, list),
+  getBonusPayments: async () => sbGetAll('bonus_payments', KEYS.BONUS_PAYMENTS, []),
+  saveBonusPayments: async (list) => sbSaveAll('bonus_payments', KEYS.BONUS_PAYMENTS, list),
   getAcknowledgments: () => getJSON(KEYS.POLICY_ACKS, []),
   
   saveAcknowledgment: (ack) => {
@@ -577,21 +659,32 @@ export const dataService = {
   saveLoginAttempts: (attempts) => saveJSON(KEYS.LOGIN_ATTEMPTS, attempts),
 
   // ── Salary Structures (Snapshots/Database) ──────────────────────────
-  getSalaryStructure: (empId) => {
+  getSalaryStructure: async (empId) => {
+    if (supabase) {
+      try {
+        const { data, error } = await supabase.from('salary_structures_ext').select('data').eq('emp_id', Number(empId)).single();
+        if (!error && data) return data.data;
+      } catch (e) { /* fallthrough to cache */ }
+    }
     const all = getJSON(KEYS.SALARY_STRUCTURES, {});
-    // Return latest if multiple versions exist, or just the stored object
     return all[empId] || null;
   },
 
   saveSalaryStructure: async (empId, data) => {
+    const snapshot = { ...data, lastUpdated: new Date().toISOString(), db_version: '1.0' };
+    // Update local cache
     const all = getJSON(KEYS.SALARY_STRUCTURES, {});
-    // We snapshot the full object with a timestamp for audit tracking
-    all[empId] = {
-      ...data,
-      lastUpdated: new Date().toISOString(),
-      db_version: '1.0'
-    };
+    all[empId] = snapshot;
     saveJSON(KEYS.SALARY_STRUCTURES, all);
+    // Upsert to Supabase
+    if (supabase) {
+      try {
+        await supabase.from('salary_structures_ext').upsert(
+          { emp_id: Number(empId), data: snapshot, last_updated: new Date().toISOString() },
+          { onConflict: 'emp_id' }
+        );
+      } catch (e) { console.warn('saveSalaryStructure Supabase failed.', e); }
+    }
     
     // Also update the main employee record's gross salary for backward compatibility in the directory
     if (data.targetSalary) {
@@ -605,12 +698,15 @@ export const dataService = {
   },
 
   // ── Training & Induction ──────────────────────────────────────────
-  getTrainingRecords: () => getJSON(KEYS.TRAINING_RECORDS, [
-    { id: 1, type: 'Safety Training', time: '2 Hours', trainer: 'Dr. Ramesh Singh', date: '2026-04-10', attendeeIds: [1, 2, 4], attendeeNames: 'Alice, Bob, Diana' },
-    { id: 2, type: 'POSH Orientation', time: '1.5 Hours', trainer: 'Adv. Meera Nair', date: '2026-04-12', attendeeIds: [3, 7], attendeeNames: 'Charlie, Frank' }
-  ]),
+  getTrainingRecords: async () => {
+    const defaults = [
+      { id: 1, type: 'Safety Training', time: '2 Hours', trainer: 'Dr. Ramesh Singh', date: '2026-04-10', attendeeIds: [1, 2, 4], attendeeNames: 'Alice, Bob, Diana' },
+      { id: 2, type: 'POSH Orientation', time: '1.5 Hours', trainer: 'Adv. Meera Nair', date: '2026-04-12', attendeeIds: [3, 7], attendeeNames: 'Charlie, Frank' }
+    ];
+    return sbGetAll('training_records', KEYS.TRAINING_RECORDS, defaults);
+  },
 
-  saveTrainingRecords: (list) => saveJSON(KEYS.TRAINING_RECORDS, list),
+  saveTrainingRecords: async (list) => sbSaveAll('training_records', KEYS.TRAINING_RECORDS, list),
 
   getInductionTasks: (empId) => {
     const all = getJSON(KEYS.INDUCTION_TASKS, {});
@@ -633,18 +729,18 @@ export const dataService = {
   },
 
   // ── Feedback & Performance ──────────────────────────────────────────
-  getFeedback: (empId, type) => {
-    const all = getJSON(KEYS.FEEDBACK_RECS, []);
+  getFeedback: async (empId, type) => {
+    const all = await sbGetAll('feedback_records', KEYS.FEEDBACK_RECS, []);
     return all.find(f => f.empId === Number(empId) && f.reviewType === type) || null;
   },
 
-  getFeedbackHistory: (empId) => {
-    const all = getJSON(KEYS.FEEDBACK_RECS, []);
+  getFeedbackHistory: async (empId) => {
+    const all = await sbGetAll('feedback_records', KEYS.FEEDBACK_RECS, []);
     return all.filter(f => f.empId === Number(empId)).sort((a,b) => new Date(b.reviewDate) - new Date(a.reviewDate));
   },
 
-  saveFeedback: (data) => {
-    const all = getJSON(KEYS.FEEDBACK_RECS, []);
+  saveFeedback: async (data) => {
+    const all = await sbGetAll('feedback_records', KEYS.FEEDBACK_RECS, []);
     const idx = all.findIndex(f => f.empId === data.empId && f.reviewType === data.reviewType);
     
     const record = {
@@ -655,12 +751,8 @@ export const dataService = {
       isLocked: true // Enforcement: Submitted records are locked
     };
 
-    if (idx > -1) {
-      all[idx] = record;
-    } else {
-      all.push(record);
-    }
-    saveJSON(KEYS.FEEDBACK_RECS, all);
+    const updated = idx > -1 ? all.map((f, i) => i === idx ? record : f) : [...all, record];
+    await sbSaveAll('feedback_records', KEYS.FEEDBACK_RECS, updated);
     
     // Automatic Status/Probation Update Logic
     if (data.recommendation) {
@@ -671,35 +763,35 @@ export const dataService = {
   },
 
   updateEmployeeStatusAfterFeedback: (empId, recommendation, extensionVal) => {
-    const emps = dataService.getEmployees();
-    const idx = emps.findIndex(e => e.id === Number(empId));
-    if (idx === -1) return;
+    dataService.getEmployees().then(emps => {
+      const idx = emps.findIndex(e => e.id === Number(empId));
+      if (idx === -1) return;
 
-    const emp = emps[idx];
-    if (recommendation === 'Permanent') {
-      emp.empType = 'Permanent';
-    } else if (recommendation === 'Extend') {
-      emp.empType = 'Probation';
-      // If extensionVal is provided (e.g. "3 months"), we could update expiry dates here
-      if (extensionVal) {
-        emp.probPeriod = extensionVal;
+      const emp = emps[idx];
+      if (recommendation === 'Permanent') {
+        emp.empType = 'Permanent';
+      } else if (recommendation === 'Extend') {
+        emp.empType = 'Probation';
+        // If extensionVal is provided (e.g. "3 months"), we could update expiry dates here
+        if (extensionVal) {
+          emp.probPeriod = extensionVal;
+        }
+      } else if (recommendation === 'Rejected' || recommendation === 'Terminate') {
+        emp.status = 'Inactive';
+        emp.exitReason = 'Performance / Termination';
+      } else if (recommendation === 'Release') {
+        emp.status = 'Inactive';
+        emp.exitReason = 'Released';
       }
-    } else if (recommendation === 'Rejected' || recommendation === 'Terminate') {
-      emp.status = 'Inactive';
-      emp.exitReason = 'Performance / Termination';
-    } else if (recommendation === 'Release') {
-      emp.status = 'Inactive';
-      emp.exitReason = 'Released';
-    }
 
-    dataService.saveEmployees(emps);
+      dataService.saveEmployees(emps);
+    });
   },
 
-  deleteFeedback: (id) => {
-    const all = getJSON(KEYS.FEEDBACK_RECS, []);
+  deleteFeedback: async (id) => {
+    const all = await sbGetAll('feedback_records', KEYS.FEEDBACK_RECS, []);
     const filtered = all.filter(f => f.id !== id);
-    saveJSON(KEYS.FEEDBACK_RECS, filtered);
-    return filtered;
+    return sbDelete('feedback_records', KEYS.FEEDBACK_RECS, id, filtered);
   },
 
   // ── Statutory Compliance Hub ───────────────────────────────────────
@@ -861,17 +953,17 @@ export const dataService = {
     return list;
   },
 
-  savePayrollSnapshot: (snapshot) => {
-    const history = dataService.getPayrollHistory();
+  savePayrollSnapshot: async (snapshot) => {
+    const history = await dataService.getPayrollHistory();
     // Check if snapshot for this month/year already exists, if so update, else push
     const idx = history.findIndex(h => h.month === snapshot.month && h.year === snapshot.year && h.empId === snapshot.empId);
     let newHistory;
     if (idx > -1) {
       newHistory = history.map((h, i) => i === idx ? { ...h, ...snapshot } : h);
     } else {
-      newHistory = [...history, { ...snapshot, id: Date.now() + Math.random() }];
+      newHistory = [...history, { ...snapshot, id: String(Date.now() + Math.random()) }];
     }
-    dataService.savePayrollHistory(newHistory);
+    await dataService.savePayrollHistory(newHistory);
     return newHistory;
   },
 
