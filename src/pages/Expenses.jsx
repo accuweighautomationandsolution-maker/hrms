@@ -38,6 +38,9 @@ const Expenses = () => {
   const [targetSite, setTargetSite] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [reloads, setReloads] = useState(0);
+  const [projects, setProjects] = useState([]);
+  const [isAddingNewProject, setIsAddingNewProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
 
   const [expenseItems, setExpenseItems] = useState([
     { id: Date.now(), date: new Date().toISOString().split('T')[0], category: '', amount: '', description: '', attachment: null }
@@ -51,12 +54,14 @@ const Expenses = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [records, advances] = await Promise.all([
+        const [records, advances, prjs] = await Promise.all([
           dataService.getExpenses(),
-          dataService.getAdvanceHistory()
+          dataService.getAdvanceHistory(),
+          dataService.getProjects()
         ]);
         setExpenseRecords(records);
         setActiveAdvances(advances.filter(a => a.type === 'Official Site Advance' && a.status === 'Active'));
+        setProjects(prjs);
       } catch (err) {
         console.error("Failed to load expenses:", err);
       } finally {
@@ -124,6 +129,15 @@ const Expenses = () => {
     setReloads(r => r+1);
     setExpenseItems([{ id: Date.now(), date: new Date().toISOString().split('T')[0], category: '', amount: '', description: '', attachment: null }]);
     setTargetSite('');
+  };
+
+  const handleAddNewProject = async () => {
+    if (!newProjectName.trim()) return;
+    const newPrj = await dataService.addProject(newProjectName);
+    setProjects([...projects, newPrj]);
+    setTargetSite(newPrj.name);
+    setIsAddingNewProject(false);
+    setNewProjectName('');
   };
 
   if (loading) {
@@ -263,18 +277,42 @@ const Expenses = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem', backgroundColor: 'var(--color-background)', padding: '1rem', borderRadius: '8px' }}>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label" style={{ fontSize: '0.875rem', fontWeight: '600' }}>Target Site / Project</label>
-                    <input 
-                      list="site-list"
-                      className="form-input" 
-                      value={targetSite} 
-                      onChange={(e) => setTargetSite(e.target.value)}
-                      placeholder="Type or select a site..."
-                    />
-                    <datalist id="site-list">
-                      {[...new Set(expenseRecords.map(r => r.site))].map(s => (
-                        <option key={s} value={s} />
-                      ))}
-                    </datalist>
+                    {isAddingNewProject ? (
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <input 
+                          className="form-input" 
+                          value={newProjectName}
+                          onChange={(e) => setNewProjectName(e.target.value)}
+                          placeholder="New Project Name"
+                          autoFocus
+                        />
+                        <button className="btn btn-primary" onClick={handleAddNewProject} type="button">Add</button>
+                        <button className="btn btn-ghost" onClick={() => setIsAddingNewProject(false)} type="button">Cancel</button>
+                      </div>
+                    ) : (
+                      <select 
+                        className="form-input" 
+                        value={targetSite} 
+                        onChange={(e) => {
+                          if (e.target.value === 'ADD_NEW') {
+                            setIsAddingNewProject(true);
+                          } else {
+                            setTargetSite(e.target.value);
+                          }
+                        }}
+                      >
+                        <option value="">Select Site/Project...</option>
+                        {projects.filter(p => p.status === 'Active').map(p => (
+                          <option key={p.id} value={p.name}>{p.name}</option>
+                        ))}
+                        <option value="ADD_NEW" style={{ fontWeight: 'bold', color: 'var(--color-primary)' }}>+ Add New Site/Project</option>
+                        <optgroup label="Closed Sites">
+                          {projects.filter(p => p.status === 'Closed').map(p => (
+                            <option key={p.id} value={p.name}>{p.name} (Closed)</option>
+                          ))}
+                        </optgroup>
+                      </select>
+                    )}
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label" style={{ fontSize: '0.875rem', fontWeight: '600' }}>Advance Reconciliation (Optional)</label>

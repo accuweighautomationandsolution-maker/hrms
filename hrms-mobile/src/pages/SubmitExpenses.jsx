@@ -13,15 +13,22 @@ const SubmitExpenses = ({ onNavigate }) => {
   const [amount, setAmount] = React.useState('');
   const [reconciliation, setReconciliation] = React.useState('none');
   const [submitting, setSubmitting] = React.useState(false);
+  const [projects, setProjects] = React.useState([]);
+  const [isAddingNewProject, setIsAddingNewProject] = React.useState(false);
+  const [newProjectName, setNewProjectName] = React.useState('');
 
   React.useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
-        const allExpenses = await dataService.getExpenses();
+        const [allExpenses, prjs] = await Promise.all([
+          dataService.getExpenses(),
+          dataService.getProjects()
+        ]);
         if (allExpenses) {
           setExpenses(allExpenses.filter(e => e.empId === Number(user?.id)));
         }
+        setProjects(prjs);
       } catch (err) {
         console.error("Failed to load expenses:", err);
       } finally {
@@ -69,20 +76,55 @@ const SubmitExpenses = ({ onNavigate }) => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: 'var(--m-text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>Target Site / Project</label>
-                  <input 
-                    type="text" 
-                    className="m-input" 
-                    placeholder="Enter site name" 
-                    value={targetSite}
-                    onChange={(e) => setTargetSite(e.target.value)}
-                    list="mobile-site-list"
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}
-                  />
-                  <datalist id="mobile-site-list">
-                    {[...new Set(expenses.map(e => e.projectName))].map(s => (
-                      <option key={s} value={s} />
-                    ))}
-                  </datalist>
+                  {isAddingNewProject ? (
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input 
+                        type="text" 
+                        className="m-input" 
+                        placeholder="Enter name" 
+                        value={newProjectName}
+                        onChange={(e) => setNewProjectName(e.target.value)}
+                        style={{ flex: 1, padding: '0.75rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}
+                        autoFocus
+                      />
+                      <button 
+                        onClick={async () => {
+                          if (!newProjectName.trim()) return;
+                          const newPrj = await dataService.addProject(newProjectName);
+                          setProjects([...projects, newPrj]);
+                          setTargetSite(newPrj.name);
+                          setIsAddingNewProject(false);
+                          setNewProjectName('');
+                        }}
+                        style={{ padding: '0 1rem', borderRadius: '12px', background: 'var(--m-primary)', color: 'white', border: 'none' }}
+                      >Add</button>
+                      <button onClick={() => setIsAddingNewProject(false)} style={{ padding: '0 0.5rem', color: 'var(--m-text-muted)', background: 'none', border: 'none' }}>✕</button>
+                    </div>
+                  ) : (
+                    <select 
+                      className="m-input" 
+                      value={targetSite}
+                      onChange={(e) => {
+                        if (e.target.value === 'ADD_NEW') {
+                          setIsAddingNewProject(true);
+                        } else {
+                          setTargetSite(e.target.value);
+                        }
+                      }}
+                      style={{ width: '100%', padding: '0.75rem', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }}
+                    >
+                      <option value="">Select Site/Project</option>
+                      {projects.filter(p => p.status === 'Active').map(p => (
+                        <option key={p.id} value={p.name}>{p.name}</option>
+                      ))}
+                      <option value="ADD_NEW" style={{ fontWeight: 'bold', color: 'var(--m-primary)' }}>+ Add New Site/Project</option>
+                      <optgroup label="Closed Sites">
+                        {projects.filter(p => p.status === 'Closed').map(p => (
+                          <option key={p.id} value={p.name}>{p.name} (Closed)</option>
+                        ))}
+                      </optgroup>
+                    </select>
+                  )}
                 </div>
 
                 <div>

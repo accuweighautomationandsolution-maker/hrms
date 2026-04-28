@@ -21,19 +21,22 @@ const SiteExpenseReport = () => {
     const [rawExpenses, setRawExpenses] = useState([]);
     const [employeesList, setEmployeesList] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('analytics'); // 'analytics', 'ledger', 'submit'
+    const [activeTab, setActiveTab] = useState('analytics'); // 'analytics', 'ledger', 'submit', 'projects'
     const [selectedSiteModal, setSelectedSiteModal] = useState(null); // Site name for drill-down
+    const [projects, setProjects] = useState([]);
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [expData, empsData] = await Promise.all([
+                const [expData, empsData, prjsData] = await Promise.all([
                     dataService.getExpenses(),
-                    dataService.getEmployees()
+                    dataService.getEmployees(),
+                    dataService.getProjects()
                 ]);
                 setRawExpenses(expData);
                 setEmployeesList(empsData);
+                setProjects(prjsData);
             } catch (err) {
                 console.error("Failed to load site expense data:", err);
             } finally {
@@ -47,6 +50,7 @@ const SiteExpenseReport = () => {
     const [filterSite, setFilterSite] = useState('All Sites');
     const [filterCat, setFilterCat] = useState('All Categories');
     const [filterStatus, setFilterStatus] = useState('All Status');
+    const [filterProjectStatus, setFilterProjectStatus] = useState('All'); // 'All', 'Active', 'Closed'
     const [dateRange, setDateRange] = useState('All Time');
     const [searchTerm, setSearchTerm] = useState('');
     const [amountMin, setAmountMin] = useState('');
@@ -70,6 +74,11 @@ const SiteExpenseReport = () => {
         if (filterCat !== 'All Categories') data = data.filter(r => r.category === filterCat);
         if (filterStatus !== 'All Status') data = data.filter(r => r.status === filterStatus);
         
+        if (filterProjectStatus !== 'All') {
+            const projectMap = projects.reduce((acc, p) => ({ ...acc, [p.name]: p.status }), {});
+            data = data.filter(r => projectMap[r.site] === filterProjectStatus);
+        }
+
         if (dateRange === 'Current Year') {
             const curYr = new Date().getFullYear();
             data = data.filter(r => new Date(r.date).getFullYear() === curYr);
@@ -206,7 +215,8 @@ const SiteExpenseReport = () => {
                 {[
                     { id: 'analytics', label: 'Analytics Dashboard', icon: TrendingUp },
                     { id: 'ledger', label: 'Audit Ledger & Approvals', icon: FileText },
-                    { id: 'submit', label: 'Submit Site Expense', icon: Plus }
+                    { id: 'submit', label: 'Submit Site Expense', icon: Plus },
+                    { id: 'projects', label: 'Project Master', icon: Building }
                 ].map(tab => (
                     <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`btn ${activeTab === tab.id ? 'btn-primary' : 'btn-ghost'}`} style={{ gap: '0.5rem', padding: '0.75rem 1.25rem' }}>
                         <tab.icon size={18} /> {tab.label}
@@ -346,6 +356,14 @@ const SiteExpenseReport = () => {
                                 <option>Last 30 Days</option>
                             </select>
                         </div>
+                        <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label" style={{ fontSize: '0.75rem' }}>Project Lifecycle</label>
+                            <select className="form-input" value={filterProjectStatus} onChange={e => setFilterProjectStatus(e.target.value)}>
+                                <option value="All">All Projects</option>
+                                <option value="Active">Active Only</option>
+                                <option value="Closed">Closed Only</option>
+                            </select>
+                        </div>
                         <div className="form-group" style={{ margin: 0, position: 'relative' }}>
                              <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} color="var(--color-text-muted)" />
                              <input type="text" className="form-input" placeholder="Keyword Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ paddingLeft: '2.25rem' }} />
@@ -475,6 +493,66 @@ const SiteExpenseReport = () => {
                                 <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 2rem' }}>Dispatch for Approval</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+            {activeTab === 'projects' && (
+                <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+                    <div className="card">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                            <div>
+                                <h2 style={{ fontSize: '1.25rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Building size={24} color="var(--color-primary)" /> Project & Site Master</h2>
+                                <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>Manage project lifecycles and operational status.</p>
+                            </div>
+                            <button className="btn btn-primary" onClick={async () => {
+                                const name = prompt('Enter New Project/Site Name:');
+                                if (name) {
+                                    await dataService.addProject(name);
+                                    setProjects(await dataService.getProjects());
+                                }
+                            }}><Plus size={18} /> Register New Project</button>
+                        </div>
+
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-muted)', textAlign: 'left', fontSize: '0.8rem' }}>
+                                        <th style={{ padding: '1rem' }}>Project / Site Name</th>
+                                        <th style={{ padding: '1rem' }}>Total Expense</th>
+                                        <th style={{ padding: '1rem' }}>Current Status</th>
+                                        <th style={{ padding: '1rem', textAlign: 'right' }}>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {projects.map(p => {
+                                        const total = rawExpenses.filter(r => r.site === p.name && r.status === 'Approved').reduce((s, r) => s + r.amount, 0);
+                                        return (
+                                            <tr key={p.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                                                <td style={{ padding: '1rem', fontWeight: 600 }}>{p.name}</td>
+                                                <td style={{ padding: '1rem' }}>{formatCurrency(total)}</td>
+                                                <td style={{ padding: '1rem' }}>
+                                                    <span className={`badge ${p.status === 'Active' ? 'badge-success' : 'badge-warning'}`}>
+                                                        {p.status}
+                                                    </span>
+                                                </td>
+                                                <td style={{ padding: '1rem', textAlign: 'right' }}>
+                                                    <button 
+                                                        className={`btn ${p.status === 'Active' ? 'btn-outline' : 'btn-primary'}`}
+                                                        style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem' }}
+                                                        onClick={async () => {
+                                                            const updated = await dataService.toggleProjectStatus(p.id);
+                                                            setProjects(updated);
+                                                        }}
+                                                    >
+                                                        {p.status === 'Active' ? 'Mark as Closed' : 'Re-open Project'}
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             )}

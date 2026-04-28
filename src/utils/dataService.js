@@ -34,7 +34,8 @@ const KEYS = {
   LETTER_TEMPLATES: 'hrms_letter_templates',
   CANDIDATES: 'hrms_candidates',
   EMPLOYEE_DOCS: 'hrms_employee_docs',
-  DEPARTMENTS: 'hrms_departments_list'
+  DEPARTMENTS: 'hrms_departments_list',
+  PROJECTS: 'hrms_projects_list'
 };
 
 const getJSON = (key, def = {}) => {
@@ -793,9 +794,8 @@ export const dataService = {
     return updatedList;
   },
 
-  // ── Extended CRUD Operations ────────────────────────────────────────
-  saveEmployee: (empData) => {
-    const list = dataService.getEmployees();
+  saveEmployee: async (empData) => {
+    const list = await dataService.getEmployees();
     const idx = list.findIndex(e => e.id === Number(empData.id));
     let savedEmp;
     let updatedList;
@@ -803,12 +803,56 @@ export const dataService = {
       savedEmp = { ...list[idx], ...empData };
       updatedList = list.map(e => e.id === Number(empData.id) ? savedEmp : e);
     } else {
-      const newId = list.length > 0 ? Math.max(...list.map(e => e.id)) + 1 : 1;
-      savedEmp = { ...empData, id: newId };
+      savedEmp = { ...empData, id: Date.now() };
       updatedList = [...list, savedEmp];
     }
     dataService.saveEmployees(updatedList);
-    return savedEmp; // Return the saved object with the ID
+    return savedEmp;
+  },
+
+  // ── Project / Site Management ─────────────────────────────────────────
+  getProjects: async () => {
+    if (supabase) {
+      const { data, error } = await supabase.from('projects').select('*');
+      if (!error) return data;
+    }
+    let list = getJSON(KEYS.PROJECTS, []);
+    if (list.length === 0) {
+      list = [
+        { id: 'PRJ-001', name: 'Mumbai Hub', status: 'Active' },
+        { id: 'PRJ-002', name: 'Delhi Installation', status: 'Active' },
+        { id: 'PRJ-003', name: 'Chennai R&D', status: 'Active' }
+      ];
+      saveJSON(KEYS.PROJECTS, list);
+    }
+    return list;
+  },
+
+  saveProjects: async (list) => saveJSON(KEYS.PROJECTS, list),
+
+  addProject: async (name) => {
+    const list = await dataService.getProjects();
+    const newPrj = { 
+      id: `PRJ-${Date.now()}`, 
+      name, 
+      status: 'Active',
+      createdAt: new Date().toISOString()
+    };
+    const updated = [...list, newPrj];
+    await dataService.saveProjects(updated);
+    return newPrj;
+  },
+
+  toggleProjectStatus: async (id) => {
+    const list = await dataService.getProjects();
+    const updated = list.map(p => {
+      if (p.id === id) {
+        return { ...p, status: p.status === 'Active' ? 'Closed' : 'Active' };
+      }
+      return p;
+    });
+    await dataService.saveProjects(updated);
+    return updated;
   },
 
   deleteEmployee: (id) => {
