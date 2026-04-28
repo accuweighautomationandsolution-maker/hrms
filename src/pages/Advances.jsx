@@ -148,19 +148,21 @@ const Advances = () => {
       installments: Number(installments),
       emi: emi,
       date: new Date().toISOString().split('T')[0],
-      status: 'Active',
-         }
-      });
-      newRecord.siteDetails = details;
+      issueDate: new Date().toLocaleDateString('en-GB'),
+      status: 'Active'
+    };
+
+    if (advanceType === 'Official Site Advance') {
+      newAdvance.siteDetails = siteExpenses;
     }
-    const finalHistory = [...history, newRecord];
+
+    const finalHistory = [...history, newAdvance];
     dataService.saveAdvanceHistory(finalHistory);
     setAdvances(finalHistory);
     
-    const totalVal = advanceType === 'Personal Advance' ? amount : calculateSiteTotal();
     const msg = advanceType === 'Official Site Advance' 
-        ? `Official Site Advance of ₹${totalVal} approved. This will be settled against expense submissions.`
-        : `Advance of ₹${totalVal} approved. Monthly EMI of ₹${emi} will be deducted from salary.`;
+        ? `Official Site Advance of ₹${totalAmount} approved. This will be settled against expense submissions.`
+        : `Advance of ₹${totalAmount} approved. Monthly EMI of ₹${emi} will be deducted from salary.`;
     alert(msg);
     
     setShowModal(false);

@@ -344,9 +344,8 @@ const PayslipModal = ({ employee, onClose }) => {
                 <Download size={20} /> Generate PDF
               </button>
             </div>
-      </div>
-      </div>
-      </div>
+          </div>
+        </div>
       </div>
     </div>
   );

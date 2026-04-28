@@ -169,7 +169,19 @@ export const dataService = {
 
 
   getPersonalAttendanceTrajectory: (userId) => {
-    return [];
+    const records = getJSON(KEYS.ATTENDANCE, {});
+    const last5Days = [];
+    for (let i = 4; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const day = d.toLocaleDateString('en-US', { weekday: 'short' });
+      const key = `${userId}_${d.getFullYear()}_${d.getMonth()}_${d.getDate()}`;
+      last5Days.push({
+        day,
+        present: (records[key] && records[key].punchIn) ? 1 : 0
+      });
+    }
+    return last5Days;
   },
 
   getDashboardStats: async () => {
@@ -253,8 +265,26 @@ export const dataService = {
 
 
   // ── Probation Alerts ──────────────────────────────────────────────
-  getUpcomingProbations: () => {
-    return [];
+  getUpcomingProbations: async () => {
+    const emps = await dataService.getEmployees();
+    const now = new Date();
+    return emps.filter(e => {
+      if (!e.joiningDate || e.empType !== 'Probation') return false;
+      const joinDate = new Date(e.joiningDate);
+      const probationEnd = new Date(joinDate.setMonth(joinDate.getMonth() + 6));
+      const daysLeft = Math.ceil((probationEnd - now) / (1000 * 60 * 60 * 24));
+      return daysLeft >= 0 && daysLeft <= 15;
+    }).map(e => {
+      const joinDate = new Date(e.joiningDate);
+      const probationEnd = new Date(joinDate.setMonth(joinDate.getMonth() + 6));
+      return {
+        id: e.id,
+        empId: e.empCode,
+        name: e.name,
+        expiryDate: probationEnd.toISOString().split('T')[0],
+        daysRemaining: Math.ceil((probationEnd - now) / (1000 * 60 * 60 * 24))
+      };
+    });
   },
 
 
@@ -888,5 +918,26 @@ export const dataService = {
     list.push({ ...doc, id: `DOC_${Date.now()}`, uploadDate: new Date().toISOString() });
     dataService.saveEmployeeDocs(list);
     return list;
+  },
+
+  getPresentDaysCount: (empId, month, year) => {
+    const records = getJSON(KEYS.ATTENDANCE, {});
+    let count = 0;
+    Object.keys(records).forEach(key => {
+      if (key.startsWith(`${empId}_${year}_${month}_`) && records[key].punchIn) {
+        count++;
+      }
+    });
+    return count;
+  },
+
+  getPersonalAttendanceSummary: async (userId, month, year) => {
+    const present = dataService.getPresentDaysCount(userId, month, year);
+    return {
+      present,
+      absent: 0,
+      late: 0,
+      total: 30
+    };
   }
 };
