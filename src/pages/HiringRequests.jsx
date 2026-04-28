@@ -4,7 +4,8 @@ import {
   CheckCircle, 
   Send,
   Clock,
-  Trash2
+  Trash2,
+  ShieldAlert
 } from 'lucide-react';
 import { dataService } from '../utils/dataService';
 

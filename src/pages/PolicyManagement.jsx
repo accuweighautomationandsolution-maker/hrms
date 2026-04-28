@@ -5,6 +5,7 @@ import {
   ArrowUpRight, Clock, FileSignature, Trash2, X
 } from 'lucide-react';
 import { dataService } from '../utils/dataService';
+import { authService } from '../utils/authService';
 import * as XLSX from 'xlsx';
 import { useNotification } from '../context/NotificationContext';
 
@@ -276,7 +277,7 @@ const PolicyManagement = ({ userRole }) => {
                         </button>
                       )
                     ) : (
-                      <button className="btn btn-ghost" style={{ flex: 1, color: 'var(--color-danger)' }} onClick={() => handleDeletePolicy(p.id)}>
+                      <button className="btn btn-ghost" style={{ flex: 1, color: 'var(--color-danger)' }} onClick={() => handleDelete(p.id)}>
                         <Trash2 size={16} /> Delete
                       </button>
                     )}
