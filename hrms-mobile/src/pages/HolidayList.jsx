@@ -1,6 +1,6 @@
 import React from 'react';
 import { Map, ChevronLeft, Calendar } from 'lucide-react';
-import { dataService } from '../../../src/utils/dataService';
+import { dataService } from '@/utils/dataService';
 
 const HolidayList = ({ onNavigate }) => {
   const [holidays, setHolidays] = React.useState([]);

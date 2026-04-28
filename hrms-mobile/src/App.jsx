@@ -18,7 +18,7 @@ import GrowthTraining from './pages/GrowthTraining';
 import ComplianceHub from './pages/ComplianceHub';
 import HRPolicies from './pages/HRPolicies';
 import MyDocuments from './pages/MyDocuments';
-import { authService } from '../../src/utils/authService';
+import { authService } from '@/utils/authService';
 
 const App = () => {
   const [activeTab, setActiveTab] = useState('home');

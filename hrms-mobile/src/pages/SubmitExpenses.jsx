@@ -1,7 +1,7 @@
 import React from 'react';
 import { Receipt, ChevronLeft, Camera, Plus } from 'lucide-react';
-import { dataService } from '../../../src/utils/dataService';
-import { authService } from '../../../src/utils/authService';
+import { dataService } from '@/utils/dataService';
+import { authService } from '@/utils/authService';
 
 const SubmitExpenses = ({ onNavigate }) => {
   const user = authService.getCurrentUser();

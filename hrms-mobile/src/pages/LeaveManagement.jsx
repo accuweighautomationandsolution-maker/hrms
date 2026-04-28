@@ -1,6 +1,6 @@
 import React from 'react';
 import { Calendar, ChevronLeft, Plus, Clock } from 'lucide-react';
-import { dataService } from '../../../src/utils/dataService';
+import { dataService } from '@/utils/dataService';
 
 const LeaveManagement = ({ onNavigate }) => {
   const user = authService.getCurrentUser();

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Fingerprint, MapPin, CheckCircle, Clock } from 'lucide-react';
-import { dataService } from '../../../src/utils/dataService';
-import { authService } from '../../../src/utils/authService';
+import { dataService } from '@/utils/dataService';
+import { authService } from '@/utils/authService';
 
 const AttendancePunch = () => {
   const [status, setStatus] = useState('ready'); // ready, punching, success

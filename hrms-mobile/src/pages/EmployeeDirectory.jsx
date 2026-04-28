@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Search, ChevronLeft, Phone, Mail, MessageSquare } from 'lucide-react';
-import { dataService } from '../../../src/utils/dataService';
+import { dataService } from '@/utils/dataService';
 
 const EmployeeDirectory = ({ onNavigate }) => {
   const [searchQ, setSearchQ] = useState('');

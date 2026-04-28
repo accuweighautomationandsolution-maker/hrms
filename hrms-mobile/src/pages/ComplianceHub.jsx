@@ -1,6 +1,6 @@
 import React from 'react';
 import { ShieldCheck, ChevronLeft, AlertTriangle, FileCheck, CheckCircle2 } from 'lucide-react';
-import { dataService } from '../../../src/utils/dataService';
+import { dataService } from '@/utils/dataService';
 
 const ComplianceHub = ({ onNavigate }) => {
   const [complianceItems, setComplianceItems] = React.useState([]);
