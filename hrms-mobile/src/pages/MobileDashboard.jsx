@@ -5,12 +5,40 @@ import { authService } from '../../../src/utils/authService';
 
 const MobileDashboard = ({ onNavigate, onMenuToggle }) => {
   const user = authService.getCurrentUser();
-  const emp = dataService.getEmployeeById(user?.id);
+  const [emp, setEmp] = React.useState(null);
+  const [balances, setBalances] = React.useState({ Sick: 0, Casual: 0, Paid: 0 });
+  const [nextHoliday, setNextHoliday] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const loadDashboardData = async () => {
+      setLoading(true);
+      try {
+        const [empData, allBalances, holidays] = await Promise.all([
+          dataService.getEmployeeById(user?.id),
+          dataService.getLeaveBalances(),
+          dataService.getCustomHolidays()
+        ]);
+        
+        setEmp(empData);
+        if (allBalances && allBalances[user?.id]) {
+          setBalances(allBalances[user?.id]);
+        }
+        
+        const futureHolidays = (holidays || []).filter(h => new Date(h.fromDate) >= new Date());
+        if (futureHolidays.length > 0) {
+          setNextHoliday(futureHolidays[0]);
+        }
+      } catch (err) {
+        console.error("Error loading mobile dashboard:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadDashboardData();
+  }, [user?.id]);
   
-  const dashboardStats = dataService.getDashboardStats();
-  const balances = dataService.getLeaveBalances()[user?.id] || { Sick: 5, Casual: 10, Paid: 15 };
   const totalBalance = Object.values(balances).reduce((a, b) => a + b, 0);
-  const nextHoliday = dataService.getCustomHolidays().find(h => new Date(h.fromDate) >= new Date());
   
   const stats = useMemo(() => {
     return {
@@ -19,6 +47,14 @@ const MobileDashboard = ({ onNavigate, onMenuToggle }) => {
       upcomingHoliday: nextHoliday ? `${new Date(nextHoliday.fromDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} (${nextHoliday.name})` : 'None'
     };
   }, [totalBalance, nextHoliday]);
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', minHeight: '400px' }}>
+        <div className="spinner" style={{ width: '30px', height: '30px', border: '3px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--m-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-slide-up" style={{ position: 'relative', overflow: 'hidden', paddingBottom: '100px' }}>

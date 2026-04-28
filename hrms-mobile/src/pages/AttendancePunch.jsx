@@ -15,11 +15,13 @@ const AttendancePunch = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const handlePunch = () => {
+  const handlePunch = async () => {
     setStatus('punching');
     
-    // Simulate network and hardware delay
-    setTimeout(() => {
+    try {
+      // Simulate network and hardware delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
       const user = authService.getCurrentUser();
       const now = new Date();
       const day = now.getDate();
@@ -28,7 +30,7 @@ const AttendancePunch = () => {
       const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
       
       const punchKey = `${user?.id}_${y}_${m}_${day}`;
-      const records = dataService.getAttendance();
+      const records = await dataService.getAttendance();
       const existing = records[punchKey] || {};
       
       const isPunchIn = !existing.punchIn;
@@ -44,9 +46,13 @@ const AttendancePunch = () => {
         }
       };
       
-      dataService.saveAttendance(updated);
+      await dataService.saveAttendance(updated);
       setStatus('success');
-    }, 2000);
+    } catch (err) {
+      console.error("Failed to punch:", err);
+      alert("Punch failed. Please check your connection.");
+      setStatus('ready');
+    }
   };
 
   return (

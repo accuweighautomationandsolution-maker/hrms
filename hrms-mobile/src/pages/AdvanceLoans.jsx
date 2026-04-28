@@ -1,9 +1,37 @@
 import React from 'react';
 import { Banknote, ChevronLeft, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { dataService } from '../../../src/utils/dataService';
+import { authService } from '../../../src/utils/authService';
 
 const AdvanceLoans = ({ onNavigate }) => {
-  const history = dataService.getAdvanceHistory().filter(h => h.empId === 1);
+  const user = authService.getCurrentUser();
+  const [history, setHistory] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const allHistory = await dataService.getAdvanceHistory();
+        if (allHistory) {
+          setHistory(allHistory.filter(h => h.empId === Number(user?.id)));
+        }
+      } catch (err) {
+        console.error("Failed to load advance history:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [user?.id]);
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', minHeight: '400px' }}>
+        <div className="spinner" style={{ width: '30px', height: '30px', border: '3px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--m-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-slide-up">

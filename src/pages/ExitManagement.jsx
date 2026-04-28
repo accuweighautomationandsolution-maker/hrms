@@ -85,14 +85,6 @@ const ExitManagement = () => {
     const [initLwd, setInitLwd] = useState('');
     const [initReason, setInitReason] = useState('');
 
-    if (loading) {
-        return (
-            <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-            </div>
-        );
-    }
-
     // Config: Add Item State
     const [newItem, setNewItem] = useState({ label: '', category: 'Work', mandatory: true });
 
@@ -137,6 +129,14 @@ const ExitManagement = () => {
         exits.forEach(e => counts[e.department] = (counts[e.department] || 0) + 1);
         return Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a,b)=>b.count - a.count);
     }, [exits]);
+
+    if (loading) {
+        return (
+            <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+            </div>
+        );
+    }
 
     // ── Handlers ─────────────────────────────────────────────────────────────
     const handleInitiateSubmit = async () => {

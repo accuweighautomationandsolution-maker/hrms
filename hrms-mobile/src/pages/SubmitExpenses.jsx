@@ -1,9 +1,37 @@
 import React from 'react';
 import { Receipt, ChevronLeft, Camera, Plus } from 'lucide-react';
 import { dataService } from '../../../src/utils/dataService';
+import { authService } from '../../../src/utils/authService';
 
 const SubmitExpenses = ({ onNavigate }) => {
-  const expenses = dataService.getExpenses().filter(e => e.empId === 1);
+  const user = authService.getCurrentUser();
+  const [expenses, setExpenses] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const allExpenses = await dataService.getExpenses();
+        if (allExpenses) {
+          setExpenses(allExpenses.filter(e => e.empId === Number(user?.id)));
+        }
+      } catch (err) {
+        console.error("Failed to load expenses:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [user?.id]);
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', minHeight: '400px' }}>
+        <div className="spinner" style={{ width: '30px', height: '30px', border: '3px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--m-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-slide-up">

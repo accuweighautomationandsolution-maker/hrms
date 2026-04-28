@@ -3,7 +3,31 @@ import { Map, ChevronLeft, Calendar } from 'lucide-react';
 import { dataService } from '../../../src/utils/dataService';
 
 const HolidayList = ({ onNavigate }) => {
-  const holidays = dataService.getCustomHolidays();
+  const [holidays, setHolidays] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const data = await dataService.getCustomHolidays();
+        setHolidays(data || []);
+      } catch (err) {
+        console.error("Failed to load holidays:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', minHeight: '400px' }}>
+        <div className="spinner" style={{ width: '30px', height: '30px', border: '3px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--m-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-slide-up">

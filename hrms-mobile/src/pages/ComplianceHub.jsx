@@ -1,12 +1,33 @@
 import React from 'react';
 import { ShieldCheck, ChevronLeft, AlertTriangle, FileCheck, CheckCircle2 } from 'lucide-react';
+import { dataService } from '../../../src/utils/dataService';
 
 const ComplianceHub = ({ onNavigate }) => {
-  const complianceItems = [
-    { id: 1, title: 'Code of Conduct', status: 'Completed', date: '2026-01-15' },
-    { id: 2, title: 'Data Privacy Policy', status: 'Pending', date: '--' },
-    { id: 3, title: 'Prevention of Sexual Harassment', status: 'Completed', date: '2026-03-10' },
-  ];
+  const [complianceItems, setComplianceItems] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const data = await dataService.getStatutoryUpdates();
+        setComplianceItems(data || []);
+      } catch (err) {
+        console.error("Failed to load compliance data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', minHeight: '400px' }}>
+        <div className="spinner" style={{ width: '30px', height: '30px', border: '3px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--m-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-slide-up">

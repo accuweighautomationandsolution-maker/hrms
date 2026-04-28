@@ -4,12 +4,36 @@ import { dataService } from '../../../src/utils/dataService';
 
 const EmployeeDirectory = ({ onNavigate }) => {
   const [searchQ, setSearchQ] = useState('');
-  const employees = dataService.getEmployees();
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  React.useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const data = await dataService.getEmployees();
+        setEmployees(data || []);
+      } catch (err) {
+        console.error("Failed to load employees:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
 
   const filtered = employees.filter(e => 
     e.name.toLowerCase().includes(searchQ.toLowerCase()) ||
     e.department.toLowerCase().includes(searchQ.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', minHeight: '400px' }}>
+        <div className="spinner" style={{ width: '30px', height: '30px', border: '3px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--m-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-slide-up">

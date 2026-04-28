@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import './styles/mobile.css';
 import { 
   Home, Clock, Calendar, User, LayoutDashboard, 
   Menu, X, LogOut, Settings, Bell, 

@@ -64,13 +64,6 @@ const SiteExpenseReport = () => {
     const uniqueSites = useMemo(() => [...new Set(rawExpenses.map(r => r.site))].sort(), [rawExpenses]);
     const uniqueCategories = useMemo(() => [...new Set(rawExpenses.map(r => r.category))].sort(), [rawExpenses]);
 
-    if (loading) {
-        return (
-            <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-            </div>
-        );
-    }
     const filteredData = useMemo(() => {
         let data = [...rawExpenses];
         if (filterSite !== 'All Sites') data = data.filter(r => r.site === filterSite);
@@ -117,7 +110,6 @@ const SiteExpenseReport = () => {
         return { approved, rejected, pending, topSite, topCat, siteTotals, catTotals };
     }, [filteredData]);
 
-    // ── Chart Preparation ──────────────────────────────────────────────────
     const siteBarData = useMemo(() => Object.entries(summary.siteTotals).map(([name, amount]) => ({ name, amount })).sort((a,b) => b.amount - a.amount).slice(0, 5), [summary.siteTotals]);
     const catPieData = useMemo(() => Object.entries(summary.catTotals).map(([name, value]) => ({ name, value })).filter(c => c.value > 0).sort((a,b) => b.value - a.value), [summary.catTotals]);
     const trendData = useMemo(() => {
@@ -128,6 +120,14 @@ const SiteExpenseReport = () => {
         });
         return Object.entries(monthly).map(([month, amount]) => ({ month, amount })).sort((a,b) => a.month.localeCompare(b.month));
     }, [filteredData]);
+
+    if (loading) {
+        return (
+            <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+            </div>
+        );
+    }
 
     // ── Handlers ────────────────────────────────────────────────────────────
     const updateStatus = async (id, status) => {

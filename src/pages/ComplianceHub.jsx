@@ -46,14 +46,6 @@ const ComplianceHub = ({ userRole }) => {
 
   const categories = ['All', 'PF', 'ESIC', 'Income Tax', 'Labour Law'];
 
-  if (loading) {
-    return (
-      <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-        <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-      </div>
-    );
-  }
-
   const handleSaveUpdate = async () => {
     if (!formData.title || !formData.summary) return;
     const formattedUpdate = {
@@ -110,6 +102,14 @@ const ComplianceHub = ({ userRole }) => {
       </span>
     );
   };
+
+  if (loading) {
+    return (
+      <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+      </div>
+    );
+  }
 
   const priorityColor = (p) => {
     if (p === 'Critical') return 'var(--color-danger)';

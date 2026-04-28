@@ -24,6 +24,7 @@ const UserManagement = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRole, setSelectedRole] = useState("All");
   const [activeTab, setActiveTab] = useState("users");
+  const [loading, setLoading] = useState(true);
 
   // Form State for new user
   const [showNewUserModal, setShowNewUserModal] = useState(false);
@@ -101,6 +102,13 @@ const UserManagement = () => {
     }
   };
 
+  const filteredUsers = users.filter((u) => {
+    const matchesSearch = u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          u.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesRole = selectedRole === "All" || u.role === selectedRole;
+    return matchesSearch && matchesRole;
+  });
+
   if (loading) {
     return (
       <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -108,13 +116,6 @@ const UserManagement = () => {
       </div>
     );
   }
-
-  const filteredUsers = users.filter((u) => {
-    const matchesSearch = u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          u.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesRole = selectedRole === "All" || u.role === selectedRole;
-    return matchesSearch && matchesRole;
-  });
 
   return (
     <div className="page-container">
