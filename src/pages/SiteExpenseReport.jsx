@@ -24,6 +24,8 @@ const SiteExpenseReport = () => {
     const [activeTab, setActiveTab] = useState('analytics'); // 'analytics', 'ledger', 'submit', 'projects'
     const [selectedSiteModal, setSelectedSiteModal] = useState(null); // Site name for drill-down
     const [projects, setProjects] = useState([]);
+    const [showAddProjectModal, setShowAddProjectModal] = useState(false);
+    const [newProjName, setNewProjName] = useState('');
 
     useEffect(() => {
         const fetchData = async () => {
@@ -504,13 +506,9 @@ const SiteExpenseReport = () => {
                                 <h2 style={{ fontSize: '1.25rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Building size={24} color="var(--color-primary)" /> Project & Site Master</h2>
                                 <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>Manage project lifecycles and operational status.</p>
                             </div>
-                            <button className="btn btn-primary" onClick={async () => {
-                                const name = prompt('Enter New Project/Site Name:');
-                                if (name) {
-                                    await dataService.addProject(name);
-                                    setProjects(await dataService.getProjects());
-                                }
-                            }}><Plus size={18} /> Register New Project</button>
+                            <button className="btn btn-primary" onClick={() => setShowAddProjectModal(true)}>
+                                <Plus size={18} /> Register New Project
+                            </button>
                         </div>
 
                         <div style={{ overflowX: 'auto' }}>
@@ -611,6 +609,39 @@ const SiteExpenseReport = () => {
                             <textarea className="form-input" rows="4" readOnly value={`Attached is the summarized expense analytics for ${filterSite}. \nApproved: ${formatCurrency(summary.approved)}\nAudit Savings: ${formatCurrency(summary.rejected)}\nTickets Audited: ${filteredData.length}`}></textarea>
                         </div>
                         <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => { alert('Report dispatched successfully!'); setShowEmailModal(false); }}>Send PDF & XLSX Attachments</button>
+                    </div>
+                </div>
+            )}
+
+            {/* Register New Project Modal */}
+            {showAddProjectModal && (
+                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1001, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="card" style={{ width: '100%', maxWidth: '400px', padding: '2rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+                            <h2 style={{ fontSize: '1.2rem', margin: 0 }}>Register New Project</h2>
+                            <button onClick={() => setShowAddProjectModal(false)} className="btn btn-ghost" style={{ padding: '0.5rem' }}><X size={20} /></button>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Project / Site Name</label>
+                            <input 
+                                type="text" 
+                                className="form-input" 
+                                placeholder="e.g. Mumbai Hub" 
+                                value={newProjName}
+                                onChange={(e) => setNewProjName(e.target.value)}
+                                autoFocus
+                            />
+                        </div>
+                        <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                            <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowAddProjectModal(false)}>Cancel</button>
+                            <button className="btn btn-primary" style={{ flex: 1 }} onClick={async () => {
+                                if (!newProjName.trim()) return;
+                                await dataService.addProject(newProjName);
+                                setProjects(await dataService.getProjects());
+                                setShowAddProjectModal(false);
+                                setNewProjName('');
+                            }}>Create Project</button>
+                        </div>
                     </div>
                 </div>
             )}
