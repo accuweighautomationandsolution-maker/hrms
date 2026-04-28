@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ShieldCheck, Search, Bell, BookOpen, Download, Filter, 
   AlertTriangle, Info, Clock, ExternalLink, Plus, Save, 

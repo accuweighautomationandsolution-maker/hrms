@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Filter, TrendingUp, Award, Target, Star, AlertCircle, CheckCircle, FileText, Plus, Trash2, MessageSquareShare } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import FeedbackPortal from '../components/FeedbackPortal';

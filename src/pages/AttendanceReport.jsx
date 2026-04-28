@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { 
   FileText, 
@@ -223,8 +223,12 @@ const AttendanceReport = () => {
                                    <button className="btn btn-ghost" style={{ justifyContent: 'flex-start', padding: '0.5rem' }} onClick={() => { generatePDF('attendance-report-capture', `Attendance_Report_${year}.pdf`); setShowExportMenu(false) }}><Printer size={16} style={{ marginRight: '0.5rem' }} /> Professional PDF</button>
                                    <button className="btn btn-ghost" style={{ justifyContent: 'flex-start', padding: '0.5rem' }} onClick={() => { setShowEmailModal(true); setShowExportMenu(false) }}><Mail size={16} style={{ marginRight: '0.5rem' }} /> Email Report</button>
                               </div>
-        <div className="page-container">
-            <div className="page-header" style={{ marginBottom: '1.5rem' }}>
+                          )}
+                     </div>
+                </div>
+            </div>
+
+            <div className="card" style={{ marginBottom: '1.5rem' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
                     {!isEmployee && (
                       <div>
@@ -438,7 +442,6 @@ const AttendanceReport = () => {
                         </tbody>
                     </table>
                 </div>
-            </div>
             </div>
 
             {/* Detailed Audit Modal */}

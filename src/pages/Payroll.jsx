@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { IndianRupee, Download, Search, Filter, Eye, AlertCircle, Info, FileText, FileSpreadsheet, Printer, Mail, X, Lock } from 'lucide-react';
 import { calculateSalaryComponents, formatCurrency, getHolidayDates, numberToWords } from '../utils/payrollCalculator';
@@ -198,20 +198,17 @@ const PayslipModal = ({ employee, onClose }) => {
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
       <div className="card" style={{ width: '100%', maxWidth: '850px', padding: '0', maxHeight: '95vh', overflowY: 'auto', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.3)' }}>
-
-        {/* Professional Header Section */}
         <div id="standard-payslip-capture" style={{ backgroundColor: '#fff' }}>
           <div style={{ padding: '2rem', borderBottom: '2px solid var(--color-border)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', position: 'relative' }}>
-            {/* Top Row: Logo & Close Actions */}
-            <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-               <div style={{ width: '90px' }}>
-                 <img src="/C:/Users/Saurabh.b/.gemini/antigravity/brain/fb03ee8e-6266-4110-9d28-ee3c6086cfe6/Accuweigh.svg" alt="Logo" style={{ width: '100%', height: 'auto' }} />
-               </div>
-               <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  <button className="btn btn-outline" style={{ padding: '0.5rem' }}><IndianRupee size={18} /></button>
+              <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ width: '90px' }}>
+                  <img src="/Accuweigh.svg" alt="Logo" style={{ width: '100%', height: 'auto' }} />
+                </div>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
                   <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}>✕</button>
-               </div>
+                </div>
+              </div>
             </div>
 
             {/* Branding Row */}
@@ -351,7 +348,6 @@ const PayslipModal = ({ employee, onClose }) => {
   );
 };
 
-// ── Main Payroll Page ───────────────────────────────────────────────────────
 const Payroll = () => {
   const { showNotification } = useNotification();
   const [selectedEmployee, setSelectedEmployee] = useState(null);

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Filter, HandCoins, Plus, IndianRupee, User, Calendar, Trash2 } from 'lucide-react';
 import { dataService } from '../utils/dataService';
 import { authService } from '../utils/authService';

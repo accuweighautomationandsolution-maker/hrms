@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
     Coins, Calculator, Calendar, FileText, Download, 
     Settings, Users, Info, ChevronRight, CheckCircle, AlertCircle, TrendingUp

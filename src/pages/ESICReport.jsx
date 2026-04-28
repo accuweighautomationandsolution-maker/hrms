@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { FileText, Download, Users, User, IndianRupee, Printer, Search, ShieldCheck, FileSpreadsheet, Mail, X } from 'lucide-react';
 import { calculateSalaryComponents } from '../utils/payrollCalculator';

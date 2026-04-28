@@ -271,7 +271,6 @@ const EmployeeDirectory = ({ userRole }) => {
     setShowModal(false);
     resetForm();
   };
-  };
 
   const TabButton = ({ num, label, icon: Icon }) => (
     <button 
