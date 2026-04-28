@@ -7,6 +7,12 @@ const SubmitExpenses = ({ onNavigate }) => {
   const user = authService.getCurrentUser();
   const [expenses, setExpenses] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
+  const [showAddForm, setShowAddForm] = React.useState(false);
+  const [targetSite, setTargetSite] = React.useState('');
+  const [category, setCategory] = React.useState('');
+  const [amount, setAmount] = React.useState('');
+  const [reconciliation, setReconciliation] = React.useState('none');
+  const [submitting, setSubmitting] = React.useState(false);
 
   React.useEffect(() => {
     const loadData = async () => {
@@ -42,20 +48,132 @@ const SubmitExpenses = ({ onNavigate }) => {
           </button>
           <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800' }}>Expenses</h2>
         </div>
-        <button className="m-btn-primary" style={{ width: '40px', height: '40px', borderRadius: '12px', padding: 0 }}>
+        <button 
+          onClick={() => setShowAddForm(true)}
+          className="m-btn-primary" 
+          style={{ width: '40px', height: '40px', borderRadius: '12px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
           <Plus size={20} />
         </button>
       </div>
 
       <div className="mobile-container">
-        <div className="m-card" style={{ textAlign: 'center', border: '2px dashed #e2e8f0', background: 'none' }}>
-           <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-              <Camera size={32} color="var(--m-text-muted)" />
-           </div>
-           <h4 style={{ margin: 0 }}>Snap a Receipt</h4>
-           <p style={{ fontSize: '0.8rem', color: 'var(--m-text-muted)', margin: '0.5rem 0 1.5rem' }}>Take a photo of your receipt to auto-fill details.</p>
-           <button className="m-btn" style={{ background: 'var(--m-primary)', color: 'white' }}>Scan Receipt</button>
-        </div>
+        {showAddForm ? (
+          <div className="animate-slide-up" style={{ marginBottom: '2rem' }}>
+            <div className="m-card" style={{ padding: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '800' }}>New Expense</h3>
+                <button onClick={() => setShowAddForm(false)} style={{ background: 'none', border: 'none', color: 'var(--m-text-muted)' }}>Cancel</button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: 'var(--m-text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>Target Site / Project</label>
+                  <input 
+                    type="text" 
+                    className="m-input" 
+                    placeholder="Enter site name" 
+                    value={targetSite}
+                    onChange={(e) => setTargetSite(e.target.value)}
+                    list="mobile-site-list"
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}
+                  />
+                  <datalist id="mobile-site-list">
+                    {[...new Set(expenses.map(e => e.projectName))].map(s => (
+                      <option key={s} value={s} />
+                    ))}
+                  </datalist>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: 'var(--m-text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>Category</label>
+                  <select 
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }}
+                  >
+                    <option value="">Select Category</option>
+                    <option value="Food & Beverage">Food & Beverage</option>
+                    <option value="Local Conveyance">Local Conveyance</option>
+                    <option value="Lodging & Boarding">Lodging & Boarding</option>
+                    <option value="Others">Others</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: 'var(--m-text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>Amount (₹)</label>
+                  <input 
+                    type="number" 
+                    className="m-input" 
+                    placeholder="0.00" 
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: 'var(--m-text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>Reconciliation</label>
+                  <select 
+                    value={reconciliation}
+                    onChange={(e) => setReconciliation(e.target.value)}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }}
+                  >
+                    <option value="none">None - Out of Pocket</option>
+                    <option value="company_direct">Company Direct Payment</option>
+                    <option value="advance">Advance Link</option>
+                  </select>
+                </div>
+
+                <button 
+                  disabled={submitting || !amount || !category || !targetSite}
+                  onClick={async () => {
+                    setSubmitting(true);
+                    try {
+                      const newExpense = {
+                        id: Date.now(),
+                        date: new Date().toISOString().split('T')[0],
+                        empId: Number(user?.id),
+                        name: user?.name,
+                        amount: Number(amount),
+                        category: category,
+                        site: targetSite,
+                        projectName: targetSite,
+                        status: 'Pending',
+                        linkedAdvance: reconciliation === 'none' ? 'None' : (reconciliation === 'company_direct' ? 'Company Direct' : 'Advance Linked'),
+                        attachments: 0
+                      };
+                      const existing = await dataService.getExpenses();
+                      await dataService.saveExpenses([newExpense, ...existing]);
+                      setExpenses([newExpense, ...expenses]);
+                      setShowAddForm(false);
+                      setAmount('');
+                      setCategory('');
+                      setTargetSite('');
+                    } catch (err) {
+                      alert("Failed to save expense");
+                    } finally {
+                      setSubmitting(false);
+                    }
+                  }}
+                  className="m-btn-primary" 
+                  style={{ marginTop: '0.5rem' }}
+                >
+                  {submitting ? 'Submitting...' : 'Submit Expense'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="m-card" style={{ textAlign: 'center', border: '2px dashed #e2e8f0', background: 'none' }}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+                <Camera size={32} color="var(--m-text-muted)" />
+            </div>
+            <h4 style={{ margin: 0 }}>Snap a Receipt</h4>
+            <p style={{ fontSize: '0.8rem', color: 'var(--m-text-muted)', margin: '0.5rem 0 1.5rem' }}>Take a photo of your receipt to auto-fill details.</p>
+            <button onClick={() => setShowAddForm(true)} className="m-btn" style={{ background: 'var(--m-primary)', color: 'white' }}>Scan Receipt</button>
+          </div>
+        )}
 
         <h3 className="m-card-title">Recent Submissions</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

@@ -13,13 +13,7 @@ const CATEGORIES = [
   'Others'
 ];
 
-const SITES = [
-  'Mumbai Hub',
-  'Delhi Installation',
-  'Chennai R&D',
-  'HQ Corporate',
-  'Bangalore Site'
-];
+const SITES = []; // Dynamic sites will be loaded from previous entries
 
 const ACTIVE_ADVANCES = [
   { id: 'ADV-004', type: 'Official Site Advance', name: 'Site Visit: Mumbai Hub', balance: 15500 },
@@ -119,7 +113,7 @@ const Expenses = () => {
         category: item.category || 'Others',
         amount: Number(item.amount) || 0,
         status: 'Pending',
-        linkedAdvance: linkedAdvance === 'none' ? 'None' : linkedAdvance,
+        linkedAdvance: linkedAdvance === 'none' ? 'None' : (linkedAdvance === 'company_direct' ? 'Company Direct' : linkedAdvance),
         attachments: item.attachment ? 1 : 0
     }));
 
@@ -269,15 +263,24 @@ const Expenses = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem', backgroundColor: 'var(--color-background)', padding: '1rem', borderRadius: '8px' }}>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label" style={{ fontSize: '0.875rem', fontWeight: '600' }}>Target Site / Project</label>
-                    <select className="form-input" value={targetSite} onChange={(e) => setTargetSite(e.target.value)}>
-                        <option value="">Select a specific Site...</option>
-                        {SITES.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                    <input 
+                      list="site-list"
+                      className="form-input" 
+                      value={targetSite} 
+                      onChange={(e) => setTargetSite(e.target.value)}
+                      placeholder="Type or select a site..."
+                    />
+                    <datalist id="site-list">
+                      {[...new Set(expenseRecords.map(r => r.site))].map(s => (
+                        <option key={s} value={s} />
+                      ))}
+                    </datalist>
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label" style={{ fontSize: '0.875rem', fontWeight: '600' }}>Advance Reconciliation (Optional)</label>
                     <select className="form-input" value={linkedAdvance} onChange={(e) => setLinkedAdvance(e.target.value)}>
                       <option value="none">None - Out of Pocket</option>
+                      <option value="company_direct">Company Direct Payment</option>
                       {activeAdvances.map(a => (
                         <option key={a.id} value={a.id}>{a.id} ({a.empName} - Bal: ₹{(a.amount || 0).toLocaleString()})</option>
                       ))}
