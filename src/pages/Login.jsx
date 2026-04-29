@@ -90,13 +90,8 @@ const Login = ({ onLoginSuccess }) => {
     setLoading(true);
     setError('');
     try {
-      const user = authService.getCurrentUser() || { email }; // Fallback for session-less reset
-      const allUsers = authService.getUsers();
-      const targetUser = allUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
-      
-      if (!targetUser) throw new Error("User context lost. Please login again.");
-      
-      await authService.updatePassword(targetUser.id, newPassword);
+      await authService.getUsers();
+      await authService.updatePassword(newPassword);
       
       // Re-login after password change to get fresh session
       const newSession = await authService.login(email, newPassword);

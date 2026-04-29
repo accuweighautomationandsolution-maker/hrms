@@ -1,320 +1,411 @@
 import { supabase } from './supabaseClient';
 
-const KEYS = {
-  ATTENDANCE: 'hrms_attendance_records',
-  LEAVES:     'hrms_leave_balances',
-  EMPLOYEES:  'hrms_employees_list',
-  NOTICES:    'hrms_notices_board',
-  HOLIDAYS:   'hrms_custom_holidays',
-  BIO_CONFIG: 'hrms_biometric_config',
-  LEAVE_RECS: 'hrms_leave_requests',
-  ADVANCE_HISTORY: 'hrms_advance_history',
-  PAYROLL_HISTORY: 'hrms_payroll_history',
-  DEPT_BUDGETS: 'hrms_dept_budgets',
-  MANPOWER_REQUESTS: 'hrms_manpower_requests',
-  APPROVAL_LOGS: 'hrms_approval_logs',
-  EXPENSES: 'hrms_expenses_ledger',
-  EXITS: 'hrms_exit_records',
-  GRATUITY_CONFIG: 'hrms_gratuity_config',
-  HANDOVER_CONFIG: 'hrms_handover_config',
-  BONUS_CONFIG: 'hrms_bonus_config',
-  BONUS_PAYMENTS: 'hrms_bonus_payments',
-  POLICIES: 'hrms_policies',
-  POLICY_ACKS: 'hrms_policy_acks',
-  USERS: 'hrms_users',
-  INIT_GUARD: 'hrms_init_guard',
-  AUTH_LOGS: 'hrms_auth_logs',
-  LOGIN_ATTEMPTS: 'hrms_login_attempts',
-  SALARY_STRUCTURES: 'hrms_salary_structures',
-  TRAINING_RECORDS: 'hrms_training_records',
-  INDUCTION_TASKS: 'hrms_induction_tasks',
-  FEEDBACK_RECS: 'hrms_feedback_records',
-  STATUTORY_UPDATES: 'hrms_statutory_updates',
-  COMPLIANCE_MANUALS: 'hrms_compliance_manuals',
-  LETTER_TEMPLATES: 'hrms_letter_templates',
-  CANDIDATES: 'hrms_candidates',
-  EMPLOYEE_DOCS: 'hrms_employee_docs',
-  DEPARTMENTS: 'hrms_departments_list',
-  PROJECTS: 'hrms_projects_list'
+// ── Generic Supabase Helpers (Pure Supabase, No localStorage) ───────────
+
+// Fetches all rows from a table where data is stored in a JSONB 'data' column
+const sbGetAll = async (table, defaultVal = []) => {
+  if (!supabase) return defaultVal;
+  try {
+    const { data, error } = await supabase.from(table).select('data').order('created_at', { ascending: false });
+    if (error) { console.error(`sbGetAll(${table}):`, error); return defaultVal; }
+    return data.map(r => r.data);
+  } catch (e) { console.error(`sbGetAll(${table}) exception:`, e); return defaultVal; }
 };
 
-const getJSON = (key, def = {}) => {
-  const saved = localStorage.getItem(key);
-  try { return saved ? JSON.parse(saved) : def; } catch (e) { return def; }
-};
-
-const saveJSON = (key, val) => localStorage.setItem(key, JSON.stringify(val));
-
-// ── Supabase JSONB Sync Helpers ────────────────────────────────────────────
-// Generic read: fetches all rows from a JSONB table, falls back to localStorage
-const sbGetAll = async (table, localKey, defaultVal = []) => {
-  if (supabase) {
-    try {
-      const { data, error } = await supabase.from(table).select('id, data').order('created_at', { ascending: false });
-      if (!error && data) {
-        const records = data.map(r => r.data);
-        saveJSON(localKey, records); // keep local cache fresh
-        return records;
-      }
-    } catch (e) { console.warn(`sbGetAll(${table}) failed, using cache.`, e); }
-  }
-  return getJSON(localKey, defaultVal);
-};
-
-// Generic write: upserts all records, deletes removed ones, updates localStorage
-const sbSaveAll = async (table, localKey, list) => {
-  saveJSON(localKey, list); // always update local cache
+// Generic write: upserts a list of records to a JSONB table
+const sbSaveAll = async (table, list) => {
   if (!supabase) return list;
   try {
     const rows = list.map(r => ({ id: String(r.id), data: r }));
     if (rows.length > 0) {
       const { error } = await supabase.from(table).upsert(rows, { onConflict: 'id' });
-      if (error) { console.error(`sbSaveAll upsert(${table}):`, error); return list; }
+      if (error) { console.error(`sbSaveAll upsert(${table}):`, error); }
     }
-    // Delete rows that were removed from the list
-    const { data: existing } = await supabase.from(table).select('id');
-    if (existing) {
-      const currentIds = new Set(rows.map(r => r.id));
-      const toDelete = existing.filter(r => !currentIds.has(r.id)).map(r => r.id);
-      if (toDelete.length > 0) {
-        await supabase.from(table).delete().in('id', toDelete);
-      }
-    }
-  } catch (e) { console.warn(`sbSaveAll(${table}) failed.`, e); }
+  } catch (e) { console.error(`sbSaveAll(${table}) exception:`, e); }
   return list;
 };
 
-// Generic single delete from a JSONB table
-const sbDelete = async (table, localKey, id, filteredList) => {
-  saveJSON(localKey, filteredList);
-  if (supabase) {
-    try { await supabase.from(table).delete().eq('id', String(id)); }
-    catch (e) { console.warn(`sbDelete(${table}, ${id}) failed.`, e); }
-  }
-  return filteredList;
+// Generic single delete
+const sbDelete = async (table, id) => {
+  if (!supabase) return;
+  try {
+    await supabase.from(table).delete().eq('id', String(id));
+  } catch (e) { console.error(`sbDelete(${table}, ${id}):`, e); }
+};
+
+// Config helpers (using app_config table)
+const getConfig = async (key, defaultVal) => {
+  if (!supabase) return defaultVal;
+  try {
+    const { data, error } = await supabase.from('app_config').select('value').eq('key', key).maybeSingle();
+    if (error) return defaultVal;
+    return data ? data.value : defaultVal;
+  } catch (e) { return defaultVal; }
+};
+
+const saveConfig = async (key, value) => {
+  if (!supabase) return;
+  try {
+    await supabase.from('app_config').upsert({ key, value, updated_at: new Date().toISOString() });
+  } catch (e) { console.error(`saveConfig(${key}):`, e); }
 };
 
 export const dataService = {
-  // ── Sync Helper (Internal) ────────────────────────────────────────────────
-  _getLocalJSON: getJSON,
-
   // ── Employees ─────────────────────────────────────────────────────────────
   getEmployees: async () => {
-    if (supabase) {
-      const { data, error } = await supabase.from('employees').select('*');
-      if (!error) return data;
-      console.error('Supabase Error:', error);
-    }
-    return getJSON(KEYS.EMPLOYEES, []);
+    if (!supabase) return [];
+    const { data, error } = await supabase.from('employees').select('id, data').order('id');
+    if (error) return [];
+    return data.map(r => r.data || { id: r.id });
   },
 
   getEmployeeById: async (id) => {
-    if (supabase) {
-      const { data, error } = await supabase.from('employees').select('*').eq('id', id).single();
-      if (!error) return data;
-    }
-    const employees = getJSON(KEYS.EMPLOYEES, []);
-    return employees.find(e => String(e.id) === String(id));
+    if (!supabase) return null;
+    const { data, error } = await supabase.from('employees').select('data').eq('id', id).maybeSingle();
+    return (data && data.data) ? data.data : null;
+  },
+
+  saveEmployee: async (empData) => {
+    if (!supabase) return empData;
+    const id = empData.id || Date.now();
+    const row = {
+      id,
+      name: empData.name || '',
+      email: empData.email || '',
+      emp_code: empData.empCode || '',
+      designation: empData.designation || '',
+      department: empData.department || '',
+      status: empData.status || 'Active',
+      data: { ...empData, id }
+    };
+    await supabase.from('employees').upsert(row);
+    return row.data;
+  },
+
+  saveEmployees: async (list) => {
+    if (!supabase) return list;
+    const rows = list.map(emp => ({
+      id: emp.id,
+      name: emp.name || '',
+      email: emp.email || '',
+      emp_code: emp.empCode || '',
+      status: emp.status || 'Active',
+      data: emp
+    }));
+    await supabase.from('employees').upsert(rows);
+    return list;
+  },
+
+  deleteEmployee: async (id) => {
+    if (!supabase) return;
+    await supabase.from('employees').delete().eq('id', id);
   },
 
   // ── Attendance ─────────────────────────────────────────────────────────────
   getAttendance: async () => {
-    if (supabase) {
-      const { data, error } = await supabase.from('attendance').select('*');
-      if (!error) return data;
-    }
-    return getJSON(KEYS.ATTENDANCE, {});
+    if (!supabase) return [];
+    const { data } = await supabase.from('attendance').select('*');
+    return data || [];
   },
 
   getTodayAttendanceStatus: async (userId) => {
-    if (supabase) {
-      const today = new Date().toISOString().split('T')[0];
-      const { data, error } = await supabase.from('attendance').select('*').eq('emp_id', userId).eq('date', today).single();
-      if (!error && data) return data;
-    }
-    const now = new Date();
-    const key = `${userId}_${now.getFullYear()}_${now.getMonth()}_${now.getDate()}`;
-    const records = getJSON(KEYS.ATTENDANCE);
-    return records[key] || { punchIn: null, punchOut: null, status: 'Not Marked' };
+    if (!supabase) return { punch_in: null, punch_out: null, status: 'Not Marked' };
+    const today = new Date().toISOString().split('T')[0];
+    const { data } = await supabase.from('attendance')
+      .select('*')
+      .eq('emp_id', userId)
+      .eq('date', today)
+      .maybeSingle();
+    return data || { punch_in: null, punch_out: null, status: 'Not Marked' };
   },
-  
-  saveAttendance: async (records) => {
-    saveJSON(KEYS.ATTENDANCE, records);
+
+  saveAttendanceRecord: async (record) => {
+    if (!supabase) return;
+    await supabase.from('attendance').upsert(record);
+  },
+
+  getPersonalAttendanceTrajectory: async (userId) => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('attendance')
+      .select('date, punch_in')
+      .eq('emp_id', userId)
+      .order('date', { ascending: false })
+      .limit(5);
+    
+    return (data || []).reverse().map(r => ({
+      day: new Date(r.date).toLocaleDateString('en-US', { weekday: 'short' }),
+      present: r.punch_in ? 1 : 0
+    }));
+  },
+
+  getPresentDaysCount: async (empId, month, year) => {
+    if (!supabase) return 0;
+    const start = new Date(year, month, 1).toISOString().split('T')[0];
+    const end = new Date(year, month + 1, 0).toISOString().split('T')[0];
+    const { count } = await supabase.from('attendance')
+      .select('*', { count: 'exact', head: true })
+      .eq('emp_id', empId)
+      .not('punch_in', 'is', null)
+      .gte('date', start)
+      .lte('date', end);
+    return count || 0;
   },
 
   // ── Leave Management ──────────────────────────────────────────────────────
   getLeaveRequests: async () => {
-    if (supabase) {
-      const { data, error } = await supabase.from('leave_requests').select('*, employees(name)');
-      if (!error) return data;
-    }
-    return getJSON(KEYS.LEAVE_RECS, []);
+    if (!supabase) return [];
+    const { data } = await supabase.from('leave_requests').select('*, employees(name)');
+    return data || [];
+  },
+
+  saveLeaveRequests: async (reqs) => {
+    if (!supabase) return reqs;
+    const rows = reqs.map(r => ({
+      id: r.id || Date.now() + Math.random(),
+      emp_id: r.emp_id || r.empId,
+      type: r.type,
+      start_date: r.start_date || r.startDate,
+      end_date: r.end_date || r.endDate,
+      reason: r.reason,
+      status: r.status,
+      data: r
+    }));
+    await supabase.from('leave_requests').upsert(rows);
+    return reqs;
   },
 
   getLeaveBalances: async () => {
-    return getJSON(KEYS.LEAVES, {});
+    if (!supabase) return {};
+    const { data } = await supabase.from('leave_balances').select('*');
+    const map = {};
+    (data || []).forEach(r => map[r.emp_id] = r.data);
+    return map;
   },
 
-
-  // ── Notices ─────────────────────────────────────────────────────────────
-  getNotices: async () => {
-    if (supabase) {
-      const { data, error } = await supabase.from('notices').select('*').order('created_at', { ascending: false });
-      if (!error) return data;
-    }
-    return getJSON(KEYS.NOTICES, []);
-  },
-
-  saveNotices: async (notices) => {
-    saveJSON(KEYS.NOTICES, notices);
-  },
-
-  getPolicies: async () => {
-    if (supabase) {
-      const { data, error } = await supabase.from('policies').select('*').order('created_at', { ascending: false });
-      if (!error) return data;
-    }
-    return getJSON(KEYS.POLICIES, [
-      { id: 'POL-001', title: 'Code of Conduct v2.0', category: 'Compliance', uploadDate: '2026-01-15', effectiveDate: '2026-01-01', summary: 'Standard professional ethics and workplace behavior.', version: '2.0', status: 'Active' },
-      { id: 'POL-002', title: 'Work From Home Policy', category: 'IT Policies', uploadDate: '2026-02-10', effectiveDate: '2026-02-15', summary: 'Guidelines for remote work eligibility and security.', version: '1.2', status: 'Active' },
-      { id: 'POL-003', title: 'Prevention of Sexual Harassment (POSH)', category: 'Legal', uploadDate: '2025-12-01', effectiveDate: '2026-01-01', summary: 'Safety and grievance redressal for workplace harassment.', version: '3.0', status: 'Active' }
-    ]);
-  },
-
-  savePolicies: async (policies) => {
-    saveJSON(KEYS.POLICIES, policies);
-  },
-
-  // ── Holidays ─────────────────────────────────────────────────────────────
-  getCustomHolidays: async () => {
-    if (supabase) {
-      const { data, error } = await supabase.from('holidays').select('*').order('date', { ascending: true });
-      if (!error) return data;
-    }
-    return getJSON(KEYS.HOLIDAYS, []);
-  },
-
-  uploadPolicyFile: async (file) => {
-    if (supabase) {
-      const fileName = `${Date.now()}_${file.name}`;
-      const { data, error } = await supabase.storage
-        .from('policies')
-        .upload(fileName, file);
-
-      if (error) {
-        console.error('Upload Error:', error);
-        throw error;
-      }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('policies')
-        .getPublicUrl(fileName);
-
-      return publicUrl;
-    }
-    // Fallback if no Supabase (mocking URL)
-    return URL.createObjectURL(file);
-  },
-
-
-
-  getPersonalAttendanceTrajectory: (userId) => {
-    const records = getJSON(KEYS.ATTENDANCE, {});
-    const last5Days = [];
-    for (let i = 4; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const day = d.toLocaleDateString('en-US', { weekday: 'short' });
-      const key = `${userId}_${d.getFullYear()}_${d.getMonth()}_${d.getDate()}`;
-      last5Days.push({
-        day,
-        present: (records[key] && records[key].punchIn) ? 1 : 0
-      });
-    }
-    return last5Days;
-  },
-
-  getDashboardStats: async () => {
-    const emps = (await dataService.getEmployees()).filter(e => e.status !== 'Inactive');
-    const totalEmployees = emps.length;
-    const leaveRequests = await dataService.getLeaveRequests();
-    const attendance = await dataService.getAttendance();
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const day = now.getDate();
-    const todayStr = now.toISOString().split('T')[0];
-
-    let presentToday = 0;
-    let onLeave = 0;
-
-    emps.forEach(emp => {
-      const key = `${emp.id}_${year}_${month}_${day}`;
-      if (attendance[key] && attendance[key].punchIn) {
-        presentToday++;
-      }
-      const leave = leaveRequests.find(l => 
-        l.empId === emp.id && 
-        l.status === 'Approved' && 
-        todayStr >= l.startDate && 
-        todayStr <= l.endDate
-      );
-      if (leave) onLeave++;
-    });
-
-    return { totalEmployees, presentToday, onLeave };
-  },
-
-  // ── Leaves ─────────────────────────────────────────────────────────────────
-  getLeaveBalances: () => getJSON(KEYS.LEAVES, {}),
-
-  getEmployeeBalance: (empId, type = 'total') => {
-    const bals = dataService.getLeaveBalances()[empId] || { Sick: 0, Casual: 0, Paid: 0 };
+  getEmployeeBalance: async (empId, type = 'total') => {
+    if (!supabase) return 0;
+    const { data } = await supabase.from('leave_balances').select('data').eq('emp_id', empId).maybeSingle();
+    const bals = (data && data.data) ? data.data : { Sick: 0, Casual: 0, Paid: 0 };
     if (type === 'total') return Object.values(bals).reduce((a, b) => a + b, 0);
     return bals[type] || 0;
   },
 
-  updateLeaveBalance: (empId, newBalance) => {
-    const bals = dataService.getLeaveBalances();
-    bals[empId] = newBalance;
-    saveJSON(KEYS.LEAVES, bals);
+  updateLeaveBalance: async (empId, newBalance) => {
+    if (!supabase) return;
+    await supabase.from('leave_balances').upsert({ emp_id: empId, data: newBalance, updated_at: new Date().toISOString() });
   },
 
-  // ── Leave Requests ─────────────────────────────────────────────────────────
-  getLeaveRequests: async () => {
-    if (supabase) {
-      const { data, error } = await supabase.from('leave_requests').select('*, employees(name)');
-      if (!error) return data;
-    }
-    return getJSON(KEYS.LEAVE_RECS, []);
+  // ── Notices ─────────────────────────────────────────────────────────────
+  getNotices: async () => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('notices').select('*').order('created_at', { ascending: false });
+    return data || [];
   },
 
-  saveLeaveRequests: async (reqs) => saveJSON(KEYS.LEAVE_RECS, reqs),
+  saveNotices: async (notices) => {
+    if (!supabase) return notices;
+    const rows = notices.map(n => ({
+      id: n.id,
+      title: n.title,
+      content: n.content,
+      type: n.type || 'General',
+      priority: n.priority || 'Normal',
+      author: n.author,
+      date: n.date,
+      data: n
+    }));
+    await supabase.from('notices').upsert(rows);
+    return notices;
+  },
 
-  getReportRangeData: (empId, startDate, endDate, attendance) => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const results = [];
+  deleteNotice: async (id) => {
+    if (!supabase) return;
+    await supabase.from('notices').delete().eq('id', id);
+  },
+
+  // ── Policies ──────────────────────────────────────────────
+  getPolicies: async () => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('policies').select('*').order('created_at', { ascending: false });
+    return data || [];
+  },
+
+  savePolicies: async (policies) => {
+    if (!supabase) return policies;
+    const rows = policies.map(p => ({
+      id: p.id,
+      title: p.title,
+      category: p.category,
+      status: p.status || 'Active',
+      data: p
+    }));
+    await supabase.from('policies').upsert(rows);
+    return policies;
+  },
+
+  deletePolicy: async (id) => {
+    if (!supabase) return;
+    await supabase.from('policies').delete().eq('id', id);
+  },
+
+  getAcknowledgments: async () => sbGetAll('policy_acks'),
+  saveAcknowledgment: async (ack) => {
+    const id = `ACK_${Date.now()}`;
+    await supabase.from('policy_acks').insert({ id, data: { ...ack, id, timestamp: new Date().toISOString() } });
+  },
+
+  // ── Holidays ─────────────────────────────────────────────────────────────
+  getCustomHolidays: async () => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('holidays').select('*').order('from_date', { ascending: true });
+    return data || [];
+  },
+
+  saveHolidays: async (list) => {
+    if (!supabase) return list;
+    const rows = list.map(h => ({
+      id: h.id,
+      name: h.name,
+      from_date: h.from_date || h.fromDate,
+      to_date: h.to_date || h.toDate,
+      type: h.type || 'Public',
+      data: h
+    }));
+    await supabase.from('holidays').upsert(rows);
+    return list;
+  },
+
+  // ── Advances & Payroll ─────────────────────────────────────────────────
+  getAdvanceHistory: async () => sbGetAll('advances'),
+  saveAdvanceHistory: async (history) => sbSaveAll('advances', history),
+
+  getPayrollHistory: async () => sbGetAll('payroll_history'),
+  savePayrollHistory: async (history) => sbSaveAll('payroll_history', history),
+
+  // ── Expenses ──────────────────────────────────────────────────────────
+  getExpenses: async () => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('expenses').select('*').order('date', { ascending: false });
+    return data || [];
+  },
+
+  saveExpenses: async (list) => {
+    if (!supabase) return list;
+    await supabase.from('expenses').upsert(list);
+    return list;
+  },
+
+  deleteExpense: async (id) => {
+    if (!supabase) return;
+    await supabase.from('expenses').delete().eq('id', id);
+  },
+
+  // ── Projects ──────────────────────────────────────────────────────────
+  getProjects: async () => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('projects').select('*').order('name');
+    return data || [];
+  },
+
+  saveProjects: async (list) => {
+    if (!supabase) return list;
+    await supabase.from('projects').upsert(list);
+    return list;
+  },
+
+  // ── Departments ───────────────────────────────────────────────────────
+  getDepartments: async () => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('departments').select('name').order('name');
+    return (data || []).map(r => r.name);
+  },
+
+  saveDepartments: async (list) => {
+    if (!supabase) return;
+    const rows = list.map(name => ({ id: name.toLowerCase().replace(/ /g, '_'), name }));
+    await supabase.from('departments').upsert(rows);
+  },
+
+  // ── Induction & Feedback ──────────────────────────────────────────────
+  getInductionTasks: async (empId) => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('induction_tasks').select('tasks').eq('emp_id', empId).maybeSingle();
+    return (data && data.tasks) ? data.tasks : [];
+  },
+
+  saveInductionTasks: async (empId, tasks) => {
+    if (!supabase) return;
+    await supabase.from('induction_tasks').upsert({ emp_id: empId, tasks, updated_at: new Date().toISOString() });
+  },
+
+  getFeedbackHistory: async (empId) => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('feedback_records').select('data').eq('emp_id', empId);
+    return (data || []).map(r => r.data).sort((a, b) => new Date(b.reviewDate) - new Date(a.reviewDate));
+  },
+
+  saveFeedback: async (record) => {
+    if (!supabase) return record;
+    const id = record.id || `FB_${Date.now()}`;
+    const row = {
+      id,
+      emp_id: record.empId,
+      review_type: record.reviewType,
+      data: { ...record, id, submittedAt: new Date().toISOString() }
+    };
+    await supabase.from('feedback_records').upsert(row);
+    return row.data;
+  },
+
+  // ── App Configs (Bulletin, Biometrics, etc) ──────────────────────────
+  getBiometricConfig: async () => getConfig('biometric_config', { ip: '192.168.1.201', port: '4370' }),
+  saveBiometricConfig: async (conf) => saveConfig('biometric_config', conf),
+
+  getGratuityConfig: async () => getConfig('gratuity_config', { enabled: true, minYearsStandard: 5 }),
+  saveGratuityConfig: async (conf) => saveConfig('gratuity_config', conf),
+
+  getBonusConfig: async () => getConfig('bonus_config', { enabled: true, bonusPercentage: 8.33 }),
+  saveBonusConfig: async (conf) => saveConfig('bonus_config', conf),
+
+  getBulletinConfig: async () => getConfig('bulletin_config', null),
+  saveBulletinConfig: async (conf) => saveConfig('bulletin_config', conf),
+
+  // ── Dashboard Stats ──────────────────────────────────────────────────
+  getDashboardStats: async () => {
+    if (!supabase) return { totalEmployees: 0, presentToday: 0, onLeave: 0 };
     
-    // Iterate day by day
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        const year = d.getFullYear();
-        const month = d.getMonth();
-        const day = d.getDate();
-        const key = `${empId}_${year}_${month}_${day}`;
-        const log = attendance[key] || null;
-        
-        results.push({
-            date: d.toISOString().split('T')[0],
-            dayName: d.toLocaleDateString('en-US', { weekday: 'short' }),
-            log: log
-        });
-    }
-    return results;
+    const { count: totalEmployees } = await supabase.from('employees')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'Active');
+    
+    const today = new Date().toISOString().split('T')[0];
+    const { count: presentToday } = await supabase.from('attendance')
+      .select('*', { count: 'exact', head: true })
+      .eq('date', today)
+      .not('punch_in', 'is', null);
+
+    const { data: leaves } = await supabase.from('leave_requests')
+      .select('emp_id')
+      .eq('status', 'Approved')
+      .lte('start_date', today)
+      .gte('end_date', today);
+    
+    const onLeave = new Set((leaves || []).map(l => l.emp_id)).size;
+
+    return { totalEmployees: totalEmployees || 0, presentToday: presentToday || 0, onLeave };
   },
 
+  // ── Business Logic Helpers ───────────────────────────────────────────
+  getPersonalAttendanceSummary: async (userId, month, year) => {
+    const present = await dataService.getPresentDaysCount(userId, month, year);
+    return {
+      present,
+      absent: 0,
+      late: 0,
+      total: 30
+    };
+  },
 
-  // ── Probation Alerts ──────────────────────────────────────────────
   getUpcomingProbations: async () => {
     const emps = await dataService.getEmployees();
     const now = new Date();
@@ -337,24 +428,14 @@ export const dataService = {
     });
   },
 
-
-  // ── Biometrics ─────────────────────────────────────────────────────
-  getBiometricConfig: () => getJSON(KEYS.BIO_CONFIG, {
-    ip: '192.168.1.201',
-    port: '4370',
-    deviceName: 'Identix Main Hub',
-    protocol: 'TCP/IP (UDP Pull)'
-  }),
-
-  saveBiometricConfig: (config) => saveJSON(KEYS.BIO_CONFIG, config),
-
-
+  getEmployeeBalanceByCriteria: async (empId, type = 'total') => {
+    return await dataService.getEmployeeBalance(empId, type);
+  },
 
   getLeavesByCriteria: async (filters = {}) => {
     let employees = await dataService.getEmployees();
     const allLeaves = await dataService.getLeaveRequests();
     
-    // 1. Filter employees by scope
     if (filters.managerId) {
       employees = employees.filter(e => e.managerId === Number(filters.managerId));
     }
@@ -366,714 +447,88 @@ export const dataService = {
     }
 
     const empIds = employees.map(e => e.id);
-    
-    // 2. Filter leaves by those employees and date range
-    let filtered = allLeaves.filter(l => empIds.includes(l.empId));
+    let filtered = allLeaves.filter(l => empIds.includes(l.emp_id || l.empId));
     
     if (filters.startDate && filters.endDate) {
       const start = new Date(filters.startDate);
       const end = new Date(filters.endDate);
       filtered = filtered.filter(l => {
-        const lStart = new Date(l.startDate);
+        const lStart = new Date(l.start_date || l.startDate);
         return lStart >= start && lStart <= end;
       });
     }
 
-    return {
-      leaves: filtered,
-      employees: employees
-    };
+    return { leaves: filtered, employees };
   },
 
-  getLeaveAnalytics: (leaves) => {
-    const stats = {
-      typeDistribution: {},
-      statusBreakdown: { Approved: 0, Pending: 0, Rejected: 0 },
-      monthlyTrend: {}, // { "Jan": 5, "Feb": 2 ... }
-      totalDays: 0
-    };
-
-    leaves.forEach(l => {
-      // Type Dist
-      stats.typeDistribution[l.type] = (stats.typeDistribution[l.type] || 0) + 1;
-      // Status
-      stats.statusBreakdown[l.status] = (stats.statusBreakdown[l.status] || 0) + 1;
-      // Trend
-      const month = new Date(l.startDate).toLocaleString('default', { month: 'short' });
-      stats.monthlyTrend[month] = (stats.monthlyTrend[month] || 0) + l.days;
-      // Total
-      if (l.status === 'Approved') stats.totalDays += l.days;
-    });
-
-    return stats;
+  getPersonalAdvances: async (userId) => {
+    const all = await dataService.getAdvanceHistory();
+    return all.filter(a => Number(a.empId) === Number(userId));
   },
 
-  // ── Advances & Loans ─────────────────────────────────────────────────
-  getAdvanceHistory: async () => sbGetAll('advances', KEYS.ADVANCE_HISTORY, []),
+  getPersonalExpenses: async (userId) => {
+    const all = await dataService.getExpenses();
+    return all.filter(e => Number(e.emp_id || e.empId) === Number(userId));
+  },
 
-  saveAdvanceHistory: async (history) => sbSaveAll('advances', KEYS.ADVANCE_HISTORY, history),
-
-  // ── Payroll ──────────────────────────────────────────────────────────
-  getPayrollHistory: async () => sbGetAll('payroll_history', KEYS.PAYROLL_HISTORY, []),
-
-  savePayrollHistory: async (history) => sbSaveAll('payroll_history', KEYS.PAYROLL_HISTORY, history),
+  getPersonalNotices: async (userId) => {
+    const all = await dataService.getNotices();
+    return all.filter(n => !n.data?.targetUserId || n.data.targetUserId === Number(userId));
+  },
 
   getSalaryByMonth: async (month, year) => {
     const history = await dataService.getPayrollHistory();
     return history.filter(h => h.month === month && h.year === year);
   },
 
-  // ── HR Budget & Hiring ───────────────────────────────────────────────
-  getDeptBudgets: () => getJSON(KEYS.DEPT_BUDGETS, [
-    { id: 1, department: 'Engineering', year: '2026', totalBudget: 5000000, type: 'Annual', buffer: 5 },
-    { id: 2, department: 'Design', year: '2026', totalBudget: 1200000, type: 'Annual', buffer: 10 },
-    { id: 3, department: 'Human Resources', year: '2026', totalBudget: 800000, type: 'Annual', buffer: 5 },
-    { id: 4, department: 'Operations', year: '2026', totalBudget: 600000, type: 'Annual', buffer: 0 }
-  ]),
-  saveDeptBudgets: (list) => saveJSON(KEYS.DEPT_BUDGETS, list),
+  // ── Other Records ─────────────────────────────────────────────────────
 
-  getManpowerRequests: () => getJSON(KEYS.MANPOWER_REQUESTS, []),
-  saveManpowerRequests: (list) => saveJSON(KEYS.MANPOWER_REQUESTS, list),
+  getExitRecords: async () => sbGetAll('exit_records'),
+  saveExitRecords: async (list) => sbSaveAll('exit_records', list),
 
-  getApprovalLogs: () => getJSON(KEYS.APPROVAL_LOGS, []),
-  saveApprovalLogs: (list) => saveJSON(KEYS.APPROVAL_LOGS, list),
+  getTrainingRecords: async () => sbGetAll('training_records'),
+  saveTrainingRecords: async (list) => sbSaveAll('training_records', list),
 
-  getBudgetUtilization: async (department) => {
-    const employees = (await dataService.getEmployees())
-      .filter(e => e.department === department && e.status !== 'Inactive');
-    
-    let totalUtilized = 0;
-    employees.forEach(e => {
-       if (e.dayRate) {
-          totalUtilized += (e.dayRate * 26 * 12);
-       } else {
-          totalUtilized += (e.grossSalary * 12);
-       }
-    });
-    return totalUtilized;
+  getCandidates: async () => sbGetAll('candidates'),
+  saveCandidates: async (list) => sbSaveAll('candidates', list),
+
+  getLetterTemplates: async () => sbGetAll('letter_templates'),
+  saveLetterTemplates: async (list) => sbSaveAll('letter_templates', list),
+
+  getEmployeeDocs: async (empId = null) => {
+    if (!supabase) return [];
+    let query = supabase.from('employee_docs').select('data');
+    if (empId) query = query.eq('emp_id', empId);
+    const { data } = await query;
+    return (data || []).map(r => r.data);
   },
 
-  // ── Expenses & Site Analytics ──────────────────────────────────────────
-  getExpenses: async () => {
-    if (supabase) {
-      try {
-        const { data, error } = await supabase.from('expenses').select('*').order('created_at', { ascending: false });
-        if (!error && data) {
-          saveJSON(KEYS.EXPENSES, data);
-          return data;
-        }
-      } catch (e) { console.warn('getExpenses Supabase failed, using cache.', e); }
-    }
-    return getJSON(KEYS.EXPENSES, []);
+  addEmployeeDoc: async (doc) => {
+    if (!supabase) return;
+    const id = `DOC_${Date.now()}`;
+    const record = { ...doc, id, uploadDate: new Date().toISOString() };
+    await supabase.from('employee_docs').insert({ id, emp_id: doc.empId, data: record });
   },
 
-  saveExpenses: async (list) => {
-    saveJSON(KEYS.EXPENSES, list);
-    if (!supabase) return list;
-    try {
-      if (list.length > 0) {
-        const { error } = await supabase.from('expenses').upsert(list, { onConflict: 'id' });
-        if (error) { console.error('saveExpenses upsert:', error); return list; }
-      }
-      const { data: existing } = await supabase.from('expenses').select('id');
-      if (existing) {
-        const currentIds = new Set(list.map(r => r.id));
-        const toDelete = existing.filter(r => !currentIds.has(r.id)).map(r => r.id);
-        if (toDelete.length > 0) {
-          await supabase.from('expenses').delete().in('id', toDelete);
-        }
-      }
-    } catch (e) { console.warn('saveExpenses Supabase failed.', e); }
-    return list;
-  },
+  getStatutoryUpdates: async () => sbGetAll('statutory_updates'),
+  saveStatutoryUpdates: async (list) => sbSaveAll('statutory_updates', list),
 
-  deleteExpense: async (id) => {
-    const list = (await dataService.getExpenses()).filter(e => e.id !== id);
-    saveJSON(KEYS.EXPENSES, list);
-    if (supabase) {
-      try { await supabase.from('expenses').delete().eq('id', id); }
-      catch (e) { console.warn('deleteExpense Supabase failed.', e); }
-    }
-    return list;
-  },
+  getComplianceManuals: async () => sbGetAll('compliance_manuals'),
+  saveComplianceManuals: async (list) => sbSaveAll('compliance_manuals', list),
 
-  // ── Gratuity & Handover Configs ─────────────────────────────────────────
-  getGratuityConfig: () => getJSON(KEYS.GRATUITY_CONFIG, {
-    enabled: true,
-    minYearsStandard: 5,
-    enable48Rule: true,
-    contractualEnabled: true,
-    contractualMinYears: 1,
-    applyToDeathDisability: true
-  }),
-  saveGratuityConfig: (conf) => saveJSON(KEYS.GRATUITY_CONFIG, conf),
-
-  getHandoverMaster: () => getJSON(KEYS.HANDOVER_CONFIG, [
-    { id: 'WK_01', category: 'Work', label: 'Knowledge Transfer Sessions', mandatory: true },
-    { id: 'WK_02', category: 'Work', label: 'Project Files & Documentation', mandatory: true },
-    { id: 'IT_01', category: 'IT', label: 'Laptop & Peripheral Return', mandatory: true },
-    { id: 'IT_02', category: 'IT', label: 'Official Email Handover/Closure', mandatory: true },
-    { id: 'AD_01', category: 'Admin', label: 'ID Card & Access Fobs', mandatory: true },
-    { id: 'FN_01', category: 'Finance', label: 'Advance/Loan Settlements', mandatory: true }
-  ]),
-  saveHandoverMaster: (list) => saveJSON(KEYS.HANDOVER_CONFIG, list),
-
-  addHandoverItem: (item) => {
-    const list = dataService.getHandoverMaster();
-    list.push({ ...item, id: `HO_${Date.now()}` });
-    dataService.saveHandoverMaster(list);
-    return list;
-  },
-
-  deleteHandoverItem: (id) => {
-    const list = dataService.getHandoverMaster().filter(h => h.id !== id);
-    dataService.saveHandoverMaster(list);
-    return list;
-  },
-
-  // ── Exit & Off-boarding ──────────────────────────────────────────────
-  getExitRecords: async () => sbGetAll('exit_records', KEYS.EXITS, []),
-
-  saveExitRecords: async (list) => sbSaveAll('exit_records', KEYS.EXITS, list),
-
-  deleteExitRecord: async (id) => {
-    const list = (await dataService.getExitRecords()).filter(ex => ex.id !== id);
-    return sbDelete('exit_records', KEYS.EXITS, id, list);
-  },
-
-  completeFnFSystemProcess: async (empId) => {
-    // 1. Move to Inactive
-    const emps = await dataService.getEmployees();
-    const eidx = emps.findIndex(e => e.id === empId);
-    if(eidx > -1) {
-      emps[eidx].status = 'Inactive';
-      dataService.saveEmployees(emps);
-    }
-    // 2. Mark Exit completed
-    const exits = await dataService.getExitRecords();
-    const xidx = exits.findIndex(ex => ex.empId === empId);
-    if(xidx > -1) {
-      exits[xidx].status = 'Completed';
-      exits[xidx].stage = 4;
-      await dataService.saveExitRecords(exits);
-    }
-  },
-
-  saveEmployees: (list) => saveJSON(KEYS.EMPLOYEES, list),
-
-  // ── Departments ─────────────────────────────────────────────────────
-  getDepartments: () => getJSON(KEYS.DEPARTMENTS, ['Engineering', 'Product', 'Human Resources', 'Design', 'Operations', 'Finance', 'Production']),
-  
-  saveDepartments: (list) => saveJSON(KEYS.DEPARTMENTS, list),
-
-  addDepartment: (name) => {
-    const list = dataService.getDepartments();
-    if (!list.includes(name)) {
-      list.push(name);
-      dataService.saveDepartments(list);
-    }
-    return list;
-  },
-
-  deleteDepartment: (name) => {
-    const list = dataService.getDepartments().filter(d => d !== name);
-    dataService.saveDepartments(list);
-    return list;
-  },
-
-  // ── Bonus Management ────────────────────────────────────────────────
-  getBonusConfig: () => getJSON(KEYS.BONUS_CONFIG, {
-    enabled: true,
-    eligibilityDays: 30,
-    salaryThreshold: 21000,
-    calculationCeiling: 7000,
-    minWageOverride: 8500,
-    bonusPercentage: 8.33
-  }),
-  saveBonusConfig: (conf) => saveJSON(KEYS.BONUS_CONFIG, conf),
-
-  getBonusPayments: async () => sbGetAll('bonus_payments', KEYS.BONUS_PAYMENTS, []),
-  saveBonusPayments: async (list) => sbSaveAll('bonus_payments', KEYS.BONUS_PAYMENTS, list),
-  getAcknowledgments: () => getJSON(KEYS.POLICY_ACKS, []),
-  
-  saveAcknowledgment: (ack) => {
-    const list = dataService.getAcknowledgments();
-    list.push({ ...ack, timestamp: new Date().toISOString() });
-    saveJSON(KEYS.POLICY_ACKS, list);
-    return list;
-  },
-
-  deletePolicyById: (id) => {
-    const policies = dataService.getPolicies();
-    const filtered = policies.filter(p => p.id !== id);
-    saveJSON(KEYS.POLICIES, filtered);
-    return filtered;
-  },
-
-  // ── Scoped/Personal Data Fetchers ────────────────────────────────────
-  getPersonalAdvances: async (userId) => {
-    const all = await dataService.getAdvanceHistory();
-    return all.filter(a => a.empId === Number(userId));
-  },
-
-  getPersonalExpenses: async (userId) => {
-    const all = await dataService.getExpenses();
-    return all.filter(e => e.empId === Number(userId));
-  },
-
-  getPersonalNotices: async (userId) => {
-    const all = await dataService.getNotices();
-    // Notices are public if no targetedUserId, or if specifically targeted
-    return all.filter(n => !n.targetUserId || n.targetUserId === Number(userId));
-  },
-
-  // ── Identity & Access Management ──────────────────────────────────────
-  getUsers: () => getJSON(KEYS.USERS, []),
-  saveUsers: (list) => {
-    // Critical Protection: Don't allow saving an explicitly empty list if it would trigger re-init
-    if (!Array.isArray(list)) return;
-    saveJSON(KEYS.USERS, list);
-    // Set guard to prevent re-initialization if any users exist
-    if (list.length > 0 && !localStorage.getItem(KEYS.INIT_GUARD)) {
-      localStorage.setItem(KEYS.INIT_GUARD, 'true');
-    }
-  },
-
-  getAuthLogs: () => getJSON(KEYS.AUTH_LOGS, []),
-  saveAuthLogs: (list) => saveJSON(KEYS.AUTH_LOGS, list),
-
-  addAuthLog: (action, user, details) => {
-    const logs = dataService.getAuthLogs();
-    logs.unshift({
-      id: `LOG_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-      timestamp: new Date().toISOString(),
-      action,
-      user,
-      details
-    });
-    // Keep only last 500 logs
-    dataService.saveAuthLogs(logs.slice(0, 500));
-  },
-
-  getLoginAttempts: () => getJSON(KEYS.LOGIN_ATTEMPTS, {}),
-  saveLoginAttempts: (attempts) => saveJSON(KEYS.LOGIN_ATTEMPTS, attempts),
-
-  // ── Salary Structures (Snapshots/Database) ──────────────────────────
   getSalaryStructure: async (empId) => {
-    if (supabase) {
-      try {
-        const { data, error } = await supabase.from('salary_structures_ext').select('data').eq('emp_id', Number(empId)).single();
-        if (!error && data) return data.data;
-      } catch (e) { /* fallthrough to cache */ }
-    }
-    const all = getJSON(KEYS.SALARY_STRUCTURES, {});
-    return all[empId] || null;
+    if (!supabase) return null;
+    const { data } = await supabase.from('salary_structures_ext').select('data').eq('emp_id', empId).maybeSingle();
+    return data ? data.data : null;
   },
 
-  saveSalaryStructure: async (empId, data) => {
-    const snapshot = { ...data, lastUpdated: new Date().toISOString(), db_version: '1.0' };
-    // Update local cache
-    const all = getJSON(KEYS.SALARY_STRUCTURES, {});
-    all[empId] = snapshot;
-    saveJSON(KEYS.SALARY_STRUCTURES, all);
-    // Upsert to Supabase
-    if (supabase) {
-      try {
-        await supabase.from('salary_structures_ext').upsert(
-          { emp_id: Number(empId), data: snapshot, last_updated: new Date().toISOString() },
-          { onConflict: 'emp_id' }
-        );
-      } catch (e) { console.warn('saveSalaryStructure Supabase failed.', e); }
-    }
-    
-    // Also update the main employee record's gross salary for backward compatibility in the directory
-    if (data.targetSalary) {
-      const emps = await dataService.getEmployees();
-      const idx = emps.findIndex(e => e.id === Number(empId));
-      if (idx > -1) {
-        emps[idx].grossSalary = Number(data.targetSalary);
-        dataService.saveEmployees(emps);
-      }
-    }
-  },
-
-  // ── Training & Induction ──────────────────────────────────────────
-  getTrainingRecords: async () => {
-    const defaults = [
-      { id: 1, type: 'Safety Training', time: '2 Hours', trainer: 'Dr. Ramesh Singh', date: '2026-04-10', attendeeIds: [1, 2, 4], attendeeNames: 'Alice, Bob, Diana' },
-      { id: 2, type: 'POSH Orientation', time: '1.5 Hours', trainer: 'Adv. Meera Nair', date: '2026-04-12', attendeeIds: [3, 7], attendeeNames: 'Charlie, Frank' }
-    ];
-    return sbGetAll('training_records', KEYS.TRAINING_RECORDS, defaults);
-  },
-
-  saveTrainingRecords: async (list) => sbSaveAll('training_records', KEYS.TRAINING_RECORDS, list),
-
-  getInductionTasks: (empId) => {
-    const all = getJSON(KEYS.INDUCTION_TASKS, {});
-    if (!all[empId]) {
-      // Default template for new hires
-      return [
-        { id: 1, task: 'ID Card & Biometric Registration', status: 'Completed', owner: 'IT/Admin' },
-        { id: 2, task: 'Safety Gear (PPE) Handover', status: 'Pending', owner: 'Operations' },
-        { id: 3, task: 'HR Policy & POSH Briefing', status: 'Pending', owner: 'HR' },
-        { id: 4, task: 'Bank Account & PF Form Submission', status: 'Pending', owner: 'Finance' }
-      ];
-    }
-    return all[empId];
-  },
-
-  saveInductionTasks: (empId, tasks) => {
-    const all = getJSON(KEYS.INDUCTION_TASKS, {});
-    all[empId] = tasks;
-    saveJSON(KEYS.INDUCTION_TASKS, all);
-  },
-
-  // ── Feedback & Performance ──────────────────────────────────────────
-  getFeedback: async (empId, type) => {
-    const all = await sbGetAll('feedback_records', KEYS.FEEDBACK_RECS, []);
-    return all.find(f => f.empId === Number(empId) && f.reviewType === type) || null;
-  },
-
-  getFeedbackHistory: async (empId) => {
-    const all = await sbGetAll('feedback_records', KEYS.FEEDBACK_RECS, []);
-    return all.filter(f => f.empId === Number(empId)).sort((a,b) => new Date(b.reviewDate) - new Date(a.reviewDate));
-  },
-
-  saveFeedback: async (data) => {
-    const all = await sbGetAll('feedback_records', KEYS.FEEDBACK_RECS, []);
-    const idx = all.findIndex(f => f.empId === data.empId && f.reviewType === data.reviewType);
-    
-    const record = {
-      ...data,
-      id: idx > -1 ? all[idx].id : `FB_${Date.now()}`,
-      reviewDate: new Date().toISOString(),
-      submittedAt: new Date().toISOString(),
-      isLocked: true // Enforcement: Submitted records are locked
-    };
-
-    const updated = idx > -1 ? all.map((f, i) => i === idx ? record : f) : [...all, record];
-    await sbSaveAll('feedback_records', KEYS.FEEDBACK_RECS, updated);
-    
-    // Automatic Status/Probation Update Logic
-    if (data.recommendation) {
-      dataService.updateEmployeeStatusAfterFeedback(data.empId, data.recommendation, data.extensionPeriod);
-    }
-
-    return record;
-  },
-
-  updateEmployeeStatusAfterFeedback: (empId, recommendation, extensionVal) => {
-    dataService.getEmployees().then(emps => {
-      const idx = emps.findIndex(e => e.id === Number(empId));
-      if (idx === -1) return;
-
-      const emp = emps[idx];
-      if (recommendation === 'Permanent') {
-        emp.empType = 'Permanent';
-      } else if (recommendation === 'Extend') {
-        emp.empType = 'Probation';
-        // If extensionVal is provided (e.g. "3 months"), we could update expiry dates here
-        if (extensionVal) {
-          emp.probPeriod = extensionVal;
-        }
-      } else if (recommendation === 'Rejected' || recommendation === 'Terminate') {
-        emp.status = 'Inactive';
-        emp.exitReason = 'Performance / Termination';
-      } else if (recommendation === 'Release') {
-        emp.status = 'Inactive';
-        emp.exitReason = 'Released';
-      }
-
-      dataService.saveEmployees(emps);
+  saveSalaryStructure: async (empId, structData) => {
+    if (!supabase) return;
+    const snapshot = { ...structData, lastUpdated: new Date().toISOString() };
+    await supabase.from('salary_structures_ext').upsert({
+      emp_id: empId,
+      data: snapshot,
+      last_updated: new Date().toISOString()
     });
-  },
-
-  deleteFeedback: async (id) => {
-    const all = await sbGetAll('feedback_records', KEYS.FEEDBACK_RECS, []);
-    const filtered = all.filter(f => f.id !== id);
-    return sbDelete('feedback_records', KEYS.FEEDBACK_RECS, id, filtered);
-  },
-
-  // ── Statutory Compliance Hub ───────────────────────────────────────
-  getStatutoryUpdates: () => {
-    return getJSON(KEYS.STATUTORY_UPDATES, []);
-  },
-
-  saveStatutoryUpdates: (list) => saveJSON(KEYS.STATUTORY_UPDATES, list),
-
-  saveStatutoryUpdate: (update) => {
-    const list = dataService.getStatutoryUpdates();
-    const idx = list.findIndex(u => u.id === update.id);
-    let updatedList;
-    if (idx > -1) {
-      updatedList = list.map(u => u.id === update.id ? { ...u, ...update } : u);
-    } else {
-      updatedList = [...list, { ...update, id: Date.now() }];
-    }
-    dataService.saveStatutoryUpdates(updatedList);
-    return updatedList;
-  },
-
-  deleteStatutoryUpdate: (id) => {
-    const list = dataService.getStatutoryUpdates().filter(u => u.id !== id);
-    dataService.saveStatutoryUpdates(list);
-    return list;
-  },
-
-  getComplianceManuals: () => {
-    let list = getJSON(KEYS.COMPLIANCE_MANUALS, []);
-    if (list.length === 0) {
-      list = [
-        { 
-          id: 'MAN_01', 
-          category: 'PF', 
-          title: 'EPF Master Handbook 2026 (Official)', 
-          content: 'This manual covers all aspects of PF withdrawal, nominations, and UAN management. Key section 7 outlines the new 2026 withdrawal rules.',
-          version: '4.2', 
-          lastUpdated: '2026-03-20',
-          previousVersions: [
-            { version: '4.1', date: '2025-09-10', note: 'Last stable version' }
-          ]
-        },
-        { 
-          id: 'MAN_02', 
-          category: 'ESIC', 
-          title: 'ESIC Benefits & Claims Manual', 
-          content: 'Detailed guide for HR admins to process sickness benefits and maternity claims. Includes updated ESIC discharge forms.',
-          version: '3.0', 
-          lastUpdated: '2026-02-15',
-          previousVersions: []
-        },
-        { 
-          id: 'MAN_03', 
-          category: 'Labour Law', 
-          title: 'Factories Act Compliance Guide', 
-          content: 'Comprehensive handbook for workplace safety, working hours, and leave policy as per the revised Labour Code.',
-          version: '1.5', 
-          lastUpdated: '2026-01-10',
-          previousVersions: [
-            { version: '1.4', date: '2024-12-01', note: 'Old code reference' }
-          ]
-        }
-      ];
-      saveJSON(KEYS.COMPLIANCE_MANUALS, list);
-    }
-    return list;
-  },
-
-  saveComplianceManuals: (list) => saveJSON(KEYS.COMPLIANCE_MANUALS, list),
-
-  saveComplianceManual: (manual) => {
-    const list = dataService.getComplianceManuals();
-    const idx = list.findIndex(m => m.id === manual.id);
-    let updatedList;
-    if (idx > -1) {
-      // Versioning Logic: Move current version to previousVersions
-      const current = list[idx];
-      const newVersion = {
-        ...manual,
-        lastUpdated: new Date().toISOString().split('T')[0],
-        previousVersions: [
-          { version: current.version, date: current.lastUpdated, note: 'Replaced by system update' },
-          ...(current.previousVersions || [])
-        ]
-      };
-      updatedList = list.map(m => m.id === manual.id ? newVersion : m);
-    } else {
-      updatedList = [...list, { ...manual, previousVersions: [], lastUpdated: new Date().toISOString().split('T')[0] }];
-    }
-    dataService.saveComplianceManuals(updatedList);
-    return updatedList;
-  },
-
-  saveEmployee: async (empData) => {
-    const list = await dataService.getEmployees();
-    const idx = list.findIndex(e => e.id === Number(empData.id));
-    let savedEmp;
-    let updatedList;
-    if (idx > -1) {
-      savedEmp = { ...list[idx], ...empData };
-      updatedList = list.map(e => e.id === Number(empData.id) ? savedEmp : e);
-    } else {
-      savedEmp = { ...empData, id: Date.now() };
-      updatedList = [...list, savedEmp];
-    }
-    dataService.saveEmployees(updatedList);
-    return savedEmp;
-  },
-
-  // ── Project / Site Management ─────────────────────────────────────────
-  getProjects: async () => {
-    if (supabase) {
-      const { data, error } = await supabase.from('projects').select('*');
-      if (!error) return data;
-    }
-    let list = getJSON(KEYS.PROJECTS, []);
-    if (list.length === 0) {
-      list = [
-        { id: 'PRJ-001', name: 'Mumbai Hub', status: 'Active' },
-        { id: 'PRJ-002', name: 'Delhi Installation', status: 'Active' },
-        { id: 'PRJ-003', name: 'Chennai R&D', status: 'Active' }
-      ];
-      saveJSON(KEYS.PROJECTS, list);
-    }
-    return list;
-  },
-
-  saveProjects: async (list) => saveJSON(KEYS.PROJECTS, list),
-
-  addProject: async (name) => {
-    const list = await dataService.getProjects();
-    const newPrj = { 
-      id: `PRJ-${Date.now()}`, 
-      name, 
-      status: 'Active',
-      createdAt: new Date().toISOString()
-    };
-    const updated = [...list, newPrj];
-    await dataService.saveProjects(updated);
-    return newPrj;
-  },
-
-  toggleProjectStatus: async (id) => {
-    const list = await dataService.getProjects();
-    const updated = list.map(p => {
-      if (p.id === id) {
-        return { ...p, status: p.status === 'Active' ? 'Closed' : 'Active' };
-      }
-      return p;
-    });
-    await dataService.saveProjects(updated);
-    return updated;
-  },
-
-  deleteEmployee: (id) => {
-    const list = dataService.getEmployees().filter(e => e.id !== Number(id));
-    dataService.saveEmployees(list);
-    return list;
-  },
-
-  savePayrollSnapshot: async (snapshot) => {
-    const history = await dataService.getPayrollHistory();
-    // Check if snapshot for this month/year already exists, if so update, else push
-    const idx = history.findIndex(h => h.month === snapshot.month && h.year === snapshot.year && h.empId === snapshot.empId);
-    let newHistory;
-    if (idx > -1) {
-      newHistory = history.map((h, i) => i === idx ? { ...h, ...snapshot } : h);
-    } else {
-      newHistory = [...history, { ...snapshot, id: String(Date.now() + Math.random()) }];
-    }
-    await dataService.savePayrollHistory(newHistory);
-    return newHistory;
-  },
-
-  deletePolicy: (id) => {
-    const list = dataService.getPolicies().filter(p => p.id !== id);
-    dataService.savePolicies(list);
-    return list;
-  },
-
-  saveBonusPayment: (payment) => {
-    const list = dataService.getBonusPayments();
-    list.push({ ...payment, id: `BON_${Date.now()}`, timestamp: new Date().toISOString() });
-    dataService.saveBonusPayments(list);
-    return list;
-  },
-
-  // ── Letters & Documents ─────────────────────────────────────────────
-  getLetterTemplates: () => getJSON(KEYS.LETTER_TEMPLATES, [
-    {
-      id: 'template_offer',
-      type: 'Offer Letter',
-      subject: 'Offer of Employment - {{company_name}}',
-      content: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; padding: 40px; border: 1px solid #eee; background: #fff;">
-          <h2 style="text-align: center; color: #1e293b; margin-bottom: 30px;">OFFER OF EMPLOYMENT</h2>
-          <p style="text-align: right;">Date: ${new Date().toLocaleDateString()}</p>
-          <p>To,<br/><strong>{{employee_name}}</strong></p>
-          <p>Dear {{employee_name}},</p>
-          <p>We are pleased to offer you the position of <strong>{{designation}}</strong> at <strong>{{company_name}}</strong>. We were impressed with your background and believe you will be a valuable asset to our {{department}} team.</p>
-          <p>The details of your offer are as follows:</p>
-          <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <ul style="list-style: none; padding: 0; margin: 0;">
-              <li style="margin-bottom: 10px;"><strong>Annual CTC:</strong> ₹{{salary}}</li>
-              <li style="margin-bottom: 10px;"><strong>Expected Joining Date:</strong> {{joining_date}}</li>
-              <li><strong>Location:</strong> Mumbai HQ</li>
-            </ul>
-          </div>
-          <p>This offer is contingent upon successful background verification. Please signify your acceptance by signing a copy of this letter.</p>
-          <p>Welcome aboard!</p>
-          <p style="margin-top: 40px;">Sincerely,<br/><br/><strong>HR Department</strong><br/>{{company_name}}</p>
-        </div>
-      `
-    },
-    {
-      id: 'template_appointment',
-      type: 'Appointment Letter',
-      subject: 'Letter of Appointment',
-      content: `
-        <div style="font-family: 'Times New Roman', serif; line-height: 1.8; padding: 40px; border: 1px solid #eee;">
-          <h2 style="text-align: center; text-decoration: underline; color: #000;">APPOINTMENT LETTER</h2>
-          <p style="text-align: right;">Date: ${new Date().toLocaleDateString()}</p>
-          <p>To,<br/>{{employee_name}}<br/>{{designation}}</p>
-          <p>Dear {{employee_name}},</p>
-          <p>Further to your acceptance of our offer, we are pleased to appoint you as <strong>{{designation}}</strong> in the <strong>{{department}}</strong> department of {{company_name}} effective from <strong>{{joining_date}}</strong>.</p>
-          <p>Your employment will be governed by the terms and conditions mentioned in the employee handbook and company policies.</p>
-          <p>We look forward to a long and mutually beneficial association.</p>
-          <div style="margin-top: 60px; display: flex; justify-content: space-between;">
-            <div>
-               <p>For {{company_name}},</p>
-               <br/><br/>
-               <p>____________________<br/>Authorized Signatory</p>
-            </div>
-            <div style="text-align: right;">
-               <br/><br/><br/>
-               <p>____________________<br/>Candidate Signature</p>
-            </div>
-          </div>
-        </div>
-      `
-    }
-  ]),
-  saveLetterTemplates: (list) => saveJSON(KEYS.LETTER_TEMPLATES, list),
-
-  getCandidates: () => getJSON(KEYS.CANDIDATES, [
-    { id: 101, name: 'John Doe', email: 'john.doe@example.com', role: 'Full Stack Developer', department: 'Engineering', ctc: 1200000, status: 'Applied', date: '2026-04-10' },
-    { id: 102, name: 'Jane Smith', email: 'jane.smith@example.com', role: 'UI Designer', department: 'Design', ctc: 900000, status: 'Selected', date: '2026-04-12' }
-  ]),
-  saveCandidates: (list) => saveJSON(KEYS.CANDIDATES, list),
-
-  getEmployeeDocs: (empId = null) => {
-    const all = getJSON(KEYS.EMPLOYEE_DOCS, []);
-    return empId ? all.filter(d => d.empId === Number(empId)) : all;
-  },
-  saveEmployeeDocs: (list) => saveJSON(KEYS.EMPLOYEE_DOCS, list),
-
-  addEmployeeDoc: (doc) => {
-    const list = dataService.getEmployeeDocs();
-    list.push({ ...doc, id: `DOC_${Date.now()}`, uploadDate: new Date().toISOString() });
-    dataService.saveEmployeeDocs(list);
-    return list;
-  },
-
-  getPresentDaysCount: (empId, month, year) => {
-    const records = getJSON(KEYS.ATTENDANCE, {});
-    let count = 0;
-    Object.keys(records).forEach(key => {
-      if (key.startsWith(`${empId}_${year}_${month}_`) && records[key].punchIn) {
-        count++;
-      }
-    });
-    return count;
-  },
-
-  getPersonalAttendanceSummary: async (userId, month, year) => {
-    const present = dataService.getPresentDaysCount(userId, month, year);
-    return {
-      present,
-      absent: 0,
-      late: 0,
-      total: 30
-    };
   }
 };

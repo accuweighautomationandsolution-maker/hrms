@@ -63,10 +63,6 @@ const Dashboard = ({ userRole }) => {
   };
 
   const getInitialBulletin = () => {
-    const saved = localStorage.getItem('hrms_bulletin_config');
-    if (saved) {
-      try { return JSON.parse(saved); } catch(e) {}
-    }
     const defaultExpiry = new Date();
     defaultExpiry.setDate(defaultExpiry.getDate() + 7);
     return {
@@ -78,8 +74,8 @@ const Dashboard = ({ userRole }) => {
   };
 
   const [bulletin, setBulletinState] = useState(getInitialBulletin);
-  const setBulletin = (newConfig) => {
-    localStorage.setItem('hrms_bulletin_config', JSON.stringify(newConfig));
+  const setBulletin = async (newConfig) => {
+    await dataService.saveBulletinConfig(newConfig);
     setBulletinState(newConfig);
   };
 
@@ -102,11 +98,14 @@ const Dashboard = ({ userRole }) => {
           setPersonalTrajectory(trajectory);
         }
 
-        const [noticesList, probationList, holidayList] = await Promise.all([
+        const [noticesList, probationList, holidayList, bulletinConfig] = await Promise.all([
           dataService.getNotices(),
           dataService.getUpcomingProbations(),
-          dataService.getCustomHolidays()
+          dataService.getCustomHolidays(),
+          dataService.getBulletinConfig()
         ]);
+
+        if (bulletinConfig) setBulletinState(bulletinConfig);
 
         // Transform upcoming holidays into notice-like items for the timeline
         const now = new Date();

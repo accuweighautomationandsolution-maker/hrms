@@ -1,332 +1,198 @@
-import { dataService } from './dataService';
+import { supabase } from './supabaseClient';
 
-const SESSION_KEY = 'hrms_current_session';
-const LOCKOUT_LIMIT = 999; // Effectively disabled lockout
-const LOCKOUT_DURATION_MINS = 1; 
+// ── In-memory session cache (avoids async getCurrentUser in every component) ──
+let _cachedProfile = null;
 
-/**
- * SHA-256 Hashing using Web Crypto API
- */
-async function hashPassword(password) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
+function normalizeEmail(e) { return e ? e.trim().toLowerCase() : ''; }
 
-function normalizeEmail(email) {
-  return email ? email.trim().toLowerCase() : '';
-}
-
-/**
- * Password Policy Enforcement
- */
-function validatePassword(password) {
-  const minLength = 7;
-  const hasUpper = /[A-Z]/.test(password);
-  const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-  
-  if (password.length < minLength) return "Password must be at least 8 characters long.";
-  if (!hasUpper) return "Password must contain at least one uppercase letter.";
-  if (!hasSpecial) return "Password must contain at least one special character.";
+function validatePassword(p) {
+  if (p.length < 7) return 'Password must be at least 8 characters long.';
+  if (!/[A-Z]/.test(p)) return 'Password must contain at least one uppercase letter.';
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(p)) return 'Password must contain at least one special character.';
   return null;
 }
 
-export const authService = {
-  /**
-   * Initialize system with a default admin if no users exist
-   */
-  async init() {
-    const users = dataService.getUsers();
-    
-    // Recovery logic: If users are missing, we MUST seed the admin even if guard is set
-    if (users.length === 0) {
-      const admin = {
-        id: 'ADMIN_001',
-        email: 'admin@hrms.com',
-        name: 'System Admin',
-        passwordHash: await hashPassword('Admin@123'),
-        role: 'management',
-        active: true,
-        forcePasswordReset: true,
-        plainPassword: 'Admin@123',
-        createdAt: new Date().toISOString()
-      };
-      const alice = {
-        id: 1,
-        email: 'alice@company.com',
-        name: 'Alice Smith',
-        passwordHash: await hashPassword('Alice@123'),
-        role: 'employee',
-        active: true,
-        forcePasswordReset: false,
-        plainPassword: 'Alice@123',
-        createdAt: new Date().toISOString()
-      };
-      const bob = {
-        id: 2,
-        email: 'bob@company.com',
-        name: 'Bob Johnson',
-        passwordHash: await hashPassword('Bob@123'),
-        role: 'employee',
-        active: true,
-        forcePasswordReset: false,
-        plainPassword: 'Bob@123',
-        createdAt: new Date().toISOString()
-      };
-      dataService.saveUsers([admin, alice, bob]);
-      localStorage.setItem('hrms_init_guard', 'true');
-      dataService.addAuthLog('SYSTEM_INIT', 'SYSTEM', 'Standard users seeded.');
-    } else {
-      // Self-Healing Logic: ensure default accounts are healthy
-      const users = dataService.getUsers();
-      const accounts = [
-        { email: 'admin@hrms.com', pwd: 'Admin@123', role: 'management', name: 'System Admin', id: 'ADMIN_001' },
-        { email: 'alice@company.com', pwd: 'Alice@123', role: 'employee', name: 'Alice Smith', id: 1 },
-        { email: 'bob@company.com', pwd: 'Bob@123', role: 'employee', name: 'Bob Johnson', id: 2 }
-      ];
-      
-      let changed = false;
-      for (const acc of accounts) {
-        const idx = users.findIndex(u => normalizeEmail(u.email) === acc.email);
-        const expectedHash = await hashPassword(acc.pwd);
-        
-        if (idx === -1) {
-          users.push({
-            id: acc.id, email: acc.email, name: acc.name, passwordHash: expectedHash,
-            plainPassword: acc.pwd,
-            role: acc.role, active: true, forcePasswordReset: false, createdAt: new Date().toISOString()
-          });
-          changed = true;
-        } else {
-          if (!users[idx].active || users[idx].passwordHash !== expectedHash || !users[idx].plainPassword) {
-            users[idx].active = true;
-            users[idx].passwordHash = expectedHash;
-            users[idx].plainPassword = acc.pwd;
-            changed = true;
-          }
-        }
-      }
+async function fetchProfile(userId) {
+  const { data } = await supabase.from('user_profiles').select('*').eq('id', userId).single();
+  return data || null;
+}
 
-      if (changed) {
-        dataService.saveUsers(users);
-        console.log("Standard accounts self-healed.");
+async function addAuthLog(action, user, details) {
+  const log = {
+    id: `LOG_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+    timestamp: new Date().toISOString(),
+    action, user, details
+  };
+  try {
+    await supabase.from('auth_logs').insert({ id: log.id, data: log });
+  } catch (e) { console.warn('authLog failed', e); }
+}
+
+export const authService = {
+  async init() {
+    // Subscribe to auth state changes to keep cache in sync
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        _cachedProfile = await fetchProfile(session.user.id);
+      } else {
+        _cachedProfile = null;
+      }
+    });
+
+    // Load current session
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      _cachedProfile = await fetchProfile(session.user.id);
+    }
+
+    // Seed default accounts if no profiles exist yet
+    const { data: profiles } = await supabase.from('user_profiles').select('id').limit(1);
+    if (!profiles || profiles.length === 0) {
+      await this._seedDefaultAccounts();
+    }
+  },
+
+  async _seedDefaultAccounts() {
+    const accounts = [
+      { email: 'admin@accuweigh.com', password: 'Admin@123', name: 'System Admin', role: 'management' },
+      { email: 'alice@company.com', password: 'Alice@123', name: 'Alice Smith', role: 'employee' },
+      { email: 'bob@company.com', password: 'Bob@123', name: 'Bob Johnson', role: 'employee' },
+    ];
+    for (const acc of accounts) {
+      const { data, error } = await supabase.auth.signUp({
+        email: acc.email,
+        password: acc.password,
+        options: { data: { name: acc.name } }
+      });
+      if (!error && data.user) {
+        await supabase.from('user_profiles').upsert({
+          id: data.user.id,
+          email: acc.email,
+          name: acc.name,
+          role: acc.role,
+          active: true,
+          force_password_reset: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'id' });
       }
     }
+    await addAuthLog('SYSTEM_INIT', 'SYSTEM', 'Default accounts seeded via Supabase Auth.');
   },
 
   async login(email, password) {
-    const users = dataService.getUsers();
-    const attempts = dataService.getLoginAttempts();
-    const normalizedEmail = normalizeEmail(email);
-    const user = users.find(u => normalizeEmail(u.email) === normalizedEmail);
-
-    if (!user) {
-      dataService.addAuthLog('LOGIN_FAIL', normalizedEmail, 'Identity validation failed (User not found).');
-      throw new Error("Incorrect email address.");
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: normalizeEmail(email),
+      password,
+    });
+    if (error) {
+      await addAuthLog('LOGIN_FAIL', normalizeEmail(email), error.message);
+      const msg = error.message.includes('Invalid login credentials')
+        ? 'Incorrect email or password.'
+        : error.message;
+      throw new Error(msg);
     }
-
-    if (!user.active) {
-      dataService.addAuthLog('LOGIN_FAIL', normalizedEmail, 'Account deactivated.');
-      throw new Error("Your account is deactivated. Please contact HR.");
+    const profile = await fetchProfile(data.user.id);
+    if (!profile) throw new Error('User profile not found. Please contact HR.');
+    if (!profile.active) {
+      await supabase.auth.signOut();
+      throw new Error('Your account is deactivated. Please contact HR.');
     }
-
-    // Check Lockout
-    const attemptData = attempts[normalizedEmail] || { count: 0, lockedUntil: null };
-    if (attemptData.lockedUntil && new Date(attemptData.lockedUntil) > new Date()) {
-      const remainingMins = Math.ceil((new Date(attemptData.lockedUntil) - new Date()) / 60000);
-      dataService.addAuthLog('LOGIN_LOCKOUT_HIT', normalizedEmail, `Attempted login during lockout. ${remainingMins}m remaining.`);
-      throw new Error(`Account temporarily locked. Please try again in ${remainingMins} minutes.`);
-    }
-
-    const inputHash = await hashPassword(password);
-    
-    // Constant-time comparison simulation
-    if (user.passwordHash === inputHash) {
-      // Success
-      const empRecord = await dataService.getEmployeeById(user.id);
-      const session = {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        empCode: empRecord ? empRecord.empCode : null,
-        forcePasswordReset: user.forcePasswordReset,
-        loginTime: new Date().toISOString()
-      };
-      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-      
-      // Clear attempts
-      delete attempts[normalizedEmail];
-      dataService.saveLoginAttempts(attempts);
-      
-      dataService.addAuthLog('LOGIN_SUCCESS', normalizedEmail, 'Login successful.');
-      return session;
-    } else {
-      // Failed
-      attemptData.count = (attemptData.count || 0) + 1;
-      let errorMsg = "Incorrect password.";
-      
-      if (attemptData.count >= LOCKOUT_LIMIT) {
-        const lockoutTime = new Date();
-        lockoutTime.setMinutes(lockoutTime.getMinutes() + LOCKOUT_DURATION_MINS);
-        attemptData.lockedUntil = lockoutTime.toISOString();
-        errorMsg = `Too many failed attempts. Your account has been locked for ${LOCKOUT_DURATION_MINS} minutes for security.`;
-        dataService.addAuthLog('LOGIN_LOCKOUT_TRIGGERED', normalizedEmail, 'Security lockout triggered.');
-      } else {
-        dataService.addAuthLog('LOGIN_FAIL', normalizedEmail, `Verification failed. Attempt ${attemptData.count}/${LOCKOUT_LIMIT}`);
-      }
-      
-      attempts[normalizedEmail] = attemptData;
-      dataService.saveLoginAttempts(attempts);
-      throw new Error(errorMsg);
-    }
+    _cachedProfile = profile;
+    await addAuthLog('LOGIN_SUCCESS', email, 'Login successful.');
+    return profile;
   },
 
-  logout() {
-    const user = this.getCurrentUser();
-    if (user) {
-      dataService.addAuthLog('LOGOUT', user.email, 'User logged out.');
-    }
-    localStorage.removeItem(SESSION_KEY);
+  async logout() {
+    if (_cachedProfile) await addAuthLog('LOGOUT', _cachedProfile.email, 'User logged out.');
+    _cachedProfile = null;
+    await supabase.auth.signOut();
   },
 
-  getCurrentUser() {
-    const saved = localStorage.getItem(SESSION_KEY);
-    try {
-      return saved ? JSON.parse(saved) : null;
-    } catch (e) {
-      return null;
-    }
-  },
-  
-  getUserRole() {
-    return this.getCurrentUser()?.role || null;
-  },
+  // Synchronous — returns cached profile (set during init/login)
+  getCurrentUser() { return _cachedProfile; },
+  getUserRole() { return _cachedProfile?.role || null; },
 
   async createUser(email, password, role, name) {
     const pwdError = validatePassword(password);
     if (pwdError) throw new Error(pwdError);
 
-    const users = dataService.getUsers();
-    if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
-      throw new Error("User with this email already exists.");
-    }
+    const { data: existing } = await supabase
+      .from('user_profiles').select('id').eq('email', normalizeEmail(email)).maybeSingle();
+    if (existing) throw new Error('User with this email already exists.');
 
-    const passwordHash = await hashPassword(password);
-    const newUser = {
-      id: `USR_${Date.now()}`,
-      email: email.toLowerCase(),
-      name,
-      passwordHash,
-      plainPassword: password,
-      role,
-      active: true,
-      forcePasswordReset: false,
-      createdAt: new Date().toISOString()
+    const { data, error } = await supabase.auth.signUp({
+      email: normalizeEmail(email),
+      password,
+      options: { data: { name } }
+    });
+    if (error) throw new Error(error.message);
+    if (!data.user) throw new Error('Failed to create user account.');
+
+    const profile = {
+      id: data.user.id, email: normalizeEmail(email), name, role,
+      active: true, force_password_reset: false,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     };
-
-    users.push(newUser);
-    dataService.saveUsers(users);
-    
-    const admin = this.getCurrentUser();
-    dataService.addAuthLog('USER_CREATED', admin?.email || 'SYSTEM', `New user created: ${email}`);
-    return newUser;
+    await supabase.from('user_profiles').insert(profile);
+    await addAuthLog('USER_CREATED', _cachedProfile?.email || 'SYSTEM', `New user created: ${email}`);
+    return profile;
   },
 
-  async resetUserPassword(userId, newPassword) {
+  async updatePassword(newPassword) {
     const pwdError = validatePassword(newPassword);
     if (pwdError) throw new Error(pwdError);
-
-    const users = dataService.getUsers();
-    const idx = users.findIndex(u => u.id === userId);
-    if (idx === -1) throw new Error("User not found.");
-
-    users[idx].passwordHash = await hashPassword(newPassword);
-    users[idx].plainPassword = newPassword;
-    users[idx].forcePasswordReset = true;
-    dataService.saveUsers(users);
-
-    const admin = this.getCurrentUser();
-    dataService.addAuthLog('PWD_RESET_ADMIN', admin?.email || 'SYSTEM', `Admin reset password for: ${users[idx].email}`);
-  },
-
-  async updatePassword(userId, newPassword) {
-    const pwdError = validatePassword(newPassword);
-    if (pwdError) throw new Error(pwdError);
-
-    const users = dataService.getUsers();
-    const idx = users.findIndex(u => u.id === userId);
-    if (idx === -1) throw new Error("User not found.");
-
-    users[idx].passwordHash = await hashPassword(newPassword);
-    users[idx].plainPassword = newPassword;
-    users[idx].forcePasswordReset = false;
-    dataService.saveUsers(users);
-
-    // Update session if it's the current user
-    const current = this.getCurrentUser();
-    if (current && current.id === userId) {
-      current.forcePasswordReset = false;
-      localStorage.setItem(SESSION_KEY, JSON.stringify(current));
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw new Error(error.message);
+    if (_cachedProfile) {
+      await supabase.from('user_profiles').update({
+        force_password_reset: false, updated_at: new Date().toISOString()
+      }).eq('id', _cachedProfile.id);
+      _cachedProfile.force_password_reset = false;
+      await addAuthLog('PWD_CHANGED', _cachedProfile.email, 'User updated their password.');
     }
-
-    dataService.addAuthLog('PWD_CHANGED', users[idx].email, 'User updated their password.');
   },
 
-  updateUserStatus(userId, active) {
-    const users = dataService.getUsers();
-    const idx = users.findIndex(u => u.id === userId);
-    if (idx === -1) return;
-
-    users[idx].active = active;
-    dataService.saveUsers(users);
-
-    const admin = this.getCurrentUser();
-    dataService.addAuthLog('USER_STATUS_CHANGE', admin?.email || 'SYSTEM', `User ${users[idx].email} status set to ${active ? 'Active' : 'Inactive'}`);
+  async resetUserPassword(userId) {
+    await supabase.from('user_profiles').update({
+      force_password_reset: true, updated_at: new Date().toISOString()
+    }).eq('id', userId);
+    const { data: profile } = await supabase.from('user_profiles').select('email').eq('id', userId).single();
+    await addAuthLog('PWD_RESET_ADMIN', _cachedProfile?.email || 'SYSTEM', `Reset flag set for: ${profile?.email}`);
   },
 
-  updateUserRole(userId, newRole) {
-    const users = dataService.getUsers();
-    const idx = users.findIndex(u => u.id === userId);
-    if (idx === -1) return;
-
-    const oldRole = users[idx].role;
-    users[idx].role = newRole;
-    dataService.saveUsers(users);
-
-    const admin = this.getCurrentUser();
-    dataService.addAuthLog('USER_ROLE_CHANGE', admin?.email || 'SYSTEM', `User ${users[idx].email} role changed from ${oldRole} to ${newRole}`);
+  async updateUserStatus(userId, active) {
+    await supabase.from('user_profiles').update({ active, updated_at: new Date().toISOString() }).eq('id', userId);
+    const { data: p } = await supabase.from('user_profiles').select('email').eq('id', userId).single();
+    await addAuthLog('USER_STATUS_CHANGE', _cachedProfile?.email || 'SYSTEM',
+      `User ${p?.email} status set to ${active ? 'Active' : 'Inactive'}`);
   },
 
-  getUsers() {
-    return dataService.getUsers();
+  async updateUserRole(userId, newRole) {
+    const { data: p } = await supabase.from('user_profiles').select('email, role').eq('id', userId).single();
+    await supabase.from('user_profiles').update({ role: newRole, updated_at: new Date().toISOString() }).eq('id', userId);
+    await addAuthLog('USER_ROLE_CHANGE', _cachedProfile?.email || 'SYSTEM',
+      `User ${p?.email} role changed from ${p?.role} to ${newRole}`);
   },
 
-  getLogs() {
-    return dataService.getAuthLogs();
+  async getUsers() {
+    const { data, error } = await supabase.from('user_profiles').select('*').order('created_at');
+    if (error) { console.error('getUsers:', error); return []; }
+    return data || [];
+  },
+
+  async getLogs() {
+    const { data } = await supabase.from('auth_logs').select('data')
+      .order('created_at', { ascending: false }).limit(500);
+    return (data || []).map(r => r.data);
   },
 
   async forgotPassword(email) {
-    const users = dataService.getUsers();
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    
-    if (!user) {
-      // For security, don't reveal if user exists, but here we can be more helpful in a demo
-      throw new Error("If an account exists for this email, a reset code will be sent.");
-    }
-
-    const resetToken = Math.random().toString(36).substr(2, 6).toUpperCase();
-    const expiry = new Date();
-    expiry.setMinutes(expiry.getMinutes() + 15);
-
-    // In a real app, send email here. In mock, we'll store it in a temp place or log it.
-    dataService.addAuthLog('PWD_RESET_REQUEST', email, `Reset requested. Token: ${resetToken} (Expires in 15m)`);
-    
-    // Simulate email send
-    console.log(`[MOCK EMAIL] To: ${email} - Subject: Password Reset - Code: ${resetToken}`);
-    
-    return { token: resetToken, email }; // Returning for demo purposes so UI can "fill" it
-  }
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizeEmail(email), {
+      redirectTo: `${window.location.origin}/login`,
+    });
+    if (error) throw new Error(error.message);
+    await addAuthLog('PWD_RESET_REQUEST', email, 'Password reset email sent via Supabase.');
+    return { email };
+  },
 };

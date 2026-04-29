@@ -47,8 +47,8 @@ function App() {
   const [isInitializing, setIsInitializing] = useState(true);
 
   // Logout handler
-  const handleLogout = useCallback(() => {
-    authService.logout();
+  const handleLogout = useCallback(async () => {
+    await authService.logout();
     setCurrentUser(null);
     // Force redirect to login with feedback
     window.location.href = '/login?logout=success';
