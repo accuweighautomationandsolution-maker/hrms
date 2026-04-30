@@ -174,13 +174,37 @@ const ContractualPayslipModal = ({ employee, onClose }) => {
 
 // ── Standard Payslip Modal (Staff / On-role) ───────────────────────────────
 const PayslipModal = ({ employee, onClose }) => {
-  const presentDaysCount = dataService.getPresentDaysCount(employee.id, CUR_MO, CUR_YR);
+  const [daysPresent, setDaysPresent] = useState(0);
+  const [balanceLeaves, setBalanceLeaves] = useState(0);
   const [holidayWorked, setHolidayWorked] = useState([]);
   const [shiftHours, setShiftHours] = useState('9.5');
-  const daysPresent = presentDaysCount || 0;
-  const balanceLeaves = dataService.getEmployeeBalance(employee.id);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      setLoading(true);
+      try {
+        const [count, balance] = await Promise.all([
+          dataService.getPresentDaysCount(employee.id, CUR_MO, CUR_YR),
+          dataService.getEmployeeBalance(employee.id)
+        ]);
+        setDaysPresent(count || 0);
+        setBalanceLeaves(balance || 0);
+      } catch (err) {
+        console.error("Error fetching payslip stats:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (employee) fetchStats();
+  }, [employee]);
 
   if (!employee) return null;
+  if (loading) return (
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+    </div>
+  );
   const { payrollContext } = employee;
   const { earnings, deductions, netPay } = payrollContext;
 

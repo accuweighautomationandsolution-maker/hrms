@@ -46,6 +46,7 @@ const Dashboard = ({ userRole }) => {
   const [notices, setNotices] = useState([]);
   const [probations, setProbations] = useState([]);
   const [dashboardStats, setDashboardStats] = useState({ totalEmployees: 0, presentToday: 0, onLeave: 0 });
+  const [statutoryUpdates, setStatutoryUpdates] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const isEmployee = userRole === 'employee';
@@ -98,14 +99,16 @@ const Dashboard = ({ userRole }) => {
           setPersonalTrajectory(trajectory);
         }
 
-        const [noticesList, probationList, holidayList, bulletinConfig] = await Promise.all([
+        const [noticesList, probationList, holidayList, bulletinConfig, statutoryData] = await Promise.all([
           dataService.getNotices(),
           dataService.getUpcomingProbations(),
           dataService.getCustomHolidays(),
-          dataService.getBulletinConfig()
+          dataService.getBulletinConfig(),
+          dataService.getStatutoryUpdates()
         ]);
 
         if (bulletinConfig) setBulletinState(bulletinConfig);
+        setStatutoryUpdates(statutoryData || []);
 
         // Transform upcoming holidays into notice-like items for the timeline
         const now = new Date();
@@ -429,7 +432,7 @@ const Dashboard = ({ userRole }) => {
               <Link to="/compliance" className="btn btn-ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>View Hub</Link>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {dataService.getStatutoryUpdates().slice(0, 3).map(u => (
+              {statutoryUpdates.slice(0, 3).map(u => (
                 <div key={u.id} style={{ display: 'flex', gap: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--color-background)' }}>
                   <div style={{ width: '4px', height: 'auto', backgroundColor: u.priority === 'Critical' ? 'var(--color-danger)' : u.priority === 'Important' ? 'var(--color-warning)' : 'var(--color-success)', borderRadius: '2px' }} />
                   <div style={{ flex: 1 }}>

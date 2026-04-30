@@ -14,13 +14,11 @@ const sbGetAll = async (table, defaultVal = []) => {
 
 // Generic write: upserts a list of records to a JSONB table
 const sbSaveAll = async (table, list) => {
-  if (!supabase) return list;
+  if (!supabase || !list || list.length === 0) return list;
   try {
     const rows = list.map(r => ({ id: String(r.id), data: r }));
-    if (rows.length > 0) {
-      const { error } = await supabase.from(table).upsert(rows, { onConflict: 'id' });
-      if (error) { console.error(`sbSaveAll upsert(${table}):`, error); }
-    }
+    const { error } = await supabase.from(table).upsert(rows, { onConflict: 'id' });
+    if (error) { console.error(`sbSaveAll upsert(${table}):`, error); }
   } catch (e) { console.error(`sbSaveAll(${table}) exception:`, e); }
   return list;
 };
@@ -248,6 +246,12 @@ export const dataService = {
     await supabase.from('policies').delete().eq('id', id);
   },
 
+  uploadPolicyFile: async (file) => {
+    // Placeholder: In a real app, use supabase.storage.from('policies').upload(...)
+    console.log("Mock file upload:", file.name);
+    return `/mock-storage/policies/${file.name}`;
+  },
+
   getAcknowledgments: async () => sbGetAll('policy_acks'),
   saveAcknowledgment: async (ack) => {
     const id = `ACK_${Date.now()}`;
@@ -311,6 +315,19 @@ export const dataService = {
     if (!supabase) return list;
     await supabase.from('projects').upsert(list);
     return list;
+  },
+
+  addProject: async (name) => {
+    if (!supabase) return;
+    const id = name.toLowerCase().replace(/ /g, '_');
+    await supabase.from('projects').insert({ id, name, status: 'Active' });
+  },
+
+  toggleProjectStatus: async (id) => {
+    if (!supabase) return;
+    const { data } = await supabase.from('projects').select('status').eq('id', id).single();
+    const newStatus = data?.status === 'Active' ? 'Inactive' : 'Active';
+    await supabase.from('projects').update({ status: newStatus }).eq('id', id);
   },
 
   // ── Departments ───────────────────────────────────────────────────────
@@ -530,5 +547,19 @@ export const dataService = {
       data: snapshot,
       last_updated: new Date().toISOString()
     });
+  },
+
+  savePayrollSnapshot: async (data) => {
+    if (!supabase) return;
+    const id = `PAY_${data.year}_${data.month}_${data.empId}`;
+    await supabase.from('payroll_history').upsert({ id, data, created_at: new Date().toISOString() });
+  },
+
+  getLeaveAnalytics: (leaves) => {
+    const stats = { Approved: 0, Pending: 0, Rejected: 0, total: leaves.length };
+    leaves.forEach(l => {
+      if (stats[l.status] !== undefined) stats[l.status]++;
+    });
+    return stats;
   }
 };

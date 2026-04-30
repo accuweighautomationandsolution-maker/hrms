@@ -50,13 +50,13 @@ const Login = ({ onLoginSuccess }) => {
     setSuccess('');
     
     try {
-      const session = await authService.login(email, password);
-      
-      if (session.forcePasswordReset) {
+      const result = await authService.login(email, password);
+      // result contains { profile, forcePasswordReset }
+      if (result.forcePasswordReset) {
         setView('force-reset');
         setLoading(false);
       } else {
-        onLoginSuccess(session);
+        onLoginSuccess(result.profile);
         navigate('/');
       }
     } catch (err) {

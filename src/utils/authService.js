@@ -30,25 +30,29 @@ async function addAuthLog(action, user, details) {
 
 export const authService = {
   async init() {
-    // Subscribe to auth state changes to keep cache in sync
-    supabase.auth.onAuthStateChange(async (event, session) => {
+    try {
+      // Subscribe to auth state changes to keep cache in sync
+      supabase.auth.onAuthStateChange(async (event, session) => {
+        if (session?.user) {
+          _cachedProfile = await fetchProfile(session.user.id);
+        } else {
+          _cachedProfile = null;
+        }
+      });
+
+      // Load current session
+      const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         _cachedProfile = await fetchProfile(session.user.id);
-      } else {
-        _cachedProfile = null;
       }
-    });
 
-    // Load current session
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      _cachedProfile = await fetchProfile(session.user.id);
-    }
-
-    // Seed default accounts if no profiles exist yet
-    const { data: profiles } = await supabase.from('user_profiles').select('id').limit(1);
-    if (!profiles || profiles.length === 0) {
-      await this._seedDefaultAccounts();
+      // Seed default accounts if no profiles exist yet
+      const { data: profiles, error: pError } = await supabase.from('user_profiles').select('id').limit(1);
+      if (!pError && (!profiles || profiles.length === 0)) {
+        await this._seedDefaultAccounts();
+      }
+    } catch (err) {
+      console.error('Auth initialization failed:', err);
     }
   },
 
@@ -58,15 +62,34 @@ export const authService = {
       { email: 'alice@company.com', password: 'Alice@123', name: 'Alice Smith', role: 'employee' },
       { email: 'bob@company.com', password: 'Bob@123', name: 'Bob Johnson', role: 'employee' },
     ];
+    
     for (const acc of accounts) {
+      // First check if user already exists in auth.users (via a safe sign-in attempt or just skip if signup fails)
       const { data, error } = await supabase.auth.signUp({
         email: acc.email,
         password: acc.password,
         options: { data: { name: acc.name } }
       });
-      if (!error && data.user) {
+
+      let userId = data.user?.id;
+
+      // If signUp fails because user exists, we don't have the UID easily via client SDK without admin privileges.
+      // However, we can try to find them in user_profiles by email if they were partially created.
+      if (error && error.message.includes('already registered')) {
+        // User exists in Auth, check if they have a profile
+        const { data: existingProf } = await supabase.from('user_profiles').select('id').eq('email', acc.email).maybeSingle();
+        if (existingProf) continue; // Already fully setup
+        
+        // If they exist in Auth but not in user_profiles, we have a "broken" state.
+        // In a production app, we'd need Admin API to get the UID. 
+        // For this migration, we'll suggest the user manually logs in or we attempt a reset.
+        console.warn(`User ${acc.email} exists in Auth but missing profile. Manual sync required or use Admin API.`);
+        continue;
+      }
+
+      if (userId) {
         await supabase.from('user_profiles').upsert({
-          id: data.user.id,
+          id: userId,
           email: acc.email,
           name: acc.name,
           role: acc.role,
@@ -77,7 +100,7 @@ export const authService = {
         }, { onConflict: 'id' });
       }
     }
-    await addAuthLog('SYSTEM_INIT', 'SYSTEM', 'Default accounts seeded via Supabase Auth.');
+    await addAuthLog('SYSTEM_INIT', 'SYSTEM', 'Default accounts seed attempted.');
   },
 
   async login(email, password) {
@@ -100,7 +123,8 @@ export const authService = {
     }
     _cachedProfile = profile;
     await addAuthLog('LOGIN_SUCCESS', email, 'Login successful.');
-    return profile;
+    // Return both profile and force password reset flag
+    return { profile, forcePasswordReset: profile.force_password_reset };
   },
 
   async logout() {
