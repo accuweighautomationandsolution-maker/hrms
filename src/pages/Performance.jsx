@@ -93,7 +93,7 @@ const Performance = () => {
     fetchData();
   }, []);
 
-  const stats = useMemo(() => {
+  const stats = (() => {
     const total = allActiveData.length;
     const completed = allActiveData.filter(e => e.status === 'Completed').length;
     const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -104,16 +104,25 @@ const Performance = () => {
     const topEmp = [...allActiveData].sort((a, b) => (b.lastHalfYearly || 0) - (a.lastHalfYearly || 0))[0];
     
     return { completionRate, completed, total, avgRating, topEmp };
-  }, [allActiveData]);
+  })();
 
-  const chartData = useMemo(() => {
+  const chartData = (() => {
     return departments.map(d => {
       const deptEmps = allActiveData.filter(e => e.dept === d);
       const scores = deptEmps.map(e => e.lastHalfYearly || e.lastMonthly).filter(s => s !== null);
       const avg = scores.length > 0 ? Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)) : 0;
       return { department: d, score: avg, color: DEPARTMENT_COLORS[d] || '#94a3b8' };
     }).filter(d => d.score > 0 || allActiveData.some(e => e.dept === d.department));
-  }, [allActiveData, departments]);
+  })();
+
+  const filteredData = (() => {
+    return allActiveData.filter(emp => {
+      const matchesSearch = (emp.name || '').toLowerCase().includes((searchTerm || '').toLowerCase()) || 
+                           (emp.role || '').toLowerCase().includes((searchTerm || '').toLowerCase());
+      const matchesDept = deptFilter === 'All' || emp.dept === deptFilter;
+      return matchesSearch && matchesDept;
+    });
+  })();
 
   if (loading) {
     return (
@@ -122,15 +131,6 @@ const Performance = () => {
       </div>
     );
   }
-
-  const filteredData = useMemo(() => {
-    return allActiveData.filter(emp => {
-      const matchesSearch = (emp.name || '').toLowerCase().includes((searchTerm || '').toLowerCase()) || 
-                           (emp.role || '').toLowerCase().includes((searchTerm || '').toLowerCase());
-      const matchesDept = deptFilter === 'All' || emp.dept === deptFilter;
-      return matchesSearch && matchesDept;
-    });
-  }, [allActiveData, searchTerm, deptFilter]);
 
   const handleExport = () => {
     alert("Generating encrypted PDF Performance Report for all departments... \nSuccess! 'HRMS_Performance_Audit_2026.pdf' has been dispatched to your email.");
@@ -327,12 +327,14 @@ const Performance = () => {
       )}
 
       {/* Persistence Layer Feedback Portal */}
-      <FeedbackPortal 
-        isOpen={feedbackConfig.isOpen}
-        empId={feedbackConfig.empId}
-        reviewType={feedbackConfig.type}
-        onClose={() => setFeedbackConfig(p => ({ ...p, isOpen: false }))}
-      />
+      {feedbackConfig.isOpen && (
+        <FeedbackPortal 
+          isOpen={feedbackConfig.isOpen}
+          empId={feedbackConfig.empId}
+          reviewType={feedbackConfig.type}
+          onClose={() => setFeedbackConfig(p => ({ ...p, isOpen: false }))}
+        />
+      )}
     </div>
   );
 };

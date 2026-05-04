@@ -459,18 +459,7 @@ export const dataService = {
     await supabase.from('projects').update({ status: newStatus }).eq('id', id);
   },
 
-  // ── Departments ───────────────────────────────────────────────────────
-  getDepartments: async () => {
-    if (!supabase) return [];
-    const { data } = await supabase.from('departments').select('name').order('name');
-    return (data || []).map(r => r.name);
-  },
 
-  saveDepartments: async (list) => {
-    if (!supabase) return;
-    const rows = list.map(name => ({ id: name.toLowerCase().replace(/ /g, '_'), name }));
-    await supabase.from('departments').upsert(rows);
-  },
 
   // ── Induction & Feedback ──────────────────────────────────────────────
   getInductionTasks: async (empId) => {
@@ -484,24 +473,7 @@ export const dataService = {
     await supabase.from('induction_tasks').upsert({ emp_id: empId, tasks, updated_at: new Date().toISOString() });
   },
 
-  getFeedbackHistory: async (empId) => {
-    if (!supabase) return [];
-    const { data } = await supabase.from('feedback_records').select('data').eq('emp_id', empId);
-    return (data || []).map(r => r.data).sort((a, b) => new Date(b.reviewDate) - new Date(a.reviewDate));
-  },
 
-  saveFeedback: async (record) => {
-    if (!supabase) return record;
-    const id = record.id || `FB_${Date.now()}`;
-    const row = {
-      id,
-      emp_id: record.empId,
-      review_type: record.reviewType,
-      data: { ...record, id, submittedAt: new Date().toISOString() }
-    };
-    await supabase.from('feedback_records').upsert(row);
-    return row.data;
-  },
 
   // ── App Configs (Bulletin, Biometrics, etc) ──────────────────────────
   getBiometricConfig: async () => getConfig('biometric_config', { ip: '192.168.1.201', port: '4370' }),

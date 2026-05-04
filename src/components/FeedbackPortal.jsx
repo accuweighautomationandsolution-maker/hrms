@@ -86,12 +86,12 @@ const FeedbackPortal = ({ empId, reviewType, isOpen, onClose }) => {
     }));
   };
 
-  const overallRating = useMemo(() => {
+  const overallRating = (() => {
     const vals = Object.values(formData.evaluations).map(e => e.rating);
     const filled = vals.filter(v => v > 0);
     if (filled.length === 0) return 0;
     return (filled.reduce((a, b) => a + b, 0) / filled.length).toFixed(1);
-  }, [formData.evaluations]);
+  })();
 
   const canProceed = () => {
     if (step === 1) return formData.evaluations.attendance.rating > 0 && formData.evaluations.attendance.remarks;
