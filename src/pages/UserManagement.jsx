@@ -103,8 +103,8 @@ const UserManagement = () => {
   };
 
   const filteredUsers = users.filter((u) => {
-    const matchesSearch = u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          u.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (u.email || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+                          (u.name || '').toLowerCase().includes((searchQuery || '').toLowerCase());
     const matchesRole = selectedRole === "All" || u.role === selectedRole;
     return matchesSearch && matchesRole;
   });

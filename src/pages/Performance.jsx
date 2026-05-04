@@ -125,8 +125,8 @@ const Performance = () => {
 
   const filteredData = useMemo(() => {
     return allActiveData.filter(emp => {
-      const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                           emp.role.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = (emp.name || '').toLowerCase().includes((searchTerm || '').toLowerCase()) || 
+                           (emp.role || '').toLowerCase().includes((searchTerm || '').toLowerCase());
       const matchesDept = deptFilter === 'All' || emp.dept === deptFilter;
       return matchesSearch && matchesDept;
     });

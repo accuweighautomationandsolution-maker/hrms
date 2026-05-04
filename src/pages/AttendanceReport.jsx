@@ -149,7 +149,11 @@ const AttendanceReport = () => {
             });
         });
         
-        return results.filter(r => r.employee.name.toLowerCase().includes(searchTerm.toLowerCase()));
+        return results.filter(r => {
+            const matchesSearch = (r.employee?.name || '').toLowerCase().includes((searchTerm || '').toLowerCase()) || 
+                               (r.employee?.role || '').toLowerCase().includes((searchTerm || '').toLowerCase());
+            return matchesSearch;
+        });
     }, [selectedEmpId, dateRange, employees, searchTerm]);
 
     const globalSummary = useMemo(() => {

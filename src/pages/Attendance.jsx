@@ -286,8 +286,8 @@ const Attendance = () => {
     'future':        { bg: 'transparent',            border: 'var(--color-border)',  color: 'var(--color-text-muted)' },
   };
 
-  const filteredEmps = employeesList.filter(e =>
-    e.name.toLowerCase().includes(searchQ.toLowerCase())
+  const filteredEmps = (employeesList || []).filter(e =>
+    (e.name || '').toLowerCase().includes((searchQ || '').toLowerCase())
   );
 
   // Summary stats for selected employee
