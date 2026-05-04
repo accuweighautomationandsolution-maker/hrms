@@ -103,7 +103,52 @@ export const dataService = {
   getAttendance: async () => {
     if (!supabase) return [];
     const { data } = await supabase.from('attendance').select('*');
-    return data || [];
+    if (!data) return {};
+    
+    // Transform flat array into the map expected by the UI: { "empId_y_m_d": record }
+    const map = {};
+    data.forEach(r => {
+      const dateObj = new Date(r.date);
+      const k = `${r.emp_id}_${dateObj.getFullYear()}_${dateObj.getMonth()}_${dateObj.getDate()}`;
+      map[k] = {
+        punchIn: r.punch_in ? new Date(r.punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null,
+        punchOut: r.punch_out ? new Date(r.punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null,
+        status: r.status,
+        remark: r.data?.remark || '',
+        source: r.data?.source || 'Database'
+      };
+    });
+    return map;
+  },
+
+  saveAttendance: async (recordsMap) => {
+    if (!supabase) return;
+    // recordsMap is { "empId_y_m_d": { punchIn, punchOut, remark, source } }
+    const rows = Object.entries(recordsMap).map(([key, val]) => {
+      const [empId, y, m, d] = key.split('_');
+      const dateStr = `${y}-${String(Number(m) + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      
+      // Construct timestamps
+      let punchInTs = null;
+      if (val.punchIn) {
+        punchInTs = new Date(`${dateStr}T${val.punchIn}:00`).toISOString();
+      }
+      let punchOutTs = null;
+      if (val.punchOut) {
+        punchOutTs = new Date(`${dateStr}T${val.punchOut}:00`).toISOString();
+      }
+
+      return {
+        id: key, // Using the key as ID for easy upsert
+        emp_id: empId,
+        date: dateStr,
+        punch_in: punchInTs,
+        punch_out: punchOutTs,
+        status: val.punchOut ? 'Present' : (val.punchIn ? 'Incomplete' : 'Absent'),
+        data: { remark: val.remark, source: val.source }
+      };
+    });
+    await supabase.from('attendance').upsert(rows);
   },
 
   getTodayAttendanceStatus: async (userId) => {
@@ -286,6 +331,18 @@ export const dataService = {
   getPayrollHistory: async () => sbGetAll('payroll_history'),
   savePayrollHistory: async (history) => sbSaveAll('payroll_history', history),
 
+  getManpowerRequests: async () => sbGetAll('recruitment_requests'),
+  saveManpowerRequests: async (reqs) => sbSaveAll('recruitment_requests', reqs),
+  
+  getDeptBudgets: async () => getConfig('dept_budgets', {}),
+  saveDeptBudgets: async (budgets) => saveConfig('dept_budgets', budgets),
+
+  getBonusPayments: async () => sbGetAll('bonus_payments'),
+  saveBonusPayments: async (list) => sbSaveAll('bonus_payments', list),
+
+  getHandoverMaster: async () => sbGetAll('handover_master'),
+  saveHandoverMaster: async (list) => sbSaveAll('handover_master', list),
+
   // ── Expenses ──────────────────────────────────────────────────────────
   getExpenses: async () => {
     if (!supabase) return [];
@@ -315,6 +372,13 @@ export const dataService = {
     if (!supabase) return list;
     await supabase.from('projects').upsert(list);
     return list;
+  },
+
+  getBudgetUtilization: async (dept) => {
+    if (!supabase) return 0;
+    const { data } = await supabase.from('employees').select('data').eq('department', dept);
+    if (!data) return 0;
+    return data.reduce((sum, r) => sum + (Number(r.data?.grossSalary) || 0), 0);
   },
 
   addProject: async (name) => {
@@ -474,7 +538,6 @@ export const dataService = {
         return lStart >= start && lStart <= end;
       });
     }
-
     return { leaves: filtered, employees };
   },
 
@@ -556,10 +619,51 @@ export const dataService = {
   },
 
   getLeaveAnalytics: (leaves) => {
-    const stats = { Approved: 0, Pending: 0, Rejected: 0, total: leaves.length };
+    const stats = { 
+      statusBreakdown: { Approved: 0, Pending: 0, Rejected: 0 }, 
+      typeDistribution: {}, 
+      monthlyTrend: {}, 
+      totalDays: 0 
+    };
+    
     leaves.forEach(l => {
-      if (stats[l.status] !== undefined) stats[l.status]++;
+      // Status
+      if (stats.statusBreakdown[l.status] !== undefined) {
+        stats.statusBreakdown[l.status]++;
+      }
+      
+      if (l.status === 'Approved') {
+        // Type
+        stats.typeDistribution[l.type] = (stats.typeDistribution[l.type] || 0) + 1;
+        // Days
+        stats.totalDays += (Number(l.days) || 0);
+        // Trend
+        const date = new Date(l.start_date || l.startDate);
+        const month = date.toLocaleString('default', { month: 'short' });
+        stats.monthlyTrend[month] = (stats.monthlyTrend[month] || 0) + 1;
+      }
     });
     return stats;
+  },
+
+  getReportRangeData: (empId, start, end, attendanceMap) => {
+    const results = [];
+    const curr = new Date(start);
+    while (curr <= end) {
+      const y = curr.getFullYear();
+      const m = curr.getMonth();
+      const d = curr.getDate();
+      const key = `${empId}_${y}_${m}_${d}`;
+      const dayName = curr.toLocaleDateString('en-US', { weekday: 'short' });
+      const dateStr = curr.toISOString().split('T')[0];
+      
+      results.push({
+        date: dateStr,
+        dayName,
+        log: attendanceMap[key] || null
+      });
+      curr.setDate(curr.getDate() + 1);
+    }
+    return results;
   }
 };

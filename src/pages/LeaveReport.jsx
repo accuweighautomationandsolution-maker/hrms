@@ -47,6 +47,7 @@ const LeaveReport = () => {
   const [showExportMenu, setShowExportMenu] = useState(false);
 
   const [employees, setEmployees] = useState([]);
+  const [leaveBalances, setLeaveBalances] = useState({});
   const [filteredData, setFilteredData] = useState({ leaves: [], employees: [] });
   const [analytics, setAnalytics] = useState({ typeDistribution: {}, statusBreakdown: { Approved: 0, Pending: 0, Rejected: 0 }, monthlyTrend: {}, totalDays: 0 });
   const [loading, setLoading] = useState(true);
@@ -59,8 +60,12 @@ const LeaveReport = () => {
   const loadReport = async () => {
     setLoading(true);
     try {
-      const emps = await dataService.getEmployees();
+      const [emps, bal] = await Promise.all([
+        dataService.getEmployees(),
+        dataService.getLeaveBalances()
+      ]);
       setEmployees(emps);
+      setLeaveBalances(bal);
 
       const filters = {
         departments: selectedDepts,
@@ -318,7 +323,7 @@ const LeaveReport = () => {
               {filteredData.employees.map(emp => {
                 const empLeaves = filteredData.leaves.filter(l => l.empId === emp.id && l.status === 'Approved');
                 const availeDays = empLeaves.reduce((a, b) => a + b.days, 0);
-                const balance = dataService.getLeaveBalances()[emp.id] || { Sick: 0, Casual: 0, Paid: 0 };
+                const balance = leaveBalances[emp.id] || { Sick: 0, Casual: 0, Paid: 0 };
                 
                 return (
                   <tr key={emp.id} style={{ borderBottom: '1px solid var(--color-border)' }}>

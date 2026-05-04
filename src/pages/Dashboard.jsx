@@ -282,7 +282,7 @@ const Dashboard = ({ userRole }) => {
           <>
             <StatCard title="Today's Log" value={todayStatus.punchIn || 'Not Marked'} icon={Clock} colorClass="bg-blue-500" />
             <StatCard title="Days Present" value={personalAttendance.present} icon={UserCheck} colorClass="bg-emerald-500" />
-            <StatCard title="My Leave Balance" value={dataService.getEmployeeBalance(currentUser.id, 'total')} icon={CalendarOff} colorClass="bg-amber-500" />
+            <StatCard title="My Leave Balance" value={personalLeaveBalance} icon={CalendarOff} colorClass="bg-amber-500" />
           </>
         ) : (
           <>

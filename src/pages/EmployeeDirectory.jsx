@@ -12,6 +12,7 @@ const EmployeeDirectory = ({ userRole }) => {
   const isEmployee = userRole !== 'management';
   
   const [employees, setEmployees] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [activeTab, setActiveTab] = useState(1);
@@ -174,7 +175,8 @@ const EmployeeDirectory = ({ userRole }) => {
 
   const handleDeleteEmployee = async (id) => {
     if (window.confirm('Are you sure you want to PERMANENTLY delete this employee record? This action is logged.')) {
-      const updated = await dataService.deleteEmployee(id);
+      await dataService.deleteEmployee(id);
+      const updated = await dataService.getEmployees();
       setEmployees(updated);
       showNotification('Employee record purged successfully.', 'success');
     }
@@ -363,13 +365,14 @@ const EmployeeDirectory = ({ userRole }) => {
               </tr>
             </thead>
             <tbody>
-              {employees.filter(e => 
-                e.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                (e.empCode && e.empCode.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                (e.biometricCode && e.biometricCode.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                e.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                e.department.toLowerCase().includes(searchTerm.toLowerCase())
-              ).map((emp) => (
+              {employees.filter(e => {
+                const term = searchTerm.toLowerCase();
+                return (e.name || '').toLowerCase().includes(term) || 
+                       (e.empCode || '').toLowerCase().includes(term) ||
+                       (e.biometricCode || '').toLowerCase().includes(term) ||
+                       (e.role || '').toLowerCase().includes(term) ||
+                       (e.department || '').toLowerCase().includes(term);
+              }).map((emp) => (
                 <tr key={emp.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background var(--transition-fast)' }}>
                   <td style={{ padding: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>

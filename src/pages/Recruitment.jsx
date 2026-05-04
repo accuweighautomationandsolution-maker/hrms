@@ -48,8 +48,10 @@ const Recruitment = () => {
 
     const filteredCandidates = useMemo(() => {
         return candidates.filter(c => {
-            const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                 c.role.toLowerCase().includes(searchTerm.toLowerCase());
+            const name = (c.name || '').toLowerCase();
+            const roleStr = (c.role || '').toLowerCase();
+            const term = searchTerm.toLowerCase();
+            const matchesSearch = name.includes(term) || roleStr.includes(term);
             const matchesStatus = filterStatus === 'All' || c.status === filterStatus;
             return matchesSearch && matchesStatus;
         });
