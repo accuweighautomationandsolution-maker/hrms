@@ -735,9 +735,7 @@ export const dataService = {
 
 
   getBiometricConfig: async () => {
-    if (!supabase) return { ip: '192.168.1.201', port: '4370', isEnabled: true };
-    const { data } = await supabase.from('app_config').select('value').eq('key', 'biometric').maybeSingle();
-    return data ? data.value : { ip: '192.168.1.201', port: '4370', isEnabled: true };
+    return await getConfig('biometric', { ip: '192.168.1.201', port: '4370', isEnabled: true });
   },
 
   saveBiometricConfig: async (config) => {

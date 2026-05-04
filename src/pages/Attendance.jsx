@@ -156,6 +156,7 @@ const Attendance = () => {
           dataService.getCustomHolidays(),
           dataService.getBiometricConfig()
         ]);
+        console.log("Attendance: Data Load Success", { emps: emps.length, att: Object.keys(att || {}).length });
         setEmployeesList(emps);
         setRecords(att);
         setHolidayList(hol);
@@ -170,7 +171,7 @@ const Attendance = () => {
           setSelectedEmp(emps[0]);
         }
       } catch (err) {
-        console.error("Failed to load attendance data:", err);
+        console.error("Attendance: Critical Load Error:", err);
       } finally {
         setLoading(false);
       }
