@@ -365,7 +365,7 @@ const EmployeeDirectory = ({ userRole }) => {
               </tr>
             </thead>
             <tbody>
-              {employees.filter(e => {
+              {(employees || []).filter(e => {
                 const term = searchTerm.toLowerCase();
                 return (e.name || '').toLowerCase().includes(term) || 
                        (e.empCode || '').toLowerCase().includes(term) ||
@@ -377,25 +377,25 @@ const EmployeeDirectory = ({ userRole }) => {
                   <td style={{ padding: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                       <div className="avatar" style={{ width: '32px', height: '32px', fontSize: '0.75rem' }}>
-                        {emp.name.split(' ').map(n => n[0]).join('')}
+                        {(emp.name || 'Unknown').split(' ').filter(Boolean).map(n => n[0]).join('')}
                       </div>
                       <div>
-                        <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>{emp.name}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{emp.email}</div>
+                        <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>{emp.name || ''}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{emp.email || ''}</div>
                       </div>
                     </div>
                   </td>
                   <td style={{ padding: '1rem' }}>
-                    <div style={{ fontWeight: '600', color: 'var(--color-text-main)' }}>{emp.empCode}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Bio: {emp.biometricCode}</div>
+                    <div style={{ fontWeight: '600', color: 'var(--color-text-main)' }}>{emp.empCode || ''}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Bio: {emp.biometricCode || ''}</div>
                   </td>
-                  <td style={{ padding: '1rem', color: 'var(--color-text-main)' }}>{emp.role}</td>
-                  <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{emp.department}</td>
+                  <td style={{ padding: '1rem', color: 'var(--color-text-main)' }}>{emp.role || ''}</td>
+                  <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{emp.department || ''}</td>
                   {isEmployee && <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{emp.contact || '+91 98' + Math.floor(10000000 + Math.random() * 90000000)}</td>}
                   <td style={{ padding: '1rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
                       <span className={`badge ${emp.status === 'Active' ? 'badge-success' : emp.status === 'On Leave' ? 'badge-warning' : 'badge-danger'}`}>
-                        {emp.status}
+                        {emp.status || 'Inactive'}
                       </span>
                       {emp.empType && (
                         <span className={`badge ${emp.empType === 'Probation' ? 'badge-primary' : emp.empType === 'Temporary' ? 'badge-warning' : 'badge-default'}`} style={{ opacity: 0.85, fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}>
@@ -468,47 +468,47 @@ const EmployeeDirectory = ({ userRole }) => {
                       <div className="form-group">
                         <label className="form-label">First Name *</label>
                         <input type="text" className="form-input" style={{width:'100%', borderColor: !form.firstName ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                          value={form.firstName} onChange={(e) => handleInput('firstName', e.target.value)} />
+                          value={form.firstName || ''} onChange={(e) => handleInput('firstName', e.target.value)} />
                       </div>
                       <div className="form-group">
                         <label className="form-label">Middle Name</label>
                         <input type="text" className="form-input" style={{width:'100%'}} 
-                          value={form.middleName} onChange={(e) => handleInput('middleName', e.target.value)} />
+                          value={form.middleName || ''} onChange={(e) => handleInput('middleName', e.target.value)} />
                       </div>
                       <div className="form-group">
                         <label className="form-label">Last Name *</label>
                         <input type="text" className="form-input" style={{width:'100%', borderColor: !form.lastName ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                          value={form.lastName} onChange={(e) => handleInput('lastName', e.target.value)} />
+                          value={form.lastName || ''} onChange={(e) => handleInput('lastName', e.target.value)} />
                       </div>
-                      <div className="form-group"><label className="form-label">Date of Birth</label><input type="date" className="form-input" style={{width:'100%'}} value={form.dob} onChange={e => handleInput('dob', e.target.value)} /></div>
+                      <div className="form-group"><label className="form-label">Date of Birth</label><input type="date" className="form-input" style={{width:'100%'}} value={form.dob || ''} onChange={e => handleInput('dob', e.target.value)} /></div>
                       <div className="form-group">
                         <label className="form-label">Gender</label>
-                        <select className="form-input" style={{width:'100%'}} value={form.gender} onChange={e => handleInput('gender', e.target.value)}>
+                        <select className="form-input" style={{width:'100%'}} value={form.gender || ''} onChange={e => handleInput('gender', e.target.value)}>
                           <option>Select...</option><option>Male</option><option>Female</option><option>Other</option>
                         </select>
                       </div>
                       <div className="form-group">
                         <label className="form-label">Blood Group</label>
-                        <select className="form-input" style={{width:'100%'}} value={form.bloodGroup} onChange={e => handleInput('bloodGroup', e.target.value)}>
+                        <select className="form-input" style={{width:'100%'}} value={form.bloodGroup || ''} onChange={e => handleInput('bloodGroup', e.target.value)}>
                           <option>Select...</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
                         </select>
                       </div>
                       <div className="form-group">
                         <label className="form-label">Marital Status</label>
-                        <select className="form-input" style={{width:'100%'}} value={form.marital} onChange={e => handleInput('marital', e.target.value)}>
+                        <select className="form-input" style={{width:'100%'}} value={form.marital || ''} onChange={e => handleInput('marital', e.target.value)}>
                           <option>Select...</option><option>Single</option><option>Married</option>
                         </select>
                       </div>
                       <div className="form-group">
                         <label className="form-label">Contact Number *</label>
                         <input type="tel" className="form-input" style={{width:'100%', borderColor: !form.contact ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                          value={form.contact} onChange={e => handleInput('contact', e.target.value)} />
+                          value={form.contact || ''} onChange={e => handleInput('contact', e.target.value)} />
                       </div>
-                      <div className="form-group"><label className="form-label">Alternate Contact</label><input type="tel" className="form-input" style={{width:'100%'}} value={form.altContact} onChange={e => handleInput('altContact', e.target.value)} /></div>
+                      <div className="form-group"><label className="form-label">Alternate Contact</label><input type="tel" className="form-input" style={{width:'100%'}} value={form.altContact || ''} onChange={e => handleInput('altContact', e.target.value)} /></div>
                       <div className="form-group">
                         <label className="form-label">Personal Mail ID *</label>
                         <input type="email" className="form-input" style={{width:'100%', borderColor: !form.email ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                          value={form.email} onChange={e => handleInput('email', e.target.value)} />
+                          value={form.email || ''} onChange={e => handleInput('email', e.target.value)} />
                       </div>
                     </div>
                   </div>
@@ -518,24 +518,24 @@ const EmployeeDirectory = ({ userRole }) => {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
                       <div className="form-group">
                         <label className="form-label">Aadhar Card No.</label>
-                        <input type="text" className="form-input" style={{width:'100%'}} value={form.aadharNo} onChange={e => handleInput('aadharNo', e.target.value)} />
+                        <input type="text" className="form-input" style={{width:'100%'}} value={form.aadharNo || ''} onChange={e => handleInput('aadharNo', e.target.value)} />
                       </div>
                       <div className="form-group">
                         <label className="form-label">PAN Card No.</label>
-                        <input type="text" className="form-input" style={{width:'100%'}} value={form.panNo} onChange={e => handleInput('panNo', e.target.value)} />
+                        <input type="text" className="form-input" style={{width:'100%'}} value={form.panNo || ''} onChange={e => handleInput('panNo', e.target.value)} />
                       </div>
                       <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
                         <div className="form-group">
                           <label className="form-label">Driving License No.</label>
-                          <input type="text" className="form-input" style={{width:'100%'}} value={form.dlNo} onChange={e => handleInput('dlNo', e.target.value)} />
+                          <input type="text" className="form-input" style={{width:'100%'}} value={form.dlNo || ''} onChange={e => handleInput('dlNo', e.target.value)} />
                         </div>
                         <div className="form-group">
                           <label className="form-label">DL Expiry Date</label>
-                          <input type="date" className="form-input" style={{width:'100%'}} value={form.dlExpiry} onChange={e => handleInput('dlExpiry', e.target.value)} />
+                          <input type="date" className="form-input" style={{width:'100%'}} value={form.dlExpiry || ''} onChange={e => handleInput('dlExpiry', e.target.value)} />
                         </div>
                         <div className="form-group">
                           <label className="form-label">Type of License</label>
-                          <select className="form-input" style={{width:'100%'}} value={form.dlType} onChange={e => handleInput('dlType', e.target.value)}>
+                          <select className="form-input" style={{width:'100%'}} value={form.dlType || ''} onChange={e => handleInput('dlType', e.target.value)}>
                             <option value="">Select...</option>
                             <option value="2-Wheeler">2-Wheeler</option>
                             <option value="4-Wheeler">4-Wheeler</option>
@@ -545,11 +545,11 @@ const EmployeeDirectory = ({ userRole }) => {
                         </div>
                         <div className="form-group">
                           <label className="form-label">Passport No.</label>
-                          <input type="text" className="form-input" style={{width:'100%'}} value={form.passportNo} onChange={e => handleInput('passportNo', e.target.value)} />
+                          <input type="text" className="form-input" style={{width:'100%'}} value={form.passportNo || ''} onChange={e => handleInput('passportNo', e.target.value)} />
                         </div>
                         <div className="form-group">
                           <label className="form-label">Passport Expiry Date</label>
-                          <input type="date" className="form-input" style={{width:'100%'}} value={form.passportExpiry} onChange={e => handleInput('passportExpiry', e.target.value)} />
+                          <input type="date" className="form-input" style={{width:'100%'}} value={form.passportExpiry || ''} onChange={e => handleInput('passportExpiry', e.target.value)} />
                         </div>
                       </div>
                     </div>
@@ -563,22 +563,22 @@ const EmployeeDirectory = ({ userRole }) => {
                   <div className="form-group">
                     <label className="form-label">Employee Code * (Company Identity)</label>
                     <input type="text" className="form-input" placeholder="e.g. ABC-001" style={{width:'100%', borderColor: !form.empId ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                      value={form.empId} onChange={e => handleInput('empId', e.target.value)} />
+                      value={form.empId || ''} onChange={e => handleInput('empId', e.target.value)} />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Biometric Code *</label>
                     <input type="text" className="form-input" placeholder="e.g. 101" style={{width:'100%', borderColor: !form.biometricCode ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                      value={form.biometricCode} onChange={e => handleInput('biometricCode', e.target.value)} />
+                      value={form.biometricCode || ''} onChange={e => handleInput('biometricCode', e.target.value)} />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Joining Date *</label>
                     <input type="date" className="form-input" style={{width:'100%', borderColor: !form.joinDate ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                      value={form.joinDate} onChange={e => handleInput('joinDate', e.target.value)} />
+                      value={form.joinDate || ''} onChange={e => handleInput('joinDate', e.target.value)} />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Employment Category *</label>
                     <select className="form-input" style={{width:'100%', borderColor: !form.empCategory ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                      value={form.empCategory} onChange={(e) => handleInput('empCategory', e.target.value)}>
+                      value={form.empCategory || ''} onChange={(e) => handleInput('empCategory', e.target.value)}>
                       <option value="">Select...</option>
                       <option value="Staff Employee">Staff Employee</option>
                       <option value="On role worker">On role worker</option>
@@ -587,15 +587,15 @@ const EmployeeDirectory = ({ userRole }) => {
                   </div>
                   <div className="form-group">
                     <label className="form-label">Department *</label>
-                    <select className="form-input" style={{width:'100%'}} value={form.department} onChange={e => handleInput('department', e.target.value)}>
+                    <select className="form-input" style={{width:'100%'}} value={form.department || ''} onChange={e => handleInput('department', e.target.value)}>
                       <option value="">Select Department...</option>
                       {departments.map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
                   </div>
-                  <div className="form-group"><label className="form-label">Designation</label><input type="text" className="form-input" style={{width:'100%'}} value={form.role} onChange={e => handleInput('role', e.target.value)} /></div>
-                  <div className="form-group"><label className="form-label">Employment Status</label><select className="form-input" style={{width:'100%'}} value={form.probType} onChange={e => handleInput('probType', e.target.value)}><option>Select...</option><option>Temporary</option><option>Probation</option><option>Permanent</option></select></div>
-                  <div className="form-group"><label className="form-label">Confirmation Date</label><input type="date" className="form-input" style={{width:'100%'}} value={form.exitDate} onChange={e => handleInput('exitDate', e.target.value)} disabled={form.probType === 'Probation'} /></div>
-                  <div className="form-group"><label className="form-label">Probation Period</label><select className="form-input" style={{width:'100%'}} value={form.probPeriod} onChange={e => handleInput('probPeriod', e.target.value)} disabled={form.probType === 'Permanent'}><option>1 Month</option><option>2 Months</option><option>3 Months</option><option>4 Months</option><option>5 Months</option><option>6 Months</option></select></div>
+                  <div className="form-group"><label className="form-label">Designation</label><input type="text" className="form-input" style={{width:'100%'}} value={form.role || ''} onChange={e => handleInput('role', e.target.value)} /></div>
+                  <div className="form-group"><label className="form-label">Employment Status</label><select className="form-input" style={{width:'100%'}} value={form.probType || ''} onChange={e => handleInput('probType', e.target.value)}><option>Select...</option><option>Temporary</option><option>Probation</option><option>Permanent</option></select></div>
+                  <div className="form-group"><label className="form-label">Confirmation Date</label><input type="date" className="form-input" style={{width:'100%'}} value={form.exitDate || ''} onChange={e => handleInput('exitDate', e.target.value)} disabled={form.probType === 'Probation'} /></div>
+                  <div className="form-group"><label className="form-label">Probation Period</label><select className="form-input" style={{width:'100%'}} value={form.probPeriod || ''} onChange={e => handleInput('probPeriod', e.target.value)} disabled={form.probType === 'Permanent'}><option>1 Month</option><option>2 Months</option><option>3 Months</option><option>4 Months</option><option>5 Months</option><option>6 Months</option></select></div>
                 </div>
               )}
 
@@ -605,12 +605,12 @@ const EmployeeDirectory = ({ userRole }) => {
                   <div className="form-group">
                     <label className="form-label" style={{ fontWeight: '600', color: 'var(--color-primary)' }}>Present Address</label>
                     <textarea rows="3" className="form-input" style={{width:'100%', resize: 'vertical'}} placeholder="Flat No, Street, City, State, PIN"
-                      value={form.presAddress} onChange={e => handleInput('presAddress', e.target.value)}></textarea>
+                      value={form.presAddress || ''} onChange={e => handleInput('presAddress', e.target.value)}></textarea>
                   </div>
                   
                   <div>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={form.sameAsPresent} onChange={(e) => handleInput('sameAsPresent', e.target.checked)} style={{ width: '16px', height: '16px' }} />
+                      <input type="checkbox" checked={!!form.sameAsPresent} onChange={(e) => handleInput('sameAsPresent', e.target.checked)} style={{ width: '16px', height: '16px' }} />
                       <span style={{ fontWeight: '500', fontSize: '0.875rem' }}>Permanent Address is exactly the same as Present Address</span>
                     </label>
                     
@@ -618,7 +618,7 @@ const EmployeeDirectory = ({ userRole }) => {
                       <div className="form-group">
                         <label className="form-label" style={{ fontWeight: '600' }}>Permanent Address</label>
                         <textarea rows="3" className="form-input" style={{width:'100%', resize: 'vertical'}} placeholder="Flat No, Street, City, State, PIN"
-                          value={form.permAddress} onChange={e => handleInput('permAddress', e.target.value)}></textarea>
+                          value={form.permAddress || ''} onChange={e => handleInput('permAddress', e.target.value)}></textarea>
                       </div>
                     )}
                   </div>
@@ -640,18 +640,18 @@ const EmployeeDirectory = ({ userRole }) => {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                     <div style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: '8px' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', marginBottom: form.hasPF ? '1.5rem' : '0' }}>
-                        <input type="checkbox" checked={form.hasPF} onChange={(e) => handleInput('hasPF', e.target.checked)} style={{ width: '20px', height: '20px', accentColor: 'var(--color-primary)' }} />
+                        <input type="checkbox" checked={!!form.hasPF} onChange={(e) => handleInput('hasPF', e.target.checked)} style={{ width: '20px', height: '20px', accentColor: 'var(--color-primary)' }} />
                         <span style={{ fontWeight: '600', fontSize: '1rem' }}>Employee is Eligible for Provident Fund (PF)</span>
                       </label>
                       {form.hasPF && (
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', paddingLeft: '2rem', borderLeft: '3px solid var(--color-primary)' }}>
                           <div className="form-group">
                             <label className="form-label">Universal Account Number (UAN) *</label>
-                            <input type="text" className="form-input" value={form.uan} onChange={(e) => handleInput('uan', e.target.value)} style={{width:'100%', borderColor: !form.uan ? 'var(--color-danger)' : 'var(--color-border)'}} placeholder="Required 12-digit UAN" />
+                            <input type="text" className="form-input" value={form.uan || ''} onChange={(e) => handleInput('uan', e.target.value)} style={{width:'100%', borderColor: !form.uan ? 'var(--color-danger)' : 'var(--color-border)'}} placeholder="Required 12-digit UAN" />
                           </div>
                           <div className="form-group">
                             <label className="form-label">PF Member ID *</label>
-                            <input type="text" className="form-input" value={form.pfMemberId} onChange={(e) => handleInput('pfMemberId', e.target.value)} style={{width:'100%', borderColor: !form.pfMemberId ? 'var(--color-danger)' : 'var(--color-border)'}} placeholder="Required Member ID" />
+                            <input type="text" className="form-input" value={form.pfMemberId || ''} onChange={(e) => handleInput('pfMemberId', e.target.value)} style={{width:'100%', borderColor: !form.pfMemberId ? 'var(--color-danger)' : 'var(--color-border)'}} placeholder="Required Member ID" />
                           </div>
                         </div>
                       )}
@@ -659,14 +659,14 @@ const EmployeeDirectory = ({ userRole }) => {
 
                     <div style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: '8px' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', marginBottom: form.hasESIC ? '1.5rem' : '0' }}>
-                        <input type="checkbox" checked={form.hasESIC} onChange={(e) => handleInput('hasESIC', e.target.checked)} style={{ width: '20px', height: '20px', accentColor: 'var(--color-primary)' }} />
+                        <input type="checkbox" checked={!!form.hasESIC} onChange={(e) => handleInput('hasESIC', e.target.checked)} style={{ width: '20px', height: '20px', accentColor: 'var(--color-primary)' }} />
                         <span style={{ fontWeight: '600', fontSize: '1rem' }}>Employee is Eligible for State Insurance (ESIC)</span>
                       </label>
                       {form.hasESIC && (
                         <div style={{ paddingLeft: '2rem', borderLeft: '3px solid var(--color-warning)' }}>
                           <div className="form-group">
                             <label className="form-label">ESIC Member IP Number *</label>
-                            <input type="text" className="form-input" value={form.esicIp} onChange={(e) => handleInput('esicIp', e.target.value)} style={{width:'100%', maxWidth: '300px', borderColor: !form.esicIp ? 'var(--color-danger)' : 'var(--color-border)'}} placeholder="Required Insurance IP" />
+                            <input type="text" className="form-input" value={form.esicIp || ''} onChange={(e) => handleInput('esicIp', e.target.value)} style={{width:'100%', maxWidth: '300px', borderColor: !form.esicIp ? 'var(--color-danger)' : 'var(--color-border)'}} placeholder="Required Insurance IP" />
                           </div>
                         </div>
                       )}
@@ -690,15 +690,15 @@ const EmployeeDirectory = ({ userRole }) => {
                     <input type="file" multiple style={{ display: 'none' }} onChange={handleFileUpload} />
                   </label>
                   
-                  {uploadedFiles.length > 0 && (
+                  {(uploadedFiles || []).length > 0 && (
                     <div style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '1rem' }}>
                       <h4 style={{ margin: '0 0 1rem', fontSize: '0.875rem' }}>Attached Documents ({uploadedFiles.length})</h4>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         {uploadedFiles.map((f, i) => (
                           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem', backgroundColor: 'var(--color-surface)', borderRadius: '4px', fontSize: '0.8rem' }}>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', wordBreak: 'break-all' }}>📄 {f.name}</span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', wordBreak: 'break-all' }}>📄 {f.name || ''}</span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexShrink: 0 }}>
-                              <span style={{ color: 'var(--color-text-muted)' }}>{(f.size / 1024 / 1024).toFixed(2)} MB</span>
+                              <span style={{ color: 'var(--color-text-muted)' }}>{( (f.size || 0) / 1024 / 1024).toFixed(2)} MB</span>
                               <button 
                                 type="button" 
                                 className="btn btn-ghost" 
@@ -726,13 +726,13 @@ const EmployeeDirectory = ({ userRole }) => {
                       isEmbedded={true} 
                       passedState={{
                         ...(form.salaryConfig || {}),
-                        candidateName: form.firstName,
-                        candidateMiddleName: form.middleName,
-                        candidateLastName: form.lastName,
-                        roleApplied: form.role
+                        candidateName: form.firstName || '',
+                        candidateMiddleName: form.middleName || '',
+                        candidateLastName: form.lastName || '',
+                        roleApplied: form.role || ''
                       }} 
-                      empCategory={form.empCategory} 
-                      empId={form.id}
+                      empCategory={form.empCategory || ''} 
+                      empId={form.id || ''}
                       onStateChange={(salaryData) => setForm(prev => ({ ...prev, salaryConfig: salaryData }))}
                     />
                     
@@ -746,8 +746,8 @@ const EmployeeDirectory = ({ userRole }) => {
                           navigate('/compensation', { 
                             state: { 
                               isAppraisal: true, 
-                              employeeName: `${form.firstName} ${form.middleName ? form.middleName + ' ' : ''}${form.lastName}`.trim(), 
-                              employeeRole: form.role, 
+                              employeeName: `${form.firstName || ''} ${form.middleName ? form.middleName + ' ' : ''}${form.lastName || ''}`.trim(), 
+                              employeeRole: form.role || '', 
                               empId: form.id 
                             } 
                           });
@@ -770,23 +770,23 @@ const EmployeeDirectory = ({ userRole }) => {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
                       <div className="form-group">
                         <label className="form-label">Account Holder Name</label>
-                        <input type="text" className="form-input" style={{width:'100%'}} value={form.bankAccountName} onChange={e => handleInput('bankAccountName', e.target.value)} />
+                        <input type="text" className="form-input" style={{width:'100%'}} value={form.bankAccountName || ''} onChange={e => handleInput('bankAccountName', e.target.value)} />
                       </div>
                       <div className="form-group">
                         <label className="form-label">Account Number</label>
-                        <input type="text" className="form-input" style={{width:'100%'}} value={form.bankAccountNumber} onChange={e => handleInput('bankAccountNumber', e.target.value)} />
+                        <input type="text" className="form-input" style={{width:'100%'}} value={form.bankAccountNumber || ''} onChange={e => handleInput('bankAccountNumber', e.target.value)} />
                       </div>
                       <div className="form-group">
                         <label className="form-label">Bank Name</label>
-                        <input type="text" className="form-input" style={{width:'100%'}} value={form.bankName} onChange={e => handleInput('bankName', e.target.value)} />
+                        <input type="text" className="form-input" style={{width:'100%'}} value={form.bankName || ''} onChange={e => handleInput('bankName', e.target.value)} />
                       </div>
                       <div className="form-group">
                         <label className="form-label">IFSC Code</label>
-                        <input type="text" className="form-input" style={{width:'100%'}} value={form.bankIfsc} onChange={e => handleInput('bankIfsc', e.target.value)} />
+                        <input type="text" className="form-input" style={{width:'100%'}} value={form.bankIfsc || ''} onChange={e => handleInput('bankIfsc', e.target.value)} />
                       </div>
                       <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                         <label className="form-label">Branch Name</label>
-                        <input type="text" className="form-input" style={{width:'100%'}} value={form.bankBranch} onChange={e => handleInput('bankBranch', e.target.value)} />
+                        <input type="text" className="form-input" style={{width:'100%'}} value={form.bankBranch || ''} onChange={e => handleInput('bankBranch', e.target.value)} />
                       </div>
                     </div>
                   </div>
@@ -794,26 +794,26 @@ const EmployeeDirectory = ({ userRole }) => {
                   {/* Mediclaim */}
                   <div style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: '8px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', marginBottom: form.hasMediclaim ? '1.5rem' : '0' }}>
-                      <input type="checkbox" checked={form.hasMediclaim} onChange={(e) => handleInput('hasMediclaim', e.target.checked)} style={{ width: '20px', height: '20px', accentColor: 'var(--color-primary)' }} />
+                      <input type="checkbox" checked={!!form.hasMediclaim} onChange={(e) => handleInput('hasMediclaim', e.target.checked)} style={{ width: '20px', height: '20px', accentColor: 'var(--color-primary)' }} />
                       <span style={{ fontWeight: '600', fontSize: '1rem' }}>Employee has Mediclaim Policy</span>
                     </label>
                     {form.hasMediclaim && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        {form.mediclaimPolicies.map((policy, index) => (
+                        {(form.mediclaimPolicies || []).map((policy, index) => (
                           <div key={index} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr) auto', gap: '1.5rem', paddingLeft: '2rem', borderLeft: '3px solid var(--color-primary)', alignItems: 'end' }}>
                             <div className="form-group">
                               <label className="form-label">Policy Number</label>
-                              <input type="text" className="form-input" style={{width:'100%'}} value={policy.policyNo} onChange={e => handlePolicyChange('mediclaimPolicies', index, 'policyNo', e.target.value)} />
+                              <input type="text" className="form-input" style={{width:'100%'}} value={policy.policyNo || ''} onChange={e => handlePolicyChange('mediclaimPolicies', index, 'policyNo', e.target.value)} />
                             </div>
                             <div className="form-group">
                               <label className="form-label">Policy Amount</label>
-                              <input type="number" className="form-input" style={{width:'100%'}} value={policy.amount} onChange={e => handlePolicyChange('mediclaimPolicies', index, 'amount', e.target.value)} />
+                              <input type="number" className="form-input" style={{width:'100%'}} value={policy.amount || ''} onChange={e => handlePolicyChange('mediclaimPolicies', index, 'amount', e.target.value)} />
                             </div>
                             <div className="form-group">
                               <label className="form-label">Policy Company</label>
-                              <input type="text" className="form-input" style={{width:'100%'}} value={policy.company} onChange={e => handlePolicyChange('mediclaimPolicies', index, 'company', e.target.value)} />
+                              <input type="text" className="form-input" style={{width:'100%'}} value={policy.company || ''} onChange={e => handlePolicyChange('mediclaimPolicies', index, 'company', e.target.value)} />
                             </div>
-                            {form.mediclaimPolicies.length > 1 && (
+                            {(form.mediclaimPolicies || []).length > 1 && (
                               <button type="button" className="btn btn-ghost" style={{ color: 'var(--color-danger)', marginBottom: '0.5rem' }} onClick={() => removePolicy('mediclaimPolicies', index)}>
                                 <Trash2 size={18} />
                               </button>
@@ -830,26 +830,26 @@ const EmployeeDirectory = ({ userRole }) => {
                   {/* Term Insurance */}
                   <div style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', padding: '1.5rem', borderRadius: '8px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', marginBottom: form.hasTermInsurance ? '1.5rem' : '0' }}>
-                      <input type="checkbox" checked={form.hasTermInsurance} onChange={(e) => handleInput('hasTermInsurance', e.target.checked)} style={{ width: '20px', height: '20px', accentColor: 'var(--color-primary)' }} />
+                      <input type="checkbox" checked={!!form.hasTermInsurance} onChange={(e) => handleInput('hasTermInsurance', e.target.checked)} style={{ width: '20px', height: '20px', accentColor: 'var(--color-primary)' }} />
                       <span style={{ fontWeight: '600', fontSize: '1rem' }}>Employee has Term Insurance Policy</span>
                     </label>
                     {form.hasTermInsurance && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        {form.termInsurancePolicies.map((policy, index) => (
+                        {(form.termInsurancePolicies || []).map((policy, index) => (
                           <div key={index} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr) auto', gap: '1.5rem', paddingLeft: '2rem', borderLeft: '3px solid var(--color-primary)', alignItems: 'end' }}>
                             <div className="form-group">
                               <label className="form-label">Policy Number</label>
-                              <input type="text" className="form-input" style={{width:'100%'}} value={policy.policyNo} onChange={e => handlePolicyChange('termInsurancePolicies', index, 'policyNo', e.target.value)} />
+                              <input type="text" className="form-input" style={{width:'100%'}} value={policy.policyNo || ''} onChange={e => handlePolicyChange('termInsurancePolicies', index, 'policyNo', e.target.value)} />
                             </div>
                             <div className="form-group">
                               <label className="form-label">Policy Amount</label>
-                              <input type="number" className="form-input" style={{width:'100%'}} value={policy.amount} onChange={e => handlePolicyChange('termInsurancePolicies', index, 'amount', e.target.value)} />
+                              <input type="number" className="form-input" style={{width:'100%'}} value={policy.amount || ''} onChange={e => handlePolicyChange('termInsurancePolicies', index, 'amount', e.target.value)} />
                             </div>
                             <div className="form-group">
                               <label className="form-label">Policy Company</label>
-                              <input type="text" className="form-input" style={{width:'100%'}} value={policy.company} onChange={e => handlePolicyChange('termInsurancePolicies', index, 'company', e.target.value)} />
+                              <input type="text" className="form-input" style={{width:'100%'}} value={policy.company || ''} onChange={e => handlePolicyChange('termInsurancePolicies', index, 'company', e.target.value)} />
                             </div>
-                            {form.termInsurancePolicies.length > 1 && (
+                            {(form.termInsurancePolicies || []).length > 1 && (
                               <button type="button" className="btn btn-ghost" style={{ color: 'var(--color-danger)', marginBottom: '0.5rem' }} onClick={() => removePolicy('termInsurancePolicies', index)}>
                                 <Trash2 size={18} />
                               </button>

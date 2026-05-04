@@ -162,8 +162,10 @@ const Attendance = () => {
         if (bConf) setBioConfig(bConf);
 
         if (isEmployee) {
-          const emp = emps.find(e => String(e.id) === String(currentUser?.id));
-          setSelectedEmp(emp);
+          if (emps.length > 0) {
+            const emp = emps.find(e => String(e.id) === String(currentUser?.id));
+            setSelectedEmp(emp || emps[0]);
+          }
         } else if (emps.length > 0) {
           setSelectedEmp(emps[0]);
         }
@@ -261,6 +263,8 @@ const Attendance = () => {
     if (holidaySet.has(day)) return rec ? 'holiday-worked' : 'holiday';
     if (dow === 0) return rec ? 'holiday-worked' : 'holiday'; // extra Sunday guard
     if (rec) return rec.punchOut ? 'present' : 'punch-in-only';
+    
+    if (!year || !month || !day) return 'future';
 
     // Normalize comparison to midnight
     const today = new Date();
@@ -427,7 +431,7 @@ const Attendance = () => {
 
             {/* Calendar grid */}
             {(() => {
-              const firstDow = new Date(year, month, 1).getDay();
+              const firstDow = (year && month !== undefined) ? new Date(year, month, 1).getDay() : 0;
               const cells = [
                 ...Array(firstDow).fill(null),
                 ...calDays
@@ -440,8 +444,8 @@ const Attendance = () => {
                   {cells.map((cell, idx) => {
                     if (!cell) return <div key={`blank-${idx}`} />;
                     const { day, dow } = cell;
-                    const st    = selectedEmp ? dayStatus(selectedEmp.id, day, dow) : 'future';
-                    const sty   = STATUS_STYLE[st] || STATUS_STYLE['future'];
+                    const st    = (selectedEmp && selectedEmp.id) ? dayStatus(selectedEmp.id, day, dow) : 'future';
+                    const sty   = (STATUS_STYLE[st] || STATUS_STYLE['future']);
                     const rec   = selectedEmp ? getRecord(selectedEmp.id, day) : null;
                     const isHol = holidaySet.has(day);
                     const holType = holTypeMap[day];
