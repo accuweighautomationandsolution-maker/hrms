@@ -132,6 +132,7 @@ function App() {
   }
 
   const userRole = currentUser?.role;
+  const isAdmin = userRole === 'management' || userRole === 'admin';
 
   // Unauthenticated Wrapper
   if (!currentUser) {
@@ -171,7 +172,7 @@ function App() {
                 <Route path="/my-documents" element={<MyDocuments />} />
                 
                 {/* Management-Strict Routes */}
-                {userRole === 'management' && (
+                {isAdmin && (
                   <>
                     <Route path="/payroll" element={<Payroll />} />
                     <Route path="/pf-report" element={<PFReport />} />
@@ -184,7 +185,6 @@ function App() {
                     <Route path="/recruitment" element={<Recruitment />} />
                     <Route path="/document-hub" element={<DocumentHub />} />
                     <Route path="/letter-templates" element={<LetterTemplates />} />
-                    <Route path="/budget-control" element={<BudgetControl />} />
                     <Route path="/budget-control" element={<BudgetControl />} />
                     <Route path="/performance" element={<Performance />} />
                     <Route path="/compensation" element={<SalaryStructure />} />

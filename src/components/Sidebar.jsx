@@ -4,7 +4,8 @@ import { LayoutDashboard, Users, CalendarDays, Clock, Calculator, IndianRupee, R
 
 const Sidebar = ({ userRole }) => {
   const location = useLocation();
-  const [reportsOpen, setReportsOpen] = useState(location.pathname.includes('report'));
+  const isAdmin = userRole === 'management' || userRole === 'admin';
+  const [reportsOpen, setReportsOpen] = useState(isAdmin || location.pathname.includes('report'));
 
   return (
     <aside className="sidebar hide-on-print">
@@ -62,7 +63,7 @@ const Sidebar = ({ userRole }) => {
           <span>My Documents</span>
         </Link>
 
-        {userRole === 'management' && (
+        {isAdmin && (
           <>
             <div style={{ marginTop: '2rem', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '1px', paddingLeft: '1rem' }}>Management Suite</div>
             
@@ -157,7 +158,7 @@ const Sidebar = ({ userRole }) => {
             </Link>
             <Link to="/compensation" className={`nav-item ${location.pathname === '/compensation' ? 'active' : ''}`}>
               <FileSignature size={20} />
-              <span>Offer Planning</span>
+              <span>Compensation & Offers</span>
             </Link>
             <Link to="/performance" className={`nav-item ${location.pathname === '/performance' ? 'active' : ''}`}>
               <Zap size={20} />
@@ -187,10 +188,10 @@ const Sidebar = ({ userRole }) => {
 
       <div className="sidebar-footer" style={{ marginTop: 'auto', padding: '1.5rem', borderTop: '1px solid var(--color-border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div className="avatar" style={{ width: '36px', height: '36px' }}>{userRole === 'management' ? 'AD' : 'EM'}</div>
+          <div className="avatar" style={{ width: '36px', height: '36px', backgroundColor: isAdmin ? 'var(--color-primary)' : 'var(--color-success)' }}>{isAdmin ? 'AD' : 'EM'}</div>
           <div>
-            <div style={{ fontWeight: '600', fontSize: '0.875rem' }}>{userRole === 'management' ? 'Admin Portal' : 'Self Service'}</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>v1.14.0 - Active</div>
+            <div style={{ fontWeight: '600', fontSize: '0.875rem' }}>{isAdmin ? 'Admin Portal' : 'Self Service'}</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{isAdmin ? 'Management Access' : 'Restricted Access'}</div>
           </div>
         </div>
       </div>
