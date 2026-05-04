@@ -36,28 +36,24 @@ export const authService = {
       return;
     }
     try {
-      // Subscribe to auth state changes to keep cache in sync
-      supabase.auth.onAuthStateChange(async (event, session) => {
-        if (session?.user) {
-          _cachedProfile = await fetchProfile(session.user.id);
-        } else {
-          _cachedProfile = null;
-        }
-      });
-
-      // Load current session
+      console.log('authService: Checking session...');
       const { data: { session } } = await supabase.auth.getSession();
+      
       if (session?.user) {
+        console.log('authService: Session found, fetching profile...');
         _cachedProfile = await fetchProfile(session.user.id);
       }
 
-      // Seed default accounts if no profiles exist yet
+      console.log('authService: Checking if seed is needed...');
       const { data: profiles, error: pError } = await supabase.from('user_profiles').select('id').limit(1);
       if (!pError && (!profiles || profiles.length === 0)) {
+        console.log('authService: No profiles found. Seeding default accounts...');
         await this._seedDefaultAccounts();
       }
+      
+      console.log('authService: Init sequence complete.');
     } catch (err) {
-      console.error('Auth initialization failed:', err);
+      console.error('authService: Initialization failed:', err);
     }
   },
 

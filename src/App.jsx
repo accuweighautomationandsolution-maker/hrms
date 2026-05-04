@@ -45,6 +45,7 @@ const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [initStatus, setInitStatus] = useState('Checking connectivity...');
 
   // Logout handler
   const handleLogout = useCallback(async () => {
@@ -68,12 +69,15 @@ function App() {
       }, 5000);
 
       try {
+        setInitStatus('Authenticating session...');
         await authService.init();
         const user = authService.getCurrentUser();
+        setInitStatus(user ? `Welcome, ${user.name}` : 'Ready for login');
         console.log("App: Auth Init Complete. User:", user?.email || 'Guest');
         setCurrentUser(user);
       } catch (err) {
         console.error("App: Auth Init Crash:", err);
+        setInitStatus('Error: Backend unreachable');
       } finally {
         clearTimeout(timeout);
         setIsInitializing(false);
@@ -116,6 +120,13 @@ function App() {
       <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50">
         <div className="h-12 w-12 rounded-full border-4 border-slate-200 border-t-indigo-600 animate-spin mb-4" />
         <p className="text-slate-500 font-medium animate-pulse uppercase tracking-widest text-sm">Securing Environment...</p>
+        <p className="text-slate-400 text-xs mt-2">{initStatus}</p>
+        <button 
+          onClick={() => setIsInitializing(false)}
+          className="mt-8 text-indigo-600 hover:text-indigo-700 text-xs font-semibold underline cursor-pointer"
+        >
+          Skip & Proceed to Login
+        </button>
       </div>
     );
   }
