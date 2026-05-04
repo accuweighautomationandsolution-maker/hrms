@@ -62,7 +62,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
   const targetGross = Number(form.targetSalary) || 0;
   const payroll = calculateSalaryComponents(
     targetGross, 
-    form.hasPF, 
+    true, // pfCapped (we'll keep this true as standard)
     0, 
     empCategory || 'Staff Employee', 
     30, 
@@ -72,7 +72,9 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
       salPerformance: form.salPerformance,
       salOther: form.salOther,
       salSpecial: form.salSpecial,
-      hraPercent: form.hraPercent
+      hraPercent: form.hraPercent,
+      hasPF: form.hasPF,
+      hasESIC: form.hasESIC
     }
   );
 

@@ -19,7 +19,7 @@ const ESIC_PERCENTAGE_EMPLOYER = 0.0325;
 const ESIC_GROSS_LIMIT = 21000;
 const PT_AMOUNT_MH = 200;
 
-export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, advanceDeduction = 0, category = 'Staff Employee', daysWorked = 30, daysInMonth = 30, manualAllowances = {}) => {
+export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, advanceDeduction = 0, category = 'Staff Employee', daysWorked = 30, daysInMonth = 30, options = {}) => {
   const baseGross = Number(targetGrossInput) || 0;
   let effectiveGross = baseGross;
 
@@ -33,17 +33,21 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
     effectiveGross = (baseGross / daysInMonth) * daysWorked;
   }
 
+  // Flags from options
+  const hasPF = options.hasPF !== undefined ? options.hasPF : true;
+  const hasESIC = options.hasESIC !== undefined ? options.hasESIC : false;
+
   // 1. Calculate Statutory Fixed Components (Percentages of Gross)
   const basic = Math.max(0, Math.round(effectiveGross * 0.50));
   const da = Math.max(0, Math.round(basic * 0.05));
-  const hraPercentVal = (manualAllowances.hraPercent !== undefined) ? (Number(manualAllowances.hraPercent) / 100) : 0.40;
+  const hraPercentVal = (options.hraPercent !== undefined) ? (Number(options.hraPercent) / 100) : 0.40;
   const hra = Math.max(0, Math.round((basic + da) * hraPercentVal)); 
   
   // 2. Sum up Manual Allowances
-  const conveyance = Number(manualAllowances.salConveyance) || 0;
-  const performance = Number(manualAllowances.salPerformance) || 0;
-  const otherManual = Number(manualAllowances.salOther) || 0;
-  const specialManual = Number(manualAllowances.salSpecial) || 0;
+  const conveyance = Number(options.salConveyance) || 0;
+  const performance = Number(options.salPerformance) || 0;
+  const otherManual = Number(options.salOther) || 0;
+  const specialManual = Number(options.salSpecial) || 0;
   
   // 3. Washing Allowance (1000 Fixed if gross > 15000, simplified)
   const washingAllowance = effectiveGross > 15000 ? 1000 : 0;
@@ -58,11 +62,14 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
   if (pfCapped && pfEligibleAmount > PF_CAP_AMOUNT) {
     pfEligibleAmount = PF_CAP_AMOUNT;
   }
-  const pfDeduction = Math.max(0, Math.round(pfEligibleAmount * PF_PERCENTAGE));
+  
+  // PF Deduction (Zero if disabled)
+  const pfDeduction = hasPF ? Math.max(0, Math.round(pfEligibleAmount * PF_PERCENTAGE)) : 0;
 
+  // ESIC Deduction (Zero if disabled)
   let esicDeduction = 0;
   let esicEmployerContribution = 0;
-  if (componentTotal <= ESIC_GROSS_LIMIT) {
+  if (hasESIC && componentTotal <= ESIC_GROSS_LIMIT) {
     esicDeduction = Math.max(0, Math.ceil(componentTotal * ESIC_PERCENTAGE_EMPLOYEE));
     esicEmployerContribution = Math.max(0, Math.ceil(componentTotal * ESIC_PERCENTAGE_EMPLOYER));
   }
@@ -79,19 +86,13 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
   const finalNetPay = Math.max(0, componentTotal - totalDeduction);
 
   // 6. Employer Shares
-  const erPension = Math.max(0, Math.round(pfEligibleAmount * ER_PENSION_PERCENTAGE));
-  // Ensure the sum of erEPF and erPension exactly equals 12% of pfEligibleAmount
-  const erEPF = Math.max(0, Math.round(pfEligibleAmount * PF_PERCENTAGE) - erPension);
-  const edli = Math.max(0, Math.round(pfEligibleAmount * EDLI_PERCENTAGE));
-  const admin = Math.max(0, Math.round(pfEligibleAmount * ADMIN_PERCENTAGE));
+  // Employer shares are also zero if PF is disabled
+  const erPension = hasPF ? Math.max(0, Math.round(pfEligibleAmount * ER_PENSION_PERCENTAGE)) : 0;
+  const erEPF = hasPF ? Math.max(0, Math.round(pfEligibleAmount * PF_PERCENTAGE) - erPension) : 0;
+  const edli = hasPF ? Math.max(0, Math.round(pfEligibleAmount * EDLI_PERCENTAGE)) : 0;
+  const admin = hasPF ? Math.max(0, Math.round(pfEligibleAmount * ADMIN_PERCENTAGE)) : 0;
   
-  // Consistency check: Ensure total ER statutory for PF is exactly 13% (EPF + Pension + EDLI + Admin)
-  // 12% (PF) + 0.5% (EDLI) + 0.5% (Admin) = 13%
   const totalPFStatutory = erPension + erEPF + edli + admin; 
-  // For exactly 15000, 13% is 1950. 
-  // We'll use floor for the individual components if needed to keep the sum correct, but usually 
-  // simple round works if the percentages are precise.
-  
   const totalErStatutory = totalPFStatutory + esicEmployerContribution;
 
   return {
@@ -116,9 +117,9 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
       total: totalDeduction
     },
     pfReport: {
-      epfWages: pfEligibleAmount,
-      epsWages: pfEligibleAmount, 
-      edliWages: pfEligibleAmount,
+      epfWages: hasPF ? pfEligibleAmount : 0,
+      epsWages: hasPF ? pfEligibleAmount : 0, 
+      edliWages: hasPF ? pfEligibleAmount : 0,
       eeShare: pfDeduction,
       erPension,
       erEPF,

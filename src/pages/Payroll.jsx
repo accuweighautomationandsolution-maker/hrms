@@ -427,7 +427,18 @@ const Payroll = () => {
         daysPresent,
         balanceLeaves: balanceMap[emp.id],
         payrollContext: emp.category !== 'Contractual Worker'
-          ? calculateSalaryComponents(emp.grossSalary, true, emp.advanceLoanEMI || 0, emp.category, daysPresent, 30)
+          ? calculateSalaryComponents(
+              emp.grossSalary, 
+              true, 
+              emp.advanceLoanEMI || 0, 
+              emp.category, 
+              daysPresent, 
+              30,
+              {
+                hasPF: !!emp.uanNumber,
+                hasESIC: !!emp.esicNumber
+              }
+            )
           : null
       };
     });
