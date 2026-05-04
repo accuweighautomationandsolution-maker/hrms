@@ -661,6 +661,21 @@ export const dataService = {
   getComplianceManuals: async () => sbGetAll('compliance_manuals'),
   saveComplianceManuals: async (list) => sbSaveAll('compliance_manuals', list),
 
+  getManpowerRequests: async () => sbGetAll('manpower_requests'),
+  saveManpowerRequests: async (list) => sbSaveAll('manpower_requests', list),
+
+  getDeptBudgets: async () => sbGetAll('dept_budgets'),
+  saveDeptBudgets: async (list) => sbSaveAll('dept_budgets', list),
+
+  getBudgetUtilization: async (dept) => {
+    if (!supabase) return 0;
+    const reqs = await dataService.getManpowerRequests();
+    return reqs
+      .filter(r => r.department === dept && (r.status === 'Approved' || r.status === 'Auto-Approved'))
+      .reduce((sum, r) => sum + (Number(r.proposedCTC) || 0), 0);
+  },
+
+
   getSalaryStructure: async (empId) => {
     if (!supabase) return null;
     const { data } = await supabase.from('salary_structures_ext').select('data').eq('emp_id', empId).maybeSingle();
