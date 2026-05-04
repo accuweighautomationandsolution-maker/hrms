@@ -214,9 +214,9 @@ const Attendance = () => {
     return () => unsubscribe();
   }, [bioConfig]);
 
-  const holidays   = useMemo(() => getHolidayDates(year, month, holidayList), [year, month, holidayList]);
-  const holidaySet = useMemo(() => new Set(holidays.map(h => h.day)), [holidays]);
-  const holTypeMap = useMemo(() => Object.fromEntries(holidays.map(h => [h.day, h.type])), [holidays]);
+  const holidays   = useMemo(() => getHolidayDates(year, month, holidayList || []), [year, month, holidayList]);
+  const holidaySet = useMemo(() => new Set((holidays || []).map(h => h.day)), [holidays]);
+  const holTypeMap = useMemo(() => Object.fromEntries((holidays || []).map(h => [h.day, h.type])), [holidays]);
 
   const calDays = useMemo(() => buildCalendar(year, month), [year, month]);
 
@@ -245,7 +245,10 @@ const Attendance = () => {
     }
   };
 
-  const getRecord = (empId, day) => records[key(empId, day)] || null;
+  const getRecord = (empId, day) => {
+    if (!records) return null;
+    return records[key(empId, day)] || null;
+  };
 
   const saveRecord = async ({ punchIn, punchOut, remark, source }) => {
     const { empId, day } = punchModal;

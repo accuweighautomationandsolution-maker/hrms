@@ -174,13 +174,19 @@ export const getHolidayDates = (year, month, customs = []) => {
   }
 
   // 2. Add Custom Holidays (Flatten Ranges)
-  customs.forEach(c => {
+  (customs || []).forEach(c => {
+    if (!c.fromDate || !c.toDate) return;
     const start = new Date(c.fromDate);
     const end = new Date(c.toDate);
     
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
+    
     // Check if the range overlaps with the requested month
     const currentDate = new Date(start);
-    while (currentDate <= end) {
+    // Limit loop to prevent potential infinite runs if dates are extremely far apart
+    let iterations = 0;
+    while (currentDate <= end && iterations < 366) {
+      iterations++;
       if (currentDate.getFullYear() === year && currentDate.getMonth() === month) {
         const day = currentDate.getDate();
         // Avoid duplicates if a custom holiday falls on a Sunday/Saturday
@@ -188,8 +194,8 @@ export const getHolidayDates = (year, month, customs = []) => {
           holidays.push({ 
             day, 
             date: `${String(day).padStart(2, '0')}/${String(month + 1).padStart(2, '0')}`, 
-            type: c.type, 
-            name: c.name 
+            type: c.type || 'Holiday', 
+            name: c.name || 'Custom Holiday'
           });
         }
       }
