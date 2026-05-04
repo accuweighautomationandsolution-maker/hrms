@@ -49,8 +49,8 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
   const otherManual = Number(options.salOther) || 0;
   const specialManual = Number(options.salSpecial) || 0;
   
-  // 3. Washing Allowance (1000 Fixed if gross > 15000, simplified)
-  const washingAllowance = effectiveGross > 15000 ? 1000 : 0;
+  // 3. Washing Allowance (1000 Max, Pro-rated by attendance)
+  const washingAllowance = Math.round((1000 / daysInMonth) * daysWorked);
 
   // 4. Calculate Component Total and Remaining Balance
   // componentTotal = sum of all earnings defined
