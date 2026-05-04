@@ -368,7 +368,11 @@ export const dataService = {
   getCustomHolidays: async () => {
     if (!supabase) return [];
     const { data } = await supabase.from('holidays').select('*').order('from_date', { ascending: true });
-    return data || [];
+    return (data || []).map(h => ({
+      ...h,
+      fromDate: h.from_date,
+      toDate: h.to_date
+    }));
   },
 
   saveHolidays: async (list) => {
@@ -728,16 +732,7 @@ export const dataService = {
     return results;
   },
 
-  getCustomHolidays: async () => {
-    if (!supabase) return [];
-    const { data } = await supabase.from('holidays').select('*');
-    return (data || []).map(h => ({
-      id: h.id,
-      name: h.name,
-      date: h.date,
-      type: h.type
-    }));
-  },
+
 
   getBiometricConfig: async () => {
     if (!supabase) return { ip: '192.168.1.201', port: '4370', isEnabled: true };

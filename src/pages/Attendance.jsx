@@ -323,8 +323,8 @@ const Attendance = () => {
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             {bioConfig.isEnabled && devices[0] && (
                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', padding: '0.4rem 0.6rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: devices[0].status === 'Online' ? 'var(--color-success)' : 'var(--color-danger)' }}></div>
-                  <span style={{ fontWeight: '600' }}>X2008: {devices[0].status}</span>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: devices[0]?.status === 'Online' ? 'var(--color-success)' : 'var(--color-danger)' }}></div>
+                  <span style={{ fontWeight: '600' }}>X2008: {devices[0]?.status || 'Checking...'}</span>
                </div>
             )}
             <button 
