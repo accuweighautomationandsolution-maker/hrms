@@ -30,6 +30,11 @@ async function addAuthLog(action, user, details) {
 
 export const authService = {
   async init() {
+    console.log('authService: Initializing...');
+    if (!supabase) {
+      console.warn('authService: Supabase client is NULL. Skipping initialization.');
+      return;
+    }
     try {
       // Subscribe to auth state changes to keep cache in sync
       supabase.auth.onAuthStateChange(async (event, session) => {

@@ -57,10 +57,27 @@ function App() {
   // Initialize Auth
   useEffect(() => {
     const initAuth = async () => {
-      await authService.init();
-      const user = authService.getCurrentUser();
-      setCurrentUser(user);
-      setIsInitializing(false);
+      console.log("App: Starting Auth Initialization...");
+      
+      // Fallback timeout to prevent permanent hang
+      const timeout = setTimeout(() => {
+        if (isInitializing) {
+          console.warn("App: Initialization timeout reached. Proceeding...");
+          setIsInitializing(false);
+        }
+      }, 5000);
+
+      try {
+        await authService.init();
+        const user = authService.getCurrentUser();
+        console.log("App: Auth Init Complete. User:", user?.email || 'Guest');
+        setCurrentUser(user);
+      } catch (err) {
+        console.error("App: Auth Init Crash:", err);
+      } finally {
+        clearTimeout(timeout);
+        setIsInitializing(false);
+      }
     };
     initAuth();
   }, []);
