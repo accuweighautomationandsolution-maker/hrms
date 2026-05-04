@@ -41,19 +41,27 @@ const FeedbackPortal = ({ empId, reviewType, isOpen, onClose }) => {
   });
 
   useEffect(() => {
-    if (isOpen && empId) {
-      const emp = dataService.getEmployeeById(empId);
-      setEmployee(emp);
-      
-      const existing = dataService.getFeedback(empId, reviewType);
-      if (existing) {
-        setFormData(existing);
-        setIsSubmitted(true);
-      } else {
-        setIsSubmitted(false);
-        // Reset form for new evaluation
+    const loadData = async () => {
+      if (isOpen && empId) {
+        try {
+          const [emp, existing] = await Promise.all([
+            dataService.getEmployeeById(empId),
+            dataService.getFeedback(empId, reviewType)
+          ]);
+          setEmployee(emp);
+          
+          if (existing) {
+            setFormData(existing);
+            setIsSubmitted(true);
+          } else {
+            setIsSubmitted(false);
+          }
+        } catch (err) {
+          console.error("FeedbackPortal: Failed to load data", err);
+        }
       }
-    }
+    };
+    loadData();
   }, [isOpen, empId, reviewType]);
 
   const handleRating = (section, rating) => {

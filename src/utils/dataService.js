@@ -692,6 +692,34 @@ export const dataService = {
     });
   },
 
+  getFeedback: async (empId, type) => {
+    if (!supabase) return null;
+    const { data } = await supabase.from('feedback_records').select('data')
+      .eq('emp_id', empId)
+      .eq('data->>reviewType', type)
+      .maybeSingle();
+    return data ? data.data : null;
+  },
+
+  saveFeedback: async (submission) => {
+    if (!supabase) return;
+    const id = `FB_${Date.now()}`;
+    await supabase.from('feedback_records').insert({
+      id,
+      emp_id: submission.empId,
+      data: submission,
+      created_at: new Date().toISOString()
+    });
+  },
+
+  getFeedbackHistory: async (empId) => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('feedback_records').select('data')
+      .eq('emp_id', empId)
+      .order('created_at', { ascending: false });
+    return (data || []).map(r => r.data);
+  },
+
   savePayrollSnapshot: async (data) => {
     if (!supabase) return;
     const id = `PAY_${data.year}_${data.month}_${data.empId}`;
