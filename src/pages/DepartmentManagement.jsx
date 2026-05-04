@@ -10,31 +10,37 @@ const DepartmentManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    setDepartments(dataService.getDepartments());
+    const load = async () => {
+      const list = await dataService.getDepartments();
+      setDepartments(list);
+    };
+    load();
   }, []);
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const trimmed = newDept.trim();
     if (!trimmed) return;
     if (departments.includes(trimmed)) {
       showNotification('Department already exists!', 'error');
       return;
     }
-    const updated = dataService.addDepartment(trimmed);
+    const updated = await dataService.addDepartment(trimmed);
     setDepartments(updated);
     setNewDept('');
     showNotification(`Department "${trimmed}" added successfully.`, 'success');
   };
 
-  const handleDelete = (name) => {
+  const handleDelete = async (name) => {
     if (window.confirm(`Are you sure you want to delete the "${name}" department?`)) {
-      const updated = dataService.deleteDepartment(name);
+      const updated = await dataService.deleteDepartment(name);
       setDepartments(updated);
       showNotification(`Department "${name}" removed.`, 'success');
     }
   };
 
-  const filtered = departments.filter(d => d.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filtered = (departments || []).filter(d => 
+    typeof d === 'string' && d.toLowerCase().includes((searchTerm || '').toLowerCase())
+  );
 
   return (
     <div className="page-container">

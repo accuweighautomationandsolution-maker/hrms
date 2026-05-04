@@ -99,6 +99,29 @@ export const dataService = {
     await supabase.from('employees').delete().eq('id', id);
   },
 
+  // ── Departments ──────────────────────────────────────────────────────────
+  getDepartments: async () => {
+    const list = await getConfig('departments', ['Management', 'Engineering', 'Operations', 'Sales', 'HR', 'Finance']);
+    return Array.isArray(list) ? list : ['Management', 'Engineering', 'Operations', 'Sales', 'HR', 'Finance'];
+  },
+
+  addDepartment: async (name) => {
+    const current = await dataService.getDepartments();
+    if (!current.includes(name)) {
+      const updated = [...current, name];
+      await saveConfig('departments', updated);
+      return updated;
+    }
+    return current;
+  },
+
+  deleteDepartment: async (name) => {
+    const current = await dataService.getDepartments();
+    const updated = current.filter(d => d !== name);
+    await saveConfig('departments', updated);
+    return updated;
+  },
+
   // ── Attendance ─────────────────────────────────────────────────────────────
   getAttendance: async () => {
     if (!supabase) return [];
@@ -179,6 +202,44 @@ export const dataService = {
       day: new Date(r.date).toLocaleDateString('en-US', { weekday: 'short' }),
       present: r.punch_in ? 1 : 0
     }));
+  },
+
+  getAttendance: async () => {
+    if (!supabase) return {};
+    const { data } = await supabase.from('attendance').select('*');
+    const map = {};
+    (data || []).forEach(r => {
+      map[r.id] = {
+        punchIn: r.punch_in,
+        punchOut: r.punch_out,
+        remark: r.remark,
+        source: r.source
+      };
+    });
+    return map;
+  },
+
+  saveAttendance: async (records) => {
+    if (!supabase) return;
+    const rows = Object.entries(records).map(([id, rec]) => {
+      const parts = id.split('_'); // empId_year_month_day
+      const emp_id = parts[0];
+      const date = new Date(parts[1], parts[2], parts[3]).toISOString().split('T')[0];
+      return {
+        id,
+        emp_id,
+        date,
+        punch_in: rec.punchIn,
+        punch_out: rec.punchOut,
+        remark: rec.remark,
+        source: rec.source,
+        updated_at: new Date().toISOString()
+      };
+    });
+    // Upsert in chunks to avoid URL length limits or payload issues if many records
+    for (let i = 0; i < rows.length; i += 100) {
+      await supabase.from('attendance').upsert(rows.slice(i, i + 100));
+    }
   },
 
   getPresentDaysCount: async (empId, month, year) => {
@@ -665,5 +726,27 @@ export const dataService = {
       curr.setDate(curr.getDate() + 1);
     }
     return results;
+  },
+
+  getCustomHolidays: async () => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('holidays').select('*');
+    return (data || []).map(h => ({
+      id: h.id,
+      name: h.name,
+      date: h.date,
+      type: h.type
+    }));
+  },
+
+  getBiometricConfig: async () => {
+    if (!supabase) return { ip: '192.168.1.201', port: '4370', isEnabled: true };
+    const { data } = await supabase.from('app_config').select('value').eq('key', 'biometric').maybeSingle();
+    return data ? data.value : { ip: '192.168.1.201', port: '4370', isEnabled: true };
+  },
+
+  saveBiometricConfig: async (config) => {
+    if (!supabase) return;
+    await supabase.from('app_config').upsert({ key: 'biometric', value: config, updated_at: new Date().toISOString() });
   }
 };
