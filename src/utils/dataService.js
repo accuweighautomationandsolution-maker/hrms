@@ -53,16 +53,37 @@ export const dataService = {
   getEmployees: async () => {
     if (!supabase) return [];
     try {
+      // Fetch everything to ensure we don't miss rows with missing 'data' column
       const { data, error } = await supabase
         .from('employees')
-        .select('id, data')
+        .select('*')
         .order('id', { ascending: false });
       
       if (error) {
         console.error("Error fetching employees:", error);
         return [];
       }
-      return (data || []).map(r => r.data || { id: r.id });
+      
+      return (data || []).map(r => {
+        let parsedData = {};
+        if (typeof r.data === 'string') {
+          try { parsedData = JSON.parse(r.data); } catch(e) { parsedData = {}; }
+        } else if (r.data && typeof r.data === 'object') {
+          parsedData = r.data;
+        }
+        
+        // Merge top-level columns into data to ensure consistency
+        return {
+          ...parsedData,
+          id: r.id,
+          name: r.name || parsedData.name || 'Unnamed Employee',
+          email: r.email || parsedData.email || '',
+          empCode: r.emp_code || parsedData.empCode || '',
+          role: r.designation || parsedData.role || 'Associate',
+          department: r.department || parsedData.department || 'Engineering',
+          status: r.status || parsedData.status || 'Active'
+        };
+      });
     } catch (err) {
       console.error("Exception in getEmployees:", err);
       return [];
@@ -78,6 +99,7 @@ export const dataService = {
   saveEmployee: async (empData) => {
     if (!supabase) return empData;
     const id = empData.id || Date.now();
+    const status = empData.status || 'Active';
     const row = {
       id,
       name: empData.name || '',
@@ -85,8 +107,8 @@ export const dataService = {
       emp_code: empData.empCode || '',
       designation: empData.designation || '',
       department: empData.department || '',
-      status: empData.status || 'Active',
-      data: { ...empData, id }
+      status,
+      data: { ...empData, id, status }
     };
     
     try {
@@ -98,7 +120,7 @@ export const dataService = {
       return row.data;
     } catch (err) {
       console.error("Exception in saveEmployee:", err);
-      return empData;
+      return { ...empData, id, status };
     }
   },
 

@@ -321,6 +321,15 @@ const EmployeeDirectory = ({ userRole }) => {
         </div>
         {!isEmployee && (
           <div style={{ display: 'flex', gap: '1rem' }} className="hide-on-print">
+            <button className="btn btn-outline" onClick={async () => {
+              setLoading(true);
+              const emps = await dataService.getEmployees();
+              setEmployees(emps);
+              setLoading(false);
+              showNotification('Directory synced with Database.', 'success');
+            }}>
+              <TrendingUp size={16} style={{ marginRight: '0.5rem' }} /> Refresh Sync
+            </button>
             <div style={{ position: 'relative' }}>
               <button className="btn btn-outline" onClick={() => setShowExportMenu(!showExportMenu)}>
                 <Download size={16} style={{ marginRight: '0.5rem' }} /> Export Directory

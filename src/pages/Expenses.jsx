@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Filter, Plus, FileText, UploadCloud, Link as LinkIcon, DollarSign, Receipt, CheckCircle, XCircle, MoreVertical, Trash2 } from 'lucide-react';
 import { dataService } from '../utils/dataService';
+import { authService } from '../utils/authService';
 
 const CATEGORIES = [
   'Ticket Charges',
