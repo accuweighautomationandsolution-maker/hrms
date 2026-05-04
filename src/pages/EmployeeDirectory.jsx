@@ -269,6 +269,7 @@ const EmployeeDirectory = ({ userRole }) => {
 
     const emps = await dataService.getEmployees();
     setEmployees(emps);
+    setSearchTerm(''); // Clear search so new employee is visible
     showNotification(`Employee ${form.id ? 'Updated' : 'Onboarded'} Successfully!`, 'success');
     setShowModal(false);
     resetForm();

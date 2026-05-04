@@ -52,9 +52,21 @@ export const dataService = {
   // ── Employees ─────────────────────────────────────────────────────────────
   getEmployees: async () => {
     if (!supabase) return [];
-    const { data, error } = await supabase.from('employees').select('id, data').order('id');
-    if (error) return [];
-    return data.map(r => r.data || { id: r.id });
+    try {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('id, data')
+        .order('id', { ascending: false });
+      
+      if (error) {
+        console.error("Error fetching employees:", error);
+        return [];
+      }
+      return (data || []).map(r => r.data || { id: r.id });
+    } catch (err) {
+      console.error("Exception in getEmployees:", err);
+      return [];
+    }
   },
 
   getEmployeeById: async (id) => {
@@ -76,8 +88,18 @@ export const dataService = {
       status: empData.status || 'Active',
       data: { ...empData, id }
     };
-    await supabase.from('employees').upsert(row);
-    return row.data;
+    
+    try {
+      const { error } = await supabase.from('employees').upsert(row);
+      if (error) {
+        console.error("Error saving employee to Supabase:", error);
+        throw error;
+      }
+      return row.data;
+    } catch (err) {
+      console.error("Exception in saveEmployee:", err);
+      return empData;
+    }
   },
 
   saveEmployees: async (list) => {
