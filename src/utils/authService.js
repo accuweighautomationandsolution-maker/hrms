@@ -2,6 +2,7 @@ import { supabase } from './supabaseClient';
 
 // ── In-memory session cache (avoids async getCurrentUser in every component) ──
 let _cachedProfile = null;
+let _sessionCallback = null;
 
 function normalizeEmail(e) { return e ? e.trim().toLowerCase() : ''; }
 
@@ -29,6 +30,10 @@ async function addAuthLog(action, user, details) {
 }
 
 export const authService = {
+  onSessionChange(callback) {
+    _sessionCallback = callback;
+  },
+
   async init() {
     console.log('authService: Initializing...');
     if (!supabase) {
@@ -43,6 +48,22 @@ export const authService = {
         console.log('authService: Session found, fetching profile...');
         _cachedProfile = await fetchProfile(session.user.id);
       }
+
+      supabase.auth.onAuthStateChange(async (event, currentSession) => {
+        console.log(`authService: Auth event - ${event}`);
+        if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+          _cachedProfile = null;
+          if (_sessionCallback) _sessionCallback(null);
+        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          if (currentSession?.user) {
+            const profile = await fetchProfile(currentSession.user.id);
+            if (profile) {
+              _cachedProfile = profile;
+              if (_sessionCallback) _sessionCallback(profile);
+            }
+          }
+        }
+      });
 
       console.log('authService: Checking if seed is needed...');
       const { data: profiles, error: pError } = await supabase.from('user_profiles').select('id').limit(1);

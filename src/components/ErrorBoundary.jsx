@@ -14,6 +14,13 @@ class ErrorBoundary extends React.Component {
     console.error("Uncaught error:", error, errorInfo);
   }
 
+  handleReload = () => {
+    // Clear storage to resolve potential state/cache corruption causing the crash
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.reload(true);
+  };
+
   render() {
     if (this.state.hasError) {
       return (
@@ -38,20 +45,36 @@ class ErrorBoundary extends React.Component {
           }}>
             {this.state.error && this.state.error.toString()}
           </pre>
-          <button 
-            onClick={() => window.location.reload()}
-            style={{
-              marginTop: '1.5rem',
-              padding: '0.5rem 1rem',
-              backgroundColor: '#991b1b',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Reload Page
-          </button>
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+            <button 
+              onClick={this.handleReload}
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: '#991b1b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontWeight: '600'
+              }}
+            >
+              Clear Cache & Reload App
+            </button>
+            <button 
+              onClick={() => window.location.href = '/login'}
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: '#fef2f2',
+                color: '#991b1b',
+                border: '1px solid #991b1b',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontWeight: '600'
+              }}
+            >
+              Go to Login
+            </button>
+          </div>
         </div>
       );
     }

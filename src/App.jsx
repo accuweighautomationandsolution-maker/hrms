@@ -37,8 +37,11 @@ import LetterTemplates from './pages/LetterTemplates';
 import DocumentHub from './pages/DocumentHub';
 import MyDocuments from './pages/MyDocuments';
 import MobilePreview from './pages/MobilePreview';
+import ErrorBoundary from './components/ErrorBoundary';
 import { authService } from './utils/authService';
 import './App.css'; 
+
+const APP_VERSION = 'v3.4.0-STABLE';
 
 const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
 
@@ -60,6 +63,17 @@ function App() {
     const initAuth = async () => {
       console.log("App: Starting Auth Initialization...");
       
+      // Version check for cache busting
+      const cachedVersion = localStorage.getItem('APP_VERSION');
+      if (cachedVersion !== APP_VERSION) {
+        console.log("App: Version changed, clearing cache.", cachedVersion, '->', APP_VERSION);
+        localStorage.clear();
+        sessionStorage.clear();
+        localStorage.setItem('APP_VERSION', APP_VERSION);
+        window.location.reload(true);
+        return;
+      }
+
       // Fallback timeout to prevent permanent hang
       const timeout = setTimeout(() => {
         if (isInitializing) {
@@ -71,6 +85,18 @@ function App() {
       try {
         setInitStatus('Authenticating session...');
         await authService.init();
+        
+        // Listen to session changes globally
+        authService.onSessionChange((user) => {
+           if (!user && currentUser) {
+             console.log("App: Session expired or logged out externally.");
+             setCurrentUser(null);
+             window.location.href = '/login?logout=expired';
+           } else if (user) {
+             setCurrentUser(user);
+           }
+        });
+
         const user = authService.getCurrentUser();
         setInitStatus(user ? `Welcome, ${user.name}` : 'Ready for login');
         console.log("App: Auth Init Complete. User:", user?.email || 'Guest');
@@ -159,8 +185,9 @@ function App() {
           <div className="main-content">
             <Header onLogout={handleLogout} userRole={userRole} userName={currentUser.name} />
             <main className="page-content">
-              <Routes>
-                {/* Universal Authorized Routes */}
+              <ErrorBoundary>
+                <Routes>
+                  {/* Universal Authorized Routes */}
                 <Route path="/" element={<Dashboard userRole={userRole} />} />
                 <Route path="/directory" element={<EmployeeDirectory userRole={userRole} />} />
                 <Route path="/leaves" element={<LeaveManagement />} />
@@ -204,6 +231,7 @@ function App() {
                 {/* Catch-All Fallback */}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
+              </ErrorBoundary>
             </main>
           </div>
         </div>
