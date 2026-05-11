@@ -887,6 +887,13 @@ const EmployeeDirectory = ({ userRole }) => {
 
             </div>
 
+            {errorMsg && (
+              <div style={{ padding: '1rem 1.5rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', borderTop: '1px solid rgba(239, 68, 68, 0.2)', display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--color-danger)' }}>
+                <AlertCircle size={20} />
+                <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: '500' }}>{errorMsg}</p>
+              </div>
+            )}
+
             <div style={{ padding: '1.5rem', borderTop: '1px solid var(--color-border)', backgroundColor: 'var(--color-background)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <button className="btn btn-outline" onClick={() => setActiveTab(Math.max(1, activeTab - 1))} disabled={activeTab === 1}>← Previous Block</button>
               

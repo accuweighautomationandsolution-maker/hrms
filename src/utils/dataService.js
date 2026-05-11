@@ -700,12 +700,18 @@ export const dataService = {
 
   saveSalaryStructure: async (empId, structData) => {
     if (!supabase) return;
-    const snapshot = { ...structData, lastUpdated: new Date().toISOString() };
-    await supabase.from('salary_structures_ext').upsert({
-      emp_id: empId,
-      data: snapshot,
-      last_updated: new Date().toISOString()
-    });
+    try {
+      const snapshot = { ...structData, lastUpdated: new Date().toISOString() };
+      const { error } = await supabase.from('salary_structures_ext').upsert({
+        emp_id: empId,
+        data: snapshot,
+        last_updated: new Date().toISOString()
+      });
+      if (error) throw error;
+    } catch (err) {
+      console.error("Exception in saveSalaryStructure:", err);
+      throw err;
+    }
   },
 
   getFeedback: async (empId, type) => {
