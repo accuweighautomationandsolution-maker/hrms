@@ -132,13 +132,19 @@ const DocumentHub = () => {
         // After generation, add to record
         const newDoc = {
             empId: selectedDoc.item.target?.id || selectedDoc.item.id,
-            empName: selectedDoc.item.target?.name || selectedDoc.item.name,
-            type: selectedDoc.template.type,
+            category: selectedDoc.item.category || 'Onboarding & Employment',
+            docType: selectedDoc.template.type,
+            name: `${selectedDoc.template.type}_${selectedDoc.item.target?.name || selectedDoc.item.name}.pdf`,
             status: 'Generated',
-            originalContent: selectedDoc.renderedHtml
+            content: selectedDoc.renderedHtml,
+            type: 'text/html',
+            uploadedBy: authService.getCurrentUser()?.name || 'System'
         };
-        const updated = dataService.addEmployeeDoc(newDoc);
-        setDocuments(updated);
+        await dataService.addEmployeeDoc(newDoc);
+        
+        // Refresh active documents view
+        const docsData = await dataService.getEmployeeDocs();
+        setDocuments(docsData);
         setIsPreviewing(false);
     };
 

@@ -80,3 +80,19 @@ CREATE TABLE IF NOT EXISTS letter_templates (
 
 ALTER TABLE letter_templates ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Enable all access for authenticated users" ON letter_templates FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- 7. Employee Documents System
+CREATE TABLE IF NOT EXISTS employee_documents (
+  id TEXT PRIMARY KEY,
+  emp_id BIGINT REFERENCES employees(id),
+  category TEXT NOT NULL,
+  doc_type TEXT NOT NULL,
+  file_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  status TEXT DEFAULT 'Active',
+  uploaded_by TEXT,
+  version INTEGER DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE employee_documents ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all access for authenticated users" ON employee_documents FOR ALL TO authenticated USING (true) WITH CHECK (true);

@@ -5,6 +5,7 @@ import { MoreVertical, Search, Filter, UserPlus, FileText, MapPin, Briefcase, Sh
 import SalaryStructure from './SalaryStructure';
 import { dataService } from '../utils/dataService';
 import FeedbackPortal from '../components/FeedbackPortal';
+import EmployeeDocumentsTab from '../components/EmployeeDocumentsTab';
 import { useNotification } from '../context/NotificationContext';
 
 const EmployeeDirectory = ({ userRole }) => {
@@ -484,7 +485,7 @@ const EmployeeDirectory = ({ userRole }) => {
               <TabButton num={2} label="Employment" icon={Briefcase} />
               <TabButton num={3} label="Address" icon={MapPin} />
               <TabButton num={4} label="Compliance" icon={ShieldCheck} />
-              <TabButton num={5} label="Vault" icon={UploadCloud} />
+              <TabButton num={5} label="Docs & Vault" icon={UploadCloud} />
               <TabButton num={6} label="Compensation" icon={IndianRupee} />
               <TabButton num={7} label="Banking & Ins." icon={CreditCard} />
             </div>
@@ -705,45 +706,16 @@ const EmployeeDirectory = ({ userRole }) => {
                     </div>
                   </div>
                 </div>
-              )}
-
-              {/* SECTION 5: Documents */}
+              )}              {/* SECTION 5: Documents */}
               {activeTab === 5 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                  <label 
-                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '4rem 2rem', border: '2px dashed var(--color-border)', borderRadius: '8px', cursor: 'pointer', backgroundColor: 'var(--color-surface)', transition: 'border 0.2s ease' }} 
-                    onMouseOver={(e) => e.currentTarget.style.borderColor = 'var(--color-primary)'} 
-                    onMouseOut={(e) => e.currentTarget.style.borderColor = 'var(--color-border)'}
-                  >
-                    <UploadCloud size={48} color="var(--color-text-muted)" style={{ marginBottom: '1rem' }} />
-                    <h3 style={{ marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>Secure Document Vault</h3>
-                    <p style={{ color: 'var(--color-text-muted)', marginBottom: '1rem', textAlign: 'center' }}>Upload Aadhar, PAN, Degrees, or Certifications.</p>
-                    <span style={{ backgroundColor: 'var(--color-background)', padding: '0.4rem 0.8rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '600', border: '1px solid var(--color-border)' }}>MAX LIMIT: 2 MB EACH (Multiple Supported)</span>
-                    <input type="file" multiple style={{ display: 'none' }} onChange={handleFileUpload} />
-                  </label>
-                  
-                  {(uploadedFiles || []).length > 0 && (
-                    <div style={{ backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '1rem' }}>
-                      <h4 style={{ margin: '0 0 1rem', fontSize: '0.875rem' }}>Attached Documents ({uploadedFiles.length})</h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        {uploadedFiles.map((f, i) => (
-                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem', backgroundColor: 'var(--color-surface)', borderRadius: '4px', fontSize: '0.8rem' }}>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', wordBreak: 'break-all' }}>📄 {f.name || ''}</span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexShrink: 0 }}>
-                              <span style={{ color: 'var(--color-text-muted)' }}>{( (f.size || 0) / 1024 / 1024).toFixed(2)} MB</span>
-                              <button 
-                                type="button" 
-                                className="btn btn-ghost" 
-                                style={{ padding: '0.2rem', color: 'var(--color-danger)' }} 
-                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleRemoveFile(i); }}
-                                title="Remove document"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                  {form.id ? (
+                    <EmployeeDocumentsTab empId={form.id} employeeName={form.name} />
+                  ) : (
+                    <div style={{ padding: '3rem', textAlign: 'center', backgroundColor: 'var(--color-surface)', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+                      <UploadCloud size={48} color="var(--color-text-muted)" style={{ marginBottom: '1rem' }} />
+                      <h3 style={{ marginBottom: '0.5rem', color: 'var(--color-text-main)' }}>Save Employee First</h3>
+                      <p style={{ color: 'var(--color-text-muted)' }}>You must save the employee onboarding details before you can upload or manage official documents.</p>
                     </div>
                   )}
                 </div>

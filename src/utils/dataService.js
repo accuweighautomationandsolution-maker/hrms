@@ -680,17 +680,47 @@ export const dataService = {
 
   getEmployeeDocs: async (empId = null) => {
     if (!supabase) return [];
-    let query = supabase.from('employee_docs').select('data');
+    let query = supabase.from('employee_documents').select('*');
     if (empId) query = query.eq('emp_id', empId);
     const { data } = await query;
-    return (data || []).map(r => r.data);
+    return (data || []).map(r => ({
+      ...r.file_data,
+      id: r.id,
+      empId: r.emp_id,
+      category: r.category,
+      docType: r.doc_type,
+      status: r.status,
+      uploadedBy: r.uploaded_by,
+      version: r.version,
+      createdAt: r.created_at
+    }));
   },
 
   addEmployeeDoc: async (doc) => {
     if (!supabase) return;
     const id = `DOC_${Date.now()}`;
-    const record = { ...doc, id, uploadDate: new Date().toISOString() };
-    await supabase.from('employee_docs').insert({ id, emp_id: doc.empId, data: record });
+    const file_data = { 
+      name: doc.name || doc.docType || 'Document', 
+      size: doc.size || 0, 
+      type: doc.type || 'text/html',
+      content: doc.content || '' // Base64 or HTML string
+    };
+    
+    await supabase.from('employee_documents').insert({ 
+      id, 
+      emp_id: doc.empId, 
+      category: doc.category || 'General',
+      doc_type: doc.docType || 'Document',
+      status: doc.status || 'Active',
+      uploaded_by: doc.uploadedBy || 'System',
+      version: doc.version || 1,
+      file_data 
+    });
+  },
+  
+  deleteEmployeeDoc: async (id) => {
+    if (!supabase) return;
+    await supabase.from('employee_documents').delete().eq('id', id);
   },
 
   getStatutoryUpdates: async () => sbGetAll('statutory_updates'),
