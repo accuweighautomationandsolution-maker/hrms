@@ -120,7 +120,7 @@ export const dataService = {
       return row.data;
     } catch (err) {
       console.error("Exception in saveEmployee:", err);
-      return { ...empData, id, status };
+      throw err;
     }
   },
 

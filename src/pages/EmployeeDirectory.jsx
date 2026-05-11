@@ -217,62 +217,71 @@ const EmployeeDirectory = ({ userRole }) => {
       return;
     }
     
-    const empData = {
-      id: form.id || Date.now(),
-      name: `${form.firstName} ${form.middleName ? form.middleName + ' ' : ''}${form.lastName}`.trim(),
-      email: form.email,
-      role: form.role || 'Associate',
-      department: form.department || 'Engineering',
-      status: 'Active',
-      empType: form.probType,
-      category: form.empCategory,
-      joiningDate: form.joinDate,
-      empCode: form.empId,
-      biometricCode: form.biometricCode,
-      contact: form.contact,
-      presAddress: form.presAddress,
-      permAddress: form.sameAsPresent ? form.presAddress : form.permAddress,
-      uanNumber: form.hasPF ? form.uan : '',
-      pfMemberId: form.hasPF ? form.pfMemberId : '',
-      esicNumber: form.hasESIC ? form.esicIp : '',
-      bloodGroup: form.bloodGroup,
-      aadharNo: form.aadharNo,
-      panNo: form.panNo,
-      dlNo: form.dlNo,
-      dlExpiry: form.dlExpiry,
-      dlType: form.dlType,
-      passportNo: form.passportNo,
-      passportExpiry: form.passportExpiry,
-      bankAccountName: form.bankAccountName,
-      bankAccountNumber: form.bankAccountNumber,
-      bankName: form.bankName,
-      bankIfsc: form.bankIfsc,
-      bankBranch: form.bankBranch,
-      hasMediclaim: form.hasMediclaim,
-      mediclaimPolicies: form.hasMediclaim ? form.mediclaimPolicies : [],
-      hasTermInsurance: form.hasTermInsurance,
-      termInsurancePolicies: form.hasTermInsurance ? form.termInsurancePolicies : [],
-      documents: uploadedFiles,
-      salaryConfig: form.salaryConfig,
-      grossSalary: form.salaryConfig?.targetSalary || 0
-    };
+    setLoading(true);
+    try {
+      const empData = {
+        id: form.id || Date.now(),
+        name: `${form.firstName} ${form.middleName ? form.middleName + ' ' : ''}${form.lastName}`.trim(),
+        email: form.email,
+        role: form.role || 'Associate',
+        department: form.department || 'Engineering',
+        status: 'Active',
+        empType: form.probType,
+        category: form.empCategory,
+        joiningDate: form.joinDate,
+        empCode: form.empId,
+        biometricCode: form.biometricCode,
+        contact: form.contact,
+        presAddress: form.presAddress,
+        permAddress: form.sameAsPresent ? form.presAddress : form.permAddress,
+        uanNumber: form.hasPF ? form.uan : '',
+        pfMemberId: form.hasPF ? form.pfMemberId : '',
+        esicNumber: form.hasESIC ? form.esicIp : '',
+        bloodGroup: form.bloodGroup,
+        aadharNo: form.aadharNo,
+        panNo: form.panNo,
+        dlNo: form.dlNo,
+        dlExpiry: form.dlExpiry,
+        dlType: form.dlType,
+        passportNo: form.passportNo,
+        passportExpiry: form.passportExpiry,
+        bankAccountName: form.bankAccountName,
+        bankAccountNumber: form.bankAccountNumber,
+        bankName: form.bankName,
+        bankIfsc: form.bankIfsc,
+        bankBranch: form.bankBranch,
+        hasMediclaim: form.hasMediclaim,
+        mediclaimPolicies: form.hasMediclaim ? form.mediclaimPolicies : [],
+        hasTermInsurance: form.hasTermInsurance,
+        termInsurancePolicies: form.hasTermInsurance ? form.termInsurancePolicies : [],
+        documents: uploadedFiles,
+        salaryConfig: form.salaryConfig,
+        grossSalary: form.salaryConfig?.targetSalary || 0
+      };
 
-    const savedEmp = await dataService.saveEmployee(empData);
-    
-    if (form.salaryConfig) {
-      await dataService.saveSalaryStructure(savedEmp.id, {
-        ...form.salaryConfig,
-        empId: savedEmp.id,
-        candidateName: savedEmp.name
-      });
+      const savedEmp = await dataService.saveEmployee(empData);
+      
+      if (form.salaryConfig) {
+        await dataService.saveSalaryStructure(savedEmp.id, {
+          ...form.salaryConfig,
+          empId: savedEmp.id,
+          candidateName: savedEmp.name
+        });
+      }
+
+      const emps = await dataService.getEmployees();
+      setEmployees(emps);
+      setSearchTerm(''); // Clear search so new employee is visible
+      showNotification(`Employee ${form.id ? 'Updated' : 'Onboarded'} Successfully!`, 'success');
+      setShowModal(false);
+      resetForm();
+    } catch (err) {
+      console.error("Save employee failed:", err);
+      setErrorMsg(`Failed to save: ${err.message || 'Database error occurred. Please check Supabase permissions.'}`);
+      showNotification(`Failed to save employee. Check permissions.`, 'error');
+    } finally {
+      setLoading(false);
     }
-
-    const emps = await dataService.getEmployees();
-    setEmployees(emps);
-    setSearchTerm(''); // Clear search so new employee is visible
-    showNotification(`Employee ${form.id ? 'Updated' : 'Onboarded'} Successfully!`, 'success');
-    setShowModal(false);
-    resetForm();
   };
 
   const TabButton = ({ num, label, icon: Icon }) => (
@@ -887,12 +896,11 @@ const EmployeeDirectory = ({ userRole }) => {
                   <button className="btn btn-primary" onClick={() => setActiveTab(activeTab + 1)}>Next Block →</button>
                 ) : (
                   <button className="btn btn-primary" 
-                    disabled={!isFormValid}
                     onClick={handleSave} 
                     style={{ 
                       backgroundColor: isFormValid ? 'var(--color-success)' : 'var(--color-text-muted)', 
                       borderColor: isFormValid ? 'var(--color-success)' : 'var(--color-border)',
-                      cursor: isFormValid ? 'pointer' : 'not-allowed'
+                      cursor: 'pointer'
                     }}>
                     <Save size={16} /> Save & Complete Onboarding
                   </button>
