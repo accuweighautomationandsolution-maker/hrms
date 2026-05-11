@@ -175,10 +175,15 @@ const EmployeeDirectory = ({ userRole }) => {
 
   const handleDeleteEmployee = async (id) => {
     if (window.confirm('Are you sure you want to PERMANENTLY delete this employee record? This action is logged.')) {
-      await dataService.deleteEmployee(id);
-      const updated = await dataService.getEmployees();
-      setEmployees(updated);
-      showNotification('Employee record purged successfully.', 'success');
+      try {
+        await dataService.deleteEmployee(id);
+        const updated = await dataService.getEmployees();
+        setEmployees(updated);
+        showNotification('Employee record purged successfully.', 'success');
+      } catch (err) {
+        console.error("Deletion Error:", err);
+        showNotification(err.message || 'Failed to delete employee.', 'error');
+      }
     }
   };
 

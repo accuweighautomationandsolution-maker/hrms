@@ -149,7 +149,16 @@ export const dataService = {
 
   deleteEmployee: async (id) => {
     if (!supabase) return;
-    await supabase.from('employees').delete().eq('id', id);
+    try {
+      const { data, error } = await supabase.from('employees').delete().eq('id', id).select();
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error("Deletion failed. This is likely due to database Row Level Security (RLS) blocking your account from deleting records.");
+      }
+    } catch (err) {
+      console.error("Exception in deleteEmployee:", err);
+      throw err;
+    }
   },
 
   // ── Departments ──────────────────────────────────────────────────────────
