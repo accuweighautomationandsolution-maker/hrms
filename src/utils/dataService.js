@@ -118,8 +118,12 @@ export const dataService = {
         const { error } = await supabase.from('employees').insert(row);
         dbError = error;
       } else {
-        const { error } = await supabase.from('employees').update(row).eq('id', row.id);
-        dbError = error;
+        const { data, error } = await supabase.from('employees').update(row).eq('id', row.id).select();
+        if (error) {
+          dbError = error;
+        } else if (!data || data.length === 0) {
+          dbError = new Error("Update failed. Database Row Level Security (RLS) is blocking your account from updating this record.");
+        }
       }
 
       if (dbError) {
