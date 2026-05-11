@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-import { MoreVertical, Search, Filter, UserPlus, FileText, MapPin, Briefcase, ShieldCheck, UploadCloud, AlertCircle, IndianRupee, Lock, Save, Download, FileSpreadsheet, Printer, MessageSquareShare, Trash2, CreditCard, TrendingUp } from 'lucide-react';
+import { MoreVertical, Search, Filter, UserPlus, FileText, MapPin, Briefcase, ShieldCheck, UploadCloud, AlertCircle, IndianRupee, Lock, Save, Download, FileSpreadsheet, Printer, MessageSquareShare, Trash2, CreditCard, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import SalaryStructure from './SalaryStructure';
 import { dataService } from '../utils/dataService';
 import FeedbackPortal from '../components/FeedbackPortal';
@@ -21,6 +21,8 @@ const EmployeeDirectory = ({ userRole }) => {
 
   // Feedback Portal State
   const [feedbackConfig, setFeedbackConfig] = useState({ isOpen: false, empId: null, type: 'Appraisal Review' });
+  const tabsRef = useRef(null);
+  const tabRefs = useRef({});
   
   const location = useLocation();
   const navigate = useNavigate();
@@ -174,6 +176,26 @@ const EmployeeDirectory = ({ userRole }) => {
     setShowModal(true);
   };
 
+  useEffect(() => {
+    if (tabRefs.current[activeTab]) {
+      tabRefs.current[activeTab].scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center'
+      });
+    }
+  }, [activeTab]);
+
+  const scrollTabs = (direction) => {
+    if (tabsRef.current) {
+      const scrollAmount = 200;
+      tabsRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   const handleDeleteEmployee = async (id) => {
     if (window.confirm('Are you sure you want to PERMANENTLY delete this employee record? This action is logged.')) {
       try {
@@ -293,7 +315,25 @@ const EmployeeDirectory = ({ userRole }) => {
 
   const TabButton = ({ num, label, icon: Icon }) => (
     <button 
-      style={{ padding: '1rem', flex: 1, backgroundColor: activeTab === num ? 'var(--color-surface)' : 'transparent', borderBottom: activeTab === num ? '2px solid var(--color-primary)' : '2px solid transparent', color: activeTab === num ? 'var(--color-primary)' : 'var(--color-text-muted)', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', cursor: 'pointer', borderTop: 'none', borderLeft: 'none', borderRight: 'none' }}
+      ref={el => tabRefs.current[num] = el}
+      style={{ 
+        padding: '0.8rem 1.25rem', 
+        backgroundColor: activeTab === num ? 'var(--color-surface)' : 'transparent', 
+        borderBottom: activeTab === num ? '2px solid var(--color-primary)' : '2px solid transparent', 
+        color: activeTab === num ? 'var(--color-primary)' : 'var(--color-text-muted)', 
+        fontWeight: '600', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        gap: '0.5rem', 
+        cursor: 'pointer', 
+        borderTop: 'none', 
+        borderLeft: 'none', 
+        borderRight: 'none',
+        whiteSpace: 'nowrap',
+        minWidth: 'max-content',
+        transition: 'all 0.2s ease'
+      }}
       onClick={() => setActiveTab(num)}
     >
       <Icon size={18} /> {label}
@@ -480,14 +520,43 @@ const EmployeeDirectory = ({ userRole }) => {
               <button className="btn btn-ghost" onClick={() => setShowModal(false)} style={{ fontSize: '1.5rem' }}>✕</button>
             </div>
 
-            <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', backgroundColor: 'var(--color-background)' }}>
-              <TabButton num={1} label="Identity" icon={FileText} />
-              <TabButton num={2} label="Employment" icon={Briefcase} />
-              <TabButton num={3} label="Address" icon={MapPin} />
-              <TabButton num={4} label="Compliance" icon={ShieldCheck} />
-              <TabButton num={5} label="Docs & Vault" icon={UploadCloud} />
-              <TabButton num={6} label="Compensation" icon={IndianRupee} />
-              <TabButton num={7} label="Banking & Ins." icon={CreditCard} />
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', backgroundColor: 'var(--color-background)', borderBottom: '1px solid var(--color-border)' }}>
+              <button 
+                className="btn btn-ghost" 
+                onClick={() => scrollTabs('left')}
+                style={{ padding: '0.5rem', height: '100%', borderRadius: 0, borderRight: '1px solid var(--color-border)', zIndex: 5 }}
+              >
+                <ChevronLeft size={20} />
+              </button>
+
+              <div 
+                ref={tabsRef}
+                style={{ 
+                  display: 'flex', 
+                  overflowX: 'auto', 
+                  scrollbarWidth: 'none', 
+                  msOverflowStyle: 'none',
+                  flex: 1,
+                  scrollBehavior: 'smooth'
+                }}
+                className="no-scrollbar"
+              >
+                <TabButton num={1} label="Identity" icon={FileText} />
+                <TabButton num={2} label="Employment" icon={Briefcase} />
+                <TabButton num={3} label="Address" icon={MapPin} />
+                <TabButton num={4} label="Compliance" icon={ShieldCheck} />
+                <TabButton num={5} label="Docs & Vault" icon={UploadCloud} />
+                <TabButton num={6} label="Compensation" icon={IndianRupee} />
+                <TabButton num={7} label="Banking & Ins." icon={CreditCard} />
+              </div>
+
+              <button 
+                className="btn btn-ghost" 
+                onClick={() => scrollTabs('right')}
+                style={{ padding: '0.5rem', height: '100%', borderRadius: 0, borderLeft: '1px solid var(--color-border)', zIndex: 5 }}
+              >
+                <ChevronRight size={20} />
+              </button>
             </div>
 
             <div style={{ padding: '2rem', flex: 1, overflowY: 'auto' }}>

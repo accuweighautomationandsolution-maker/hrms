@@ -427,3 +427,13 @@ p {
   font-size: 0.875rem;
   align-items: flex-start;
 }
+
+/* Scrollbar Utilities */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
