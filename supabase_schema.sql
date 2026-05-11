@@ -70,3 +70,13 @@ ALTER TABLE salary_structures ENABLE ROW LEVEL SECURITY;
 
 -- Basic Policy: Employees can read all employees, but only update themselves
 CREATE POLICY "Public employees read" ON employees FOR SELECT USING (true);
+
+-- 6. Letter Templates
+CREATE TABLE IF NOT EXISTS letter_templates (
+  id TEXT PRIMARY KEY,
+  data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE letter_templates ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all access for authenticated users" ON letter_templates FOR ALL TO authenticated USING (true) WITH CHECK (true);
