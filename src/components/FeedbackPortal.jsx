@@ -151,7 +151,7 @@ const FeedbackPortal = ({ empId, reviewType, isOpen, onClose }) => {
     const html = `
       <html>
         <head>
-          <title>\${employee.name} - Feedback Report</title>
+          <title>${employee.name} - Feedback Report</title>
           <style>
             @media print {
               @page { margin: 15mm; }
@@ -184,65 +184,65 @@ const FeedbackPortal = ({ empId, reviewType, isOpen, onClose }) => {
           <div class="header">
             <div class="logo">Accuweigh HRMS</div>
             <div>
-              <div class="title">\${reviewType} Evaluation</div>
-              <div class="subtitle">Generated on: \${new Date().toLocaleDateString()}</div>
+              <div class="title">${reviewType} Evaluation</div>
+              <div class="subtitle">Generated on: ${new Date().toLocaleDateString()}</div>
             </div>
           </div>
           
           <div class="employee-info">
             <div>
-              <div class="info-group"><div class="info-label">Employee Name</div><div class="info-value">\${employee.name}</div></div>
-              <div class="info-group"><div class="info-label">Employee Code</div><div class="info-value">\${employee.empCode}</div></div>
+              <div class="info-group"><div class="info-label">Employee Name</div><div class="info-value">${employee.name}</div></div>
+              <div class="info-group"><div class="info-label">Employee Code</div><div class="info-value">${employee.empCode}</div></div>
             </div>
             <div>
-              <div class="info-group"><div class="info-label">Department</div><div class="info-value">\${employee.department}</div></div>
-              <div class="info-group"><div class="info-label">Role/Designation</div><div class="info-value">\${employee.role}</div></div>
+              <div class="info-group"><div class="info-label">Department</div><div class="info-value">${employee.department}</div></div>
+              <div class="info-group"><div class="info-label">Role/Designation</div><div class="info-value">${employee.role}</div></div>
             </div>
           </div>
 
           <div class="section">
-            <div class="section-title"><span>1. Attendance & Punctuality</span> <span class="rating-badge">\${formData.evaluations.attendance.rating}/5 (\${getRatingText(formData.evaluations.attendance.rating)})</span></div>
-            <div class="remarks">\${formData.evaluations.attendance.remarks || 'No remarks provided.'}</div>
+            <div class="section-title"><span>1. Attendance & Punctuality</span> <span class="rating-badge">${formData.evaluations.attendance.rating}/5 (${getRatingText(formData.evaluations.attendance.rating)})</span></div>
+            <div class="remarks">${formData.evaluations.attendance.remarks || 'No remarks provided.'}</div>
           </div>
 
           <div class="section">
-            <div class="section-title"><span>2a. Quality of Work</span> <span class="rating-badge">\${formData.evaluations.performance_quality.rating}/5 (\${getRatingText(formData.evaluations.performance_quality.rating)})</span></div>
-            <div class="remarks">\${formData.evaluations.performance_quality.remarks || 'No remarks provided.'}</div>
+            <div class="section-title"><span>2a. Quality of Work</span> <span class="rating-badge">${formData.evaluations.performance_quality.rating}/5 (${getRatingText(formData.evaluations.performance_quality.rating)})</span></div>
+            <div class="remarks">${formData.evaluations.performance_quality.remarks || 'No remarks provided.'}</div>
           </div>
 
           <div class="section">
-            <div class="section-title"><span>2b. Timely Completion</span> <span class="rating-badge">\${formData.evaluations.performance_timeliness.rating}/5 (\${getRatingText(formData.evaluations.performance_timeliness.rating)})</span></div>
-            <div class="remarks">\${formData.evaluations.performance_timeliness.remarks || 'No remarks provided.'}</div>
+            <div class="section-title"><span>2b. Timely Completion</span> <span class="rating-badge">${formData.evaluations.performance_timeliness.rating}/5 (${getRatingText(formData.evaluations.performance_timeliness.rating)})</span></div>
+            <div class="remarks">${formData.evaluations.performance_timeliness.remarks || 'No remarks provided.'}</div>
           </div>
 
           <div class="section">
-            <div class="section-title"><span>2c. Productivity</span> <span class="rating-badge">\${formData.evaluations.performance_productivity.rating}/5 (\${getRatingText(formData.evaluations.performance_productivity.rating)})</span></div>
-            <div class="remarks">\${formData.evaluations.performance_productivity.remarks || 'No remarks provided.'}</div>
+            <div class="section-title"><span>2c. Productivity</span> <span class="rating-badge">${formData.evaluations.performance_productivity.rating}/5 (${getRatingText(formData.evaluations.performance_productivity.rating)})</span></div>
+            <div class="remarks">${formData.evaluations.performance_productivity.remarks || 'No remarks provided.'}</div>
           </div>
 
           <div class="section">
-            <div class="section-title"><span>3. Understanding the Role</span> <span class="rating-badge">\${formData.evaluations.role_understanding.rating}/5 (\${getRatingText(formData.evaluations.role_understanding.rating)})</span></div>
-            <div class="remarks">\${formData.evaluations.role_understanding.remarks || 'No remarks provided.'}</div>
+            <div class="section-title"><span>3. Understanding the Role</span> <span class="rating-badge">${formData.evaluations.role_understanding.rating}/5 (${getRatingText(formData.evaluations.role_understanding.rating)})</span></div>
+            <div class="remarks">${formData.evaluations.role_understanding.remarks || 'No remarks provided.'}</div>
           </div>
 
           <div class="section">
-            <div class="section-title"><span>4. Behavior & Attitude</span> <span class="rating-badge">\${formData.evaluations.behavior_attitude.rating}/5 (\${getRatingText(formData.evaluations.behavior_attitude.rating)})</span></div>
-            <div class="remarks">\${formData.evaluations.behavior_attitude.remarks || 'No remarks provided.'}</div>
+            <div class="section-title"><span>4. Behavior & Attitude</span> <span class="rating-badge">${formData.evaluations.behavior_attitude.rating}/5 (${getRatingText(formData.evaluations.behavior_attitude.rating)})</span></div>
+            <div class="remarks">${formData.evaluations.behavior_attitude.remarks || 'No remarks provided.'}</div>
           </div>
 
           <div class="section">
-            <div class="section-title"><span>5. Communication Skills</span> <span class="rating-badge">\${formData.evaluations.communication.rating}/5 (\${getRatingText(formData.evaluations.communication.rating)})</span></div>
-            <div class="remarks">\${formData.evaluations.communication.remarks || 'No remarks provided.'}</div>
+            <div class="section-title"><span>5. Communication Skills</span> <span class="rating-badge">${formData.evaluations.communication.rating}/5 (${getRatingText(formData.evaluations.communication.rating)})</span></div>
+            <div class="remarks">${formData.evaluations.communication.remarks || 'No remarks provided.'}</div>
           </div>
 
           <div class="section">
-            <div class="section-title"><span>6. Teamwork & Collaboration</span> <span class="rating-badge">\${formData.evaluations.teamwork.rating}/5 (\${getRatingText(formData.evaluations.teamwork.rating)})</span></div>
-            <div class="remarks">\${formData.evaluations.teamwork.remarks || 'No remarks provided.'}</div>
+            <div class="section-title"><span>6. Teamwork & Collaboration</span> <span class="rating-badge">${formData.evaluations.teamwork.rating}/5 (${getRatingText(formData.evaluations.teamwork.rating)})</span></div>
+            <div class="remarks">${formData.evaluations.teamwork.remarks || 'No remarks provided.'}</div>
           </div>
 
           <div class="section">
-            <div class="section-title"><span>7. Initiative & Ownership</span> <span class="rating-badge">\${formData.evaluations.initiative.rating}/5 (\${getRatingText(formData.evaluations.initiative.rating)})</span></div>
-            <div class="remarks">\${formData.evaluations.initiative.remarks || 'No remarks provided.'}</div>
+            <div class="section-title"><span>7. Initiative & Ownership</span> <span class="rating-badge">${formData.evaluations.initiative.rating}/5 (${getRatingText(formData.evaluations.initiative.rating)})</span></div>
+            <div class="remarks">${formData.evaluations.initiative.remarks || 'No remarks provided.'}</div>
           </div>
 
           <div class="summary-box">
@@ -252,27 +252,27 @@ const FeedbackPortal = ({ empId, reviewType, isOpen, onClose }) => {
               </div>
               <div style="text-align: right;">
                 <div style="font-size: 8pt; color: #64748b; font-weight: bold; text-transform: uppercase;">Overall Rating</div>
-                <div class="overall-score">\${overallRating} / 5.0</div>
+                <div class="overall-score">${overallRating} / 5.0</div>
               </div>
             </div>
             
             <div style="margin-bottom: 15px;">
               <strong>Primary Recommendation:</strong><br/>
-              <span class="recommendation">\${formData.recommendation} \${formData.recommendation === 'Extend' ? `(\${formData.extensionPeriod})` : ''}</span>
+              <span class="recommendation">${formData.recommendation} ${formData.recommendation === 'Extend' ? `(${formData.extensionPeriod})` : ''}</span>
             </div>
 
-            \${formData.recommendation === 'Extend' ? `
-              <div style="margin-bottom: 10px;"><strong>Risk Assessment:</strong><br/><div class="remarks">\${formData.conditional.riskAssessment}</div></div>
-              <div style="margin-bottom: 10px;"><strong>Improvement Plan (PIP):</strong><br/><div class="remarks">\${formData.conditional.improvementPlan}</div></div>
+            ${formData.recommendation === 'Extend' ? `
+              <div style="margin-bottom: 10px;"><strong>Risk Assessment:</strong><br/><div class="remarks">${formData.conditional.riskAssessment}</div></div>
+              <div style="margin-bottom: 10px;"><strong>Improvement Plan (PIP):</strong><br/><div class="remarks">${formData.conditional.improvementPlan}</div></div>
             ` : ''}
 
-            \${(formData.recommendation === 'Rejected' || formData.recommendation === 'Release') ? `
-              <div style="margin-bottom: 10px;"><strong>Justification:</strong><br/><div class="remarks">\${formData.conditional.justification}</div></div>
+            ${(formData.recommendation === 'Rejected' || formData.recommendation === 'Release') ? `
+              <div style="margin-bottom: 10px;"><strong>Justification:</strong><br/><div class="remarks">${formData.conditional.justification}</div></div>
             ` : ''}
 
             <div style="margin-top: 15px;">
               <strong>Manager / Head Remarks:</strong><br/>
-              <div class="remarks">\${formData.finalRemarks || 'No final remarks provided.'}</div>
+              <div class="remarks">${formData.finalRemarks || 'No final remarks provided.'}</div>
             </div>
           </div>
           

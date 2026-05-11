@@ -502,7 +502,7 @@ const EmployeeDirectory = ({ userRole }) => {
                     </td>
                   )}
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>
