@@ -221,6 +221,7 @@ const EmployeeDirectory = ({ userRole }) => {
     try {
       const empData = {
         id: form.id || Date.now(),
+        isNew: !form.id,
         name: `${form.firstName} ${form.middleName ? form.middleName + ' ' : ''}${form.lastName}`.trim(),
         email: form.email,
         role: form.role || 'Associate',
@@ -266,7 +267,7 @@ const EmployeeDirectory = ({ userRole }) => {
           ...form.salaryConfig,
           empId: savedEmp.id,
           candidateName: savedEmp.name
-        });
+        }, empData.isNew);
       }
 
       const emps = await dataService.getEmployees();

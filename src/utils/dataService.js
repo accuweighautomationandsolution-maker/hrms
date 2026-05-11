@@ -112,10 +112,19 @@ export const dataService = {
     };
     
     try {
-      const { error } = await supabase.from('employees').upsert(row);
-      if (error) {
-        console.error("Error saving employee to Supabase:", error);
-        throw error;
+      let dbError;
+      if (empData.isNew) {
+        // Use insert instead of upsert for new records to avoid RLS UPDATE privilege requirements
+        const { error } = await supabase.from('employees').insert(row);
+        dbError = error;
+      } else {
+        const { error } = await supabase.from('employees').update(row).eq('id', row.id);
+        dbError = error;
+      }
+
+      if (dbError) {
+        console.error("Error saving employee to Supabase:", dbError);
+        throw dbError;
       }
       return row.data;
     } catch (err) {
@@ -698,16 +707,28 @@ export const dataService = {
     return data ? data.data : null;
   },
 
-  saveSalaryStructure: async (empId, structData) => {
+  saveSalaryStructure: async (empId, structData, isNew = false) => {
     if (!supabase) return;
     try {
       const snapshot = { ...structData, lastUpdated: new Date().toISOString() };
-      const { error } = await supabase.from('salary_structures_ext').upsert({
-        emp_id: empId,
-        data: snapshot,
-        last_updated: new Date().toISOString()
-      });
-      if (error) throw error;
+      
+      let dbError;
+      if (isNew) {
+        const { error } = await supabase.from('salary_structures_ext').insert({
+          emp_id: empId,
+          data: snapshot,
+          last_updated: new Date().toISOString()
+        });
+        dbError = error;
+      } else {
+        const { error } = await supabase.from('salary_structures_ext').update({
+          data: snapshot,
+          last_updated: new Date().toISOString()
+        }).eq('emp_id', empId);
+        dbError = error;
+      }
+      
+      if (dbError) throw dbError;
     } catch (err) {
       console.error("Exception in saveSalaryStructure:", err);
       throw err;
