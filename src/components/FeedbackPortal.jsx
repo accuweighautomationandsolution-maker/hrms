@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Star, Save, AlertCircle, Info, ChevronRight, ChevronLeft, CheckCircle, ShieldCheck, Clock } from 'lucide-react';
+import { X, Star, Save, AlertCircle, Info, ChevronRight, ChevronLeft, CheckCircle, ShieldCheck, Clock, Printer } from 'lucide-react';
 import { dataService } from '../utils/dataService';
 
 const FeedbackPortal = ({ empId, reviewType, isOpen, onClose }) => {
@@ -133,6 +133,170 @@ const FeedbackPortal = ({ empId, reviewType, isOpen, onClose }) => {
     onClose();
   };
 
+  const handlePrint = () => {
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow.document;
+    
+    // Convert ratings to text
+    const getRatingText = (val) => ['Poor', 'Below Avg', 'Average', 'Good', 'Excellent'][val - 1] || 'N/A';
+
+    const html = `
+      <html>
+        <head>
+          <title>\${employee.name} - Feedback Report</title>
+          <style>
+            @media print {
+              @page { margin: 15mm; }
+              body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.5; font-size: 10pt; }
+              .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #2563eb; padding-bottom: 15px; margin-bottom: 20px; }
+              .logo { font-size: 18pt; font-weight: 800; color: #2563eb; letter-spacing: -0.5px; }
+              .title { font-size: 14pt; font-weight: 600; text-align: right; }
+              .subtitle { font-size: 10pt; color: #64748b; text-align: right; margin-top: 5px; }
+              
+              .employee-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #e2e8f0; }
+              .info-group { margin-bottom: 5px; }
+              .info-label { font-size: 8pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+              .info-value { font-weight: 600; font-size: 10pt; }
+              
+              .section { margin-bottom: 20px; page-break-inside: avoid; }
+              .section-title { font-size: 11pt; font-weight: 600; color: #0f172a; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; margin-bottom: 10px; display: flex; justify-content: space-between; }
+              .rating-badge { background: #eff6ff; color: #2563eb; padding: 2px 8px; border-radius: 12px; font-size: 9pt; font-weight: 600; }
+              .remarks { font-size: 9.5pt; color: #334155; background: #fff; padding: 10px; border-left: 3px solid #cbd5e1; white-space: pre-wrap; }
+              
+              .summary-box { border: 2px solid #2563eb; padding: 20px; border-radius: 8px; margin-top: 30px; page-break-inside: avoid; }
+              .summary-header { display: flex; justify-content: space-between; margin-bottom: 15px; }
+              .overall-score { font-size: 24pt; font-weight: 800; color: #2563eb; }
+              .recommendation { display: inline-block; background: #2563eb; color: white; padding: 5px 12px; border-radius: 4px; font-weight: 600; font-size: 10pt; margin-top: 10px; }
+              
+              .footer { margin-top: 40px; padding-top: 15px; border-top: 1px solid #e2e8f0; font-size: 8pt; color: #94a3b8; text-align: center; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="logo">Accuweigh HRMS</div>
+            <div>
+              <div class="title">\${reviewType} Evaluation</div>
+              <div class="subtitle">Generated on: \${new Date().toLocaleDateString()}</div>
+            </div>
+          </div>
+          
+          <div class="employee-info">
+            <div>
+              <div class="info-group"><div class="info-label">Employee Name</div><div class="info-value">\${employee.name}</div></div>
+              <div class="info-group"><div class="info-label">Employee Code</div><div class="info-value">\${employee.empCode}</div></div>
+            </div>
+            <div>
+              <div class="info-group"><div class="info-label">Department</div><div class="info-value">\${employee.department}</div></div>
+              <div class="info-group"><div class="info-label">Role/Designation</div><div class="info-value">\${employee.role}</div></div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title"><span>1. Attendance & Punctuality</span> <span class="rating-badge">\${formData.evaluations.attendance.rating}/5 (\${getRatingText(formData.evaluations.attendance.rating)})</span></div>
+            <div class="remarks">\${formData.evaluations.attendance.remarks || 'No remarks provided.'}</div>
+          </div>
+
+          <div class="section">
+            <div class="section-title"><span>2a. Quality of Work</span> <span class="rating-badge">\${formData.evaluations.performance_quality.rating}/5 (\${getRatingText(formData.evaluations.performance_quality.rating)})</span></div>
+            <div class="remarks">\${formData.evaluations.performance_quality.remarks || 'No remarks provided.'}</div>
+          </div>
+
+          <div class="section">
+            <div class="section-title"><span>2b. Timely Completion</span> <span class="rating-badge">\${formData.evaluations.performance_timeliness.rating}/5 (\${getRatingText(formData.evaluations.performance_timeliness.rating)})</span></div>
+            <div class="remarks">\${formData.evaluations.performance_timeliness.remarks || 'No remarks provided.'}</div>
+          </div>
+
+          <div class="section">
+            <div class="section-title"><span>2c. Productivity</span> <span class="rating-badge">\${formData.evaluations.performance_productivity.rating}/5 (\${getRatingText(formData.evaluations.performance_productivity.rating)})</span></div>
+            <div class="remarks">\${formData.evaluations.performance_productivity.remarks || 'No remarks provided.'}</div>
+          </div>
+
+          <div class="section">
+            <div class="section-title"><span>3. Understanding the Role</span> <span class="rating-badge">\${formData.evaluations.role_understanding.rating}/5 (\${getRatingText(formData.evaluations.role_understanding.rating)})</span></div>
+            <div class="remarks">\${formData.evaluations.role_understanding.remarks || 'No remarks provided.'}</div>
+          </div>
+
+          <div class="section">
+            <div class="section-title"><span>4. Behavior & Attitude</span> <span class="rating-badge">\${formData.evaluations.behavior_attitude.rating}/5 (\${getRatingText(formData.evaluations.behavior_attitude.rating)})</span></div>
+            <div class="remarks">\${formData.evaluations.behavior_attitude.remarks || 'No remarks provided.'}</div>
+          </div>
+
+          <div class="section">
+            <div class="section-title"><span>5. Communication Skills</span> <span class="rating-badge">\${formData.evaluations.communication.rating}/5 (\${getRatingText(formData.evaluations.communication.rating)})</span></div>
+            <div class="remarks">\${formData.evaluations.communication.remarks || 'No remarks provided.'}</div>
+          </div>
+
+          <div class="section">
+            <div class="section-title"><span>6. Teamwork & Collaboration</span> <span class="rating-badge">\${formData.evaluations.teamwork.rating}/5 (\${getRatingText(formData.evaluations.teamwork.rating)})</span></div>
+            <div class="remarks">\${formData.evaluations.teamwork.remarks || 'No remarks provided.'}</div>
+          </div>
+
+          <div class="section">
+            <div class="section-title"><span>7. Initiative & Ownership</span> <span class="rating-badge">\${formData.evaluations.initiative.rating}/5 (\${getRatingText(formData.evaluations.initiative.rating)})</span></div>
+            <div class="remarks">\${formData.evaluations.initiative.remarks || 'No remarks provided.'}</div>
+          </div>
+
+          <div class="summary-box">
+            <div class="summary-header">
+              <div>
+                <h2 style="margin:0; font-size: 14pt; color: #0f172a;">Final Summary & Recommendation</h2>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 8pt; color: #64748b; font-weight: bold; text-transform: uppercase;">Overall Rating</div>
+                <div class="overall-score">\${overallRating} / 5.0</div>
+              </div>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+              <strong>Primary Recommendation:</strong><br/>
+              <span class="recommendation">\${formData.recommendation} \${formData.recommendation === 'Extend' ? `(\${formData.extensionPeriod})` : ''}</span>
+            </div>
+
+            \${formData.recommendation === 'Extend' ? `
+              <div style="margin-bottom: 10px;"><strong>Risk Assessment:</strong><br/><div class="remarks">\${formData.conditional.riskAssessment}</div></div>
+              <div style="margin-bottom: 10px;"><strong>Improvement Plan (PIP):</strong><br/><div class="remarks">\${formData.conditional.improvementPlan}</div></div>
+            ` : ''}
+
+            \${(formData.recommendation === 'Rejected' || formData.recommendation === 'Release') ? `
+              <div style="margin-bottom: 10px;"><strong>Justification:</strong><br/><div class="remarks">\${formData.conditional.justification}</div></div>
+            ` : ''}
+
+            <div style="margin-top: 15px;">
+              <strong>Manager / Head Remarks:</strong><br/>
+              <div class="remarks">\${formData.finalRemarks || 'No final remarks provided.'}</div>
+            </div>
+          </div>
+          
+          <div class="footer">
+            Official HRMS Document &bull; This is a computer-generated report and does not require a physical signature.
+          </div>
+        </body>
+      </html>
+    `;
+    
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    // Wait for styles to apply before printing
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
+    }, 250);
+  };
+
   if (!isOpen || !employee) return null;
 
   const RatingStars = ({ section, value }) => (
@@ -170,7 +334,19 @@ const FeedbackPortal = ({ empId, reviewType, isOpen, onClose }) => {
               Standardized performance matrix for <strong>{employee.name}</strong> ({employee.empCode})
             </div>
           </div>
-          <button onClick={onClose} className="btn btn-ghost"><X size={24}/></button>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            {isSubmitted && (
+              <button 
+                onClick={handlePrint} 
+                className="btn btn-outline" 
+                style={{ padding: '0.4rem 0.8rem', borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
+                title="Print / Download PDF"
+              >
+                <Printer size={18} /> Print Report
+              </button>
+            )}
+            <button onClick={onClose} className="btn btn-ghost"><X size={24}/></button>
+          </div>
         </div>
 
         {/* Info Bar (Read Only) */}
