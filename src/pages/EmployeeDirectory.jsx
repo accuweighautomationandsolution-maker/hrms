@@ -385,15 +385,22 @@ const EmployeeDirectory = ({ userRole }) => {
               </tr>
             </thead>
             <tbody>
-              {(employees || []).filter(e => {
-                const term = searchTerm.toLowerCase();
-                return (e.name || '').toLowerCase().includes(term) || 
-                       (e.empCode || '').toLowerCase().includes(term) ||
-                       (e.biometricCode || '').toLowerCase().includes(term) ||
-                       (e.role || '').toLowerCase().includes(term) ||
-                       (e.department || '').toLowerCase().includes(term);
-              }).map((emp) => (
-                <tr key={emp.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background var(--transition-fast)' }}>
+              {(!employees || employees.length === 0) ? (
+                <tr>
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
+                    No employees found. If you expect to see employees here, your database RLS policy is blocking your account from viewing them.
+                  </td>
+                </tr>
+              ) : (
+                (employees || []).filter(e => {
+                  const term = searchTerm.toLowerCase();
+                  return (e.name || '').toLowerCase().includes(term) || 
+                         (e.empCode || '').toLowerCase().includes(term) ||
+                         (e.biometricCode || '').toLowerCase().includes(term) ||
+                         (e.role || '').toLowerCase().includes(term) ||
+                         (e.department || '').toLowerCase().includes(term);
+                }).map((emp) => (
+                  <tr key={emp.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background var(--transition-fast)' }}>
                   <td style={{ padding: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                       <div className="avatar" style={{ width: '32px', height: '32px', fontSize: '0.75rem' }}>
