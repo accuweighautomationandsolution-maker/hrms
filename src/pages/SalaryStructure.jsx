@@ -24,7 +24,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
   useEffect(() => {
     // Determine the ID to fetch for (from props, location state, or passedState)
     const effectiveEmpId = empId || (location.state && location.state.empId);
-    
+
     const fetchExisting = async () => {
       if (effectiveEmpId && !isEmbedded) {
         const existing = await dataService.getSalaryStructure(effectiveEmpId);
@@ -37,11 +37,11 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
 
     if (!isEmbedded && location.state && location.state.isAppraisal) {
       setIsAppraisal(true);
-      setForm(prev => ({ 
-        ...prev, 
-        candidateName: location.state.employeeName, 
+      setForm(prev => ({
+        ...prev,
+        candidateName: location.state.employeeName,
         roleApplied: location.state.employeeRole,
-        empId: location.state.empId 
+        empId: location.state.empId
       }));
     } else if (passedState && Object.keys(passedState).length > 0) {
       // Guard: Only update internal form if passedState is actually different to avoid cycles
@@ -63,11 +63,11 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
   // Shared Calculation Engine Integration
   const targetGross = Number(form.targetSalary) || 0;
   const payroll = calculateSalaryComponents(
-    targetGross, 
+    targetGross,
     true, // pfCapped (we'll keep this true as standard)
-    0, 
-    empCategory || 'Staff Employee', 
-    30, 
+    0,
+    empCategory || 'Staff Employee',
+    30,
     30,
     {
       salConveyance: form.salConveyance,
@@ -85,19 +85,19 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
   /* ── Number to Words ─────────────────────────────────── */
   const numberToWords = (num) => {
     if (!num || isNaN(num)) return 'Zero Rupees Only';
-    const a = ['','One ','Two ','Three ','Four ','Five ','Six ','Seven ','Eight ','Nine ','Ten ','Eleven ','Twelve ','Thirteen ','Fourteen ','Fifteen ','Sixteen ','Seventeen ','Eighteen ','Nineteen '];
-    const b = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+    const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+    const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
     const inWords = (n) => {
       let s = '';
-      if (n > 99) { s += a[Math.floor(n/100)] + 'Hundred '; n %= 100; }
-      if (n > 19) { s += b[Math.floor(n/10)] + ' '; n %= 10; }
-      if (n > 0)  { s += a[n]; }
+      if (n > 99) { s += a[Math.floor(n / 100)] + 'Hundred '; n %= 100; }
+      if (n > 19) { s += b[Math.floor(n / 10)] + ' '; n %= 10; }
+      if (n > 0) { s += a[n]; }
       return s;
     };
     let n = Math.floor(num), res = '';
-    if (Math.floor(n/10000000) > 0) { res += inWords(Math.floor(n/10000000)) + 'Crore ';    n %= 10000000; }
-    if (Math.floor(n/100000)   > 0) { res += inWords(Math.floor(n/100000))   + 'Lakh ';     n %= 100000; }
-    if (Math.floor(n/1000)     > 0) { res += inWords(Math.floor(n/1000))     + 'Thousand '; n %= 1000; }
+    if (Math.floor(n / 10000000) > 0) { res += inWords(Math.floor(n / 10000000)) + 'Crore '; n %= 10000000; }
+    if (Math.floor(n / 100000) > 0) { res += inWords(Math.floor(n / 100000)) + 'Lakh '; n %= 100000; }
+    if (Math.floor(n / 1000) > 0) { res += inWords(Math.floor(n / 1000)) + 'Thousand '; n %= 1000; }
     if (n > 0) { res += inWords(n); }
     return 'Rupees ' + res.trim() + ' Only';
   };
@@ -107,7 +107,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
   const handleDownloadPDF = async () => {
     const doc = new jsPDF('p', 'mm', 'a4');
     const pageWidth = doc.internal.pageSize.getWidth();
-    
+
     // Helper to add a horizontal line
     const addLine = (y) => {
       doc.setDrawColor(220, 220, 220);
@@ -136,17 +136,17 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     doc.setTextColor(37, 99, 235);
     doc.setFont('helvetica', 'bold');
     doc.text('ACCUWEIGH', 15, 20);
-    
+
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
     doc.setFont('helvetica', 'normal');
-    doc.text('Automation & Solution', 15, 25);
-    
+    doc.text('Automation & Solution Pvt. Ltd.', 15, 25);
+
     doc.setFontSize(9);
     doc.setTextColor(150, 150, 150);
     doc.text('Employee Compensation Matrix', pageWidth - 15, 20, { align: 'right' });
     doc.text(`Generated: ${formatDate(new Date())}`, pageWidth - 15, 25, { align: 'right' });
-    
+
     addLine(30);
 
     // 2. Document Title
@@ -154,12 +154,12 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'bold');
     doc.text('SALARY STRUCTURE', pageWidth / 2, 42, { align: 'center' });
-    
+
     // 3. Employee Details Box
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setDrawColor(230, 230, 230);
-    doc.setFillColor(252, 252, 252); 
+    doc.setFillColor(252, 252, 252);
     doc.rect(15, 50, pageWidth - 30, 42, 'FD');
 
     const startY = 58;
@@ -192,13 +192,13 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     let tableY = 105;
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    
+
     // Earnings Header
     doc.setFillColor(37, 99, 235);
     doc.rect(15, tableY, (pageWidth - 30) / 2, 9, 'F');
     doc.setTextColor(255, 255, 255);
     doc.text('EARNINGS COMPONENTS', 15 + (pageWidth - 30) / 4, tableY + 6, { align: 'center' });
-    
+
     // Deductions Header
     doc.setFillColor(239, 68, 68);
     doc.rect(15 + (pageWidth - 30) / 2, tableY, (pageWidth - 30) / 2, 9, 'F');
@@ -206,47 +206,49 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
 
     doc.setTextColor(0, 0, 0);
     tableY += 16;
-    
-    // Enhanced Vector Rupee Symbol Drawing (Compact & Professional)
+
+    // Official Indian Rupee (₹) Vector Drawing
     const drawRupee = (x, y, scale = 1) => {
-      const w = 2.8 * scale;
-      const h = 3.0 * scale;
-      doc.setLineWidth(0.25 * scale);
-      doc.setDrawColor(40, 40, 40);
-      
-      // Top horizontal lines
-      doc.line(x, y - h, x + w, y - h);
-      doc.line(x, y - h + (0.8 * scale), x + w, y - h + (0.8 * scale));
-      
-      // Vertical stem and curve
-      doc.line(x + (0.4 * scale), y - h, x + (0.4 * scale), y - (1.0 * scale));
-      doc.line(x + (0.4 * scale), y - (1.0 * scale), x + (2.2 * scale), y - (1.0 * scale));
-      doc.line(x + (2.2 * scale), y - (1.0 * scale), x + (2.2 * scale), y - h + (0.8 * scale));
-      
-      // Diagonal stroke
-      doc.line(x + (0.8 * scale), y - (1.0 * scale), x + (2.5 * scale), y + (0.2 * scale));
+      const w = 3.2 * scale;
+      const h = 3.5 * scale;
+      doc.setLineWidth(0.3 * scale);
+      doc.setDrawColor(0, 0, 0);
+
+      // Official Design: Two horizontal bars and a curved "R" shape
+      doc.line(x, y - h, x + w, y - h); // Top bar
+      doc.line(x, y - h + (1.0 * scale), x + w, y - h + (1.0 * scale)); // Middle bar
+
+      // Curve part (simplified for vector rendering)
+      doc.line(x + (0.5 * scale), y - h, x + (0.5 * scale), y - (1.2 * scale));
+      doc.line(x + (0.5 * scale), y - (1.2 * scale), x + (2.5 * scale), y - (1.2 * scale));
+      doc.line(x + (2.5 * scale), y - (1.2 * scale), x + (2.5 * scale), y - h + (1.0 * scale));
+
+      // Diagonal leg
+      doc.line(x + (1.0 * scale), y - (1.0 * scale), x + (3.0 * scale), y + (0.5 * scale));
     };
 
     const drawRow = (label, value, y, isRight = false) => {
       const xStart = isRight ? 15 + (pageWidth - 30) / 2 : 15;
       const width = (pageWidth - 30) / 2;
-      const xColon = xStart + width - 45; // Fixed colon position
-      const xSymbol = xStart + width - 38; // Fixed symbol position
-      const xAmount = xStart + width - 5; // Right aligned amount
+
+      // Absolute positions for perfect alignment
+      const xLabel = xStart + 5;
+      const xColon = xStart + 50;
+      const xSymbol = xStart + 58;
+      const xAmount = xStart + width - 5;
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(60, 60, 60);
-      doc.text(label, xStart + 5, y);
-      
-      // Vertically Aligned Colon
+      doc.text(label, xLabel, y);
+
       doc.setFont('helvetica', 'bold');
       doc.text(':', xColon, y);
 
-      // Draw Rupee Symbol (Vector)
+      // Draw Rupee Symbol (Official Design)
       drawRupee(xSymbol, y);
 
-      // Draw Amount (Monospaced)
+      // Draw Amount (Courier for monospaced precision)
       doc.setFont('courier', 'bold');
       doc.setTextColor(0, 0, 0);
       doc.text(formatValue(value), xAmount, y, { align: 'right' });
@@ -255,15 +257,15 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     // Earnings Data
     drawRow('Basic Salary', earnings.basic, tableY);
     drawRow('PF (Employee Share)', deductions.pf, tableY, true);
-    
+
     tableY += 8;
     drawRow('DA (Dearness Allowance)', earnings.da, tableY);
     drawRow('ESIC (Employee Share)', deductions.esic, tableY, true);
-    
+
     tableY += 8;
     drawRow('HRA', earnings.hra, tableY);
     drawRow('Professional Tax (PT)', deductions.pt, tableY, true);
-    
+
     tableY += 8;
     drawRow('Washing Allowance', earnings.washingAllowance, tableY);
     drawRow('Employer PF Share', payroll.erTotalStatutory - payroll.esicReport.erShare, tableY, true);
@@ -274,7 +276,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
 
     tableY += 8;
     drawRow('Special Allowance', Number(form.salSpecial) || 0, tableY);
-    
+
     tableY += 8;
     drawRow('Performance Incentive', Number(form.salPerformance) || 0, tableY);
 
@@ -282,53 +284,48 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     drawRow('Other Allowances', Number(form.salOther) || 0, tableY);
 
     addLine(tableY + 5);
-    
+
     tableY += 12;
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     drawRow('Monthly Gross Salary', earnings.totalEarnings, tableY);
     drawRow('Total Monthly Deductions', deductions.total, tableY, true);
 
-    // 5. Final Summary (Clean White Design)
+    // 5. Final Summary (Clean Design)
     tableY += 18;
     doc.setDrawColor(37, 99, 235);
     doc.setLineWidth(0.5);
     doc.line(15, tableY, pageWidth - 15, tableY);
-    
+
     tableY += 10;
-    doc.setFontSize(12);
+    doc.setFontSize(11);
     doc.setTextColor(37, 99, 235);
     doc.setFont('helvetica', 'bold');
     doc.text('NET TAKE-HOME SALARY :', 20, tableY);
-    
-    // Position symbol based on string length to avoid overwriting
-    const netPayStr = `${formatValue(netPay)} / Month`;
-    const netPayWidth = doc.getTextWidth(netPayStr);
-    drawRupee(pageWidth - 25 - netPayWidth - 8, tableY, 1.2); 
-    
+
+    // Fixed Absolute Positioning to avoid overlap
+    drawRupee(pageWidth - 75, tableY, 1.2);
     doc.setFont('courier', 'bold');
-    doc.setFontSize(14);
-    doc.text(netPayStr, pageWidth - 20, tableY, { align: 'right' });
-    
+    doc.setFontSize(13);
+    doc.text(`${formatValue(netPay)} / Month`, pageWidth - 20, tableY, { align: 'right' });
+
     tableY += 7;
     doc.setTextColor(100, 100, 100);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'italic');
     doc.text(`(${numberToWords(netPay)})`, 20, tableY);
-    
+
     tableY += 12;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
     doc.text('TOTAL ANNUAL CTC :', 20, tableY);
-    
-    const ctcStr = `${formatValue(annualCTC)} Per Annum`;
-    const ctcWidth = doc.getTextWidth(ctcStr);
-    drawRupee(pageWidth - 25 - ctcWidth - 8, tableY, 1.1);
-    
+
+    drawRupee(pageWidth - 75, tableY, 1.1);
     doc.setFont('courier', 'bold');
-    doc.text(ctcStr, pageWidth - 20, tableY, { align: 'right' });
-    
+    doc.setFontSize(12);
+    doc.text(`${formatValue(annualCTC)} Per Annum`, pageWidth - 20, tableY, { align: 'right' });
+
     doc.setLineWidth(0.1);
     doc.setDrawColor(200, 200, 200);
     doc.line(15, tableY + 6, pageWidth - 15, tableY + 6);
@@ -338,12 +335,12 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
-    
+
     doc.line(20, sigY, 80, sigY);
     doc.text('Authorized HR Signatory', 20, sigY + 6);
     doc.setFontSize(8);
     doc.text('Accuweigh Automation & Solution', 20, sigY + 11);
-    
+
     doc.setFontSize(10);
     doc.line(pageWidth - 80, sigY, pageWidth - 20, sigY);
     doc.text('Employee Acceptance', pageWidth - 80, sigY + 6);
@@ -378,22 +375,22 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
       alert(`Appraisal committed for ${form.candidateName}!`);
       navigate('/directory');
     } else {
-      navigate('/directory', { 
-        state: { 
-          onboardCandidate: true, 
-          candidateName: form.candidateName, 
+      navigate('/directory', {
+        state: {
+          onboardCandidate: true,
+          candidateName: form.candidateName,
           candidateMiddleName: form.candidateMiddleName,
           candidateLastName: form.candidateLastName,
           addressLine1: form.addressLine1,
           city: form.city,
           state: form.state,
           zipCode: form.zipCode,
-          roleApplied: form.roleApplied, 
+          roleApplied: form.roleApplied,
           empCategory: empCategory || 'Staff Employee',
           hasPF: form.hasPF,
           hasESIC: form.hasESIC,
-          salaryData: form 
-        } 
+          salaryData: form
+        }
       });
     }
   };
@@ -417,11 +414,11 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
             <button className="btn btn-outline" onClick={() => window.print()}>
               <Printer size={18} style={{ marginRight: '0.5rem' }} /> Print
             </button>
-            <button 
-              className="btn btn-primary" 
+            <button
+              className="btn btn-primary"
               onClick={handlePrimaryAction}
               disabled={!canCommit}
-              style={{ 
+              style={{
                 backgroundColor: !canCommit ? 'var(--color-text-muted)' : (isAppraisal ? 'var(--color-primary)' : 'var(--color-success)'),
                 cursor: !canCommit ? 'not-allowed' : 'pointer',
                 opacity: !canCommit ? 0.6 : 1
@@ -493,7 +490,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
               onChange={(e) => handleInput('candidateLastName', e.target.value)}
               disabled={isAppraisal || isEmbedded} />
           </div>
-          
+
           <div className="form-group hide-on-print-border">
             <label className="form-label">{isAppraisal ? 'Current Role' : 'Role / Designation'}</label>
             <input type="text" className="form-input"
@@ -590,7 +587,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
                 onChange={(e) => handleInput('targetSalary', e.target.value)}
                 style={{ width: '100%', fontSize: '1.5rem', padding: '1rem', fontWeight: 'bold', backgroundColor: 'var(--color-background)', marginBottom: '1.5rem' }}
                 placeholder="e.g. 50000" />
-              
+
               {/* REAL-TIME ALLOCATION PANEL */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem' }}>
                 <div style={{ textAlign: 'center', borderRight: '1px solid var(--color-border)' }}>
@@ -604,7 +601,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
                 <div style={{ textAlign: 'center' }}>
                   <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Remaining to Allocate</p>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
-                     <p style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold', color: isBalanced ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                    <p style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold', color: isBalanced ? 'var(--color-success)' : 'var(--color-danger)' }}>
                       ₹ {remainingAmount.toLocaleString()}
                     </p>
                     {isBalanced && <CheckCircle size={18} color="var(--color-success)" />}
@@ -634,17 +631,17 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
                 </div>
                 <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>Basic (50%) <Lock size={12} style={{ display: 'inline' }}/></span>
+                    <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>Basic (50%) <Lock size={12} style={{ display: 'inline' }} /></span>
                     <span style={{ fontWeight: '600' }}>₹ {earnings.basic.toLocaleString()}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>DA (5% of Basic) <Lock size={12} style={{ display: 'inline' }}/></span>
+                    <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>DA (5% of Basic) <Lock size={12} style={{ display: 'inline' }} /></span>
                     <span style={{ fontWeight: '600' }}>₹ {earnings.da.toLocaleString()}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--color-surface)', padding: '0.5rem', borderRadius: '4px' }}>
                     <span style={{ fontSize: '0.875rem', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      HRA % 
-                      <input type="number" className="form-input hide-on-print-border" 
+                      HRA %
+                      <input type="number" className="form-input hide-on-print-border"
                         style={{ width: '60px', padding: '0.1rem 0.25rem', textAlign: 'center' }}
                         value={form.hraPercent}
                         onChange={(e) => handleInput('hraPercent', e.target.value)}
@@ -653,7 +650,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
                     <span style={{ fontWeight: '600' }}>₹ {earnings.hra.toLocaleString()}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>Washing Allowance <Lock size={12} style={{ display: 'inline' }}/></span>
+                    <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>Washing Allowance <Lock size={12} style={{ display: 'inline' }} /></span>
                     <span style={{ fontWeight: '600' }}>₹ {earnings.washingAllowance.toLocaleString()}</span>
                   </div>
                   <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -679,7 +676,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
                         style={{ width: '120px', padding: '0.25rem' }} placeholder="₹ 0" />
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.875rem', fontWeight: '500'}}>Other Allowance</span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>Other Allowance</span>
                       <input type="number" className="form-input hide-on-print-border" min="0"
                         value={form.salOther}
                         onChange={(e) => handleInput('salOther', e.target.value)}
@@ -704,7 +701,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
                   </div>
                   <div style={{ padding: '1rem', display: 'flex', justifyContent: 'center', gap: '2rem', borderBottom: '1px solid var(--color-border)' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', fontWeight: '600' }}>
-                      <input type="checkbox" checked={form.hasPF}   onChange={(e) => handleInput('hasPF',   e.target.checked)} style={{ width: '16px', height: '16px' }} /> Enforce PF
+                      <input type="checkbox" checked={form.hasPF} onChange={(e) => handleInput('hasPF', e.target.checked)} style={{ width: '16px', height: '16px' }} /> Enforce PF
                     </label>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', fontWeight: '600' }}>
                       <input type="checkbox" checked={form.hasESIC} onChange={(e) => handleInput('hasESIC', e.target.checked)} style={{ width: '16px', height: '16px' }} /> Enforce ESIC
@@ -712,15 +709,15 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
                   </div>
                   <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', opacity: form.hasPF ? 1 : 0.4 }}>
-                      <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>PF (12%) <Lock size={12} style={{ display: 'inline' }}/></span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>PF (12%) <Lock size={12} style={{ display: 'inline' }} /></span>
                       <span style={{ fontWeight: '600' }}>₹ {deductions.pf.toLocaleString()}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', opacity: form.hasESIC ? 1 : 0.4 }}>
-                      <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>ESIC (0.75%) <Lock size={12} style={{ display: 'inline' }}/></span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>ESIC (0.75%) <Lock size={12} style={{ display: 'inline' }} /></span>
                       <span style={{ fontWeight: '600' }}>₹ {deductions.esic.toLocaleString()}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>Professional Tax <Lock size={12} style={{ display: 'inline' }}/></span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>Professional Tax <Lock size={12} style={{ display: 'inline' }} /></span>
                       <span style={{ fontWeight: '600' }}>₹ {deductions.pt.toLocaleString()}</span>
                     </div>
                     <div style={{ borderTop: '2px solid var(--color-border)', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between' }}>
@@ -736,11 +733,11 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
                   </div>
                   <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', opacity: form.hasPF ? 1 : 0.4 }}>
-                      <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>Employer PF (13%) <Lock size={12} style={{ display: 'inline' }}/></span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>Employer PF (13%) <Lock size={12} style={{ display: 'inline' }} /></span>
                       <span style={{ fontWeight: '600' }}>₹ {(payroll.pfReport.erPension + payroll.pfReport.erEPF + payroll.pfReport.edli + payroll.pfReport.admin).toLocaleString()}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', opacity: form.hasESIC ? 1 : 0.4 }}>
-                      <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>Employer ESIC (3.25%) <Lock size={12} style={{ display: 'inline' }}/></span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>Employer ESIC (3.25%) <Lock size={12} style={{ display: 'inline' }} /></span>
                       <span style={{ fontWeight: '600' }}>₹ {payroll.esicReport.erShare.toLocaleString()}</span>
                     </div>
                     <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
