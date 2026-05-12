@@ -8,13 +8,13 @@ VALUES ('admin@hrms.com', 'a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e8
 
 -- 2. Employees Seed
 INSERT INTO HRMS_EMPLOYEES (EMP_CODE, NAME, ROLE, DEPARTMENT, STATUS, EMP_TYPE, EMAIL, GROSS_SALARY, CATEGORY, JOINING_DATE, GRADE, BIOMETRIC_ID, UAN_NUMBER, ESIC_NUMBER, BANK_ACCOUNT)
-VALUES ('AW-HR-001', 'Alice Smith', 'Software Engineer', 'Engineering', 'Active', 'Probation', 'alice@company.com', 120000, 'Staff Employee', TO_DATE('2022-01-10', 'YYYY-MM-DD'), 'A1', 1, '100012345678', '31000123450011001', '3029101002345 (HDFC)');
+VALUES ('AW-HR-001', 'Alice Smith', 'Software Engineer', 'Engineering', 'Active', 'Probation', 'alice@company.com', 120000, 'Staff Employee', TO_DATE('2022-01-10', 'YYYY-MM-DD'), 'G1', 1, '100012345678', '31000123450011001', '3029101002345 (HDFC)');
 
 INSERT INTO HRMS_EMPLOYEES (EMP_CODE, NAME, ROLE, DEPARTMENT, STATUS, EMP_TYPE, EMAIL, GROSS_SALARY, CATEGORY, JOINING_DATE, GRADE, BIOMETRIC_ID, UAN_NUMBER, ESIC_NUMBER, BANK_ACCOUNT)
-VALUES ('AW-OPS-402', 'Bob Johnson', 'Worker (Shop Floor)', 'Product', 'Active', 'Permanent', 'bob@company.com', 30000, 'On role worker', TO_DATE('2023-03-15', 'YYYY-MM-DD'), 'B2', 2, '100012344020', '31000123450011402', '9120100456789 (SBI)');
+VALUES ('AW-OPS-402', 'Bob Johnson', 'Worker (Shop Floor)', 'Product', 'Active', 'Permanent', 'bob@company.com', 30000, 'On role worker', TO_DATE('2023-03-15', 'YYYY-MM-DD'), 'G2', 2, '100012344020', '31000123450011402', '9120100456789 (SBI)');
 
 INSERT INTO HRMS_EMPLOYEES (EMP_CODE, NAME, ROLE, DEPARTMENT, STATUS, EMP_TYPE, EMAIL, GROSS_SALARY, CATEGORY, JOINING_DATE, GRADE, BIOMETRIC_ID, UAN_NUMBER, ESIC_NUMBER, BANK_ACCOUNT)
-VALUES ('AW-HR-002', 'Charlie Davis', 'HR Specialist', 'Human Resources', 'On Leave', 'Permanent', 'charlie@company.com', 55000, 'Staff Employee', TO_DATE('2021-05-22', 'YYYY-MM-DD'), 'A2', 3, '100012340020', '31000123450011002', '4099101003456 (ICICI)');
+VALUES ('AW-HR-002', 'Charlie Davis', 'HR Specialist', 'Human Resources', 'On Leave', 'Permanent', 'charlie@company.com', 55000, 'Staff Employee', TO_DATE('2021-05-22', 'YYYY-MM-DD'), 'G3', 3, '100012340020', '31000123450011002', '4099101003456 (ICICI)');
 
 -- 3. Leave Balances Seed (Linked to Employee IDs 1, 2, 3)
 INSERT INTO HRMS_LEAVE_BALANCES (EMP_ID, SICK, CASUAL, PAID) VALUES (1, 5, 10, 15);

@@ -98,6 +98,8 @@ const DocumentHub = () => {
             '{{department}}': data.department,
             '{{salary}}': (data.ctc || data.grossSalary || 0).toLocaleString(),
             '{{joining_date}}': data.date || data.joiningDate || 'TBD',
+            '{{Grade}}': data.grade || 'N/A',
+            '{{grade}}': data.grade || 'N/A',
             '{{company_name}}': 'Antigravity HR Solutions',
             '{{hr_name}}': authService.getCurrentUser()?.name || 'HR Manager'
         };

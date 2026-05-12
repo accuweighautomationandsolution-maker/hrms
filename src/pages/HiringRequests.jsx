@@ -15,6 +15,7 @@ const HiringRequests = () => {
     const [department, setDepartment] = useState('');
     const [role, setRole] = useState('');
     const [proposedCTC, setProposedCTC] = useState('');
+    const [grade, setGrade] = useState('');
     const [justification, setJustification] = useState('');
     
     // Auto-refresh hook states
@@ -22,6 +23,7 @@ const HiringRequests = () => {
     const handleRefresh = () => setReloads(r => r+1);
 
     const [requestsData, setRequestsData] = useState([]);
+    const [departmentsData, setDepartmentsData] = useState([]);
     const [budgetsData, setBudgetsData] = useState([]);
     const [utilizationMap, setUtilizationMap] = useState({});
     const [loading, setLoading] = useState(true);
@@ -30,12 +32,14 @@ const HiringRequests = () => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [reqs, budgets] = await Promise.all([
+                const [reqs, budgets, depts] = await Promise.all([
                     dataService.getManpowerRequests(),
-                    dataService.getDeptBudgets()
+                    dataService.getDeptBudgets(),
+                    dataService.getDepartments()
                 ]);
                 setRequestsData(reqs);
                 setBudgetsData(budgets);
+                setDepartmentsData(depts);
 
                 const uMap = {};
                 await Promise.all(budgets.map(async (b) => {
@@ -55,7 +59,7 @@ const HiringRequests = () => {
     const budgetContext = useMemo(() => {
         if (!department) return null;
         const targetBudget = budgetsData.find(b => b.department === department);
-        if (!targetBudget) return null;
+        if (!targetBudget) return { noBudget: true, utilized: utilizationMap[department] || 0 };
 
         const utilized = utilizationMap[department] || 0;
         const projectedCTC = Number(proposedCTC) || 0;
@@ -92,9 +96,10 @@ const HiringRequests = () => {
             department,
             role,
             proposedCTC: Number(proposedCTC),
+            grade,
             justification,
             date: new Date().toISOString().split('T')[0],
-            status: (budgetContext && budgetContext.isExceeded) ? 'Pending Approval' : 'Auto-Approved',
+            status: (!budgetContext || budgetContext.noBudget || budgetContext.isExceeded) ? 'Pending Approval' : 'Auto-Approved',
             breachAmount: (budgetContext && budgetContext.isExceeded) ? budgetContext.breachAmount : 0
         };
 
@@ -104,6 +109,7 @@ const HiringRequests = () => {
         // Reset
         setRole('');
         setProposedCTC('');
+        setGrade('');
         setJustification('');
         handleRefresh();
         alert('Requisition processed successfully.');
@@ -149,7 +155,7 @@ const HiringRequests = () => {
                         <label className="form-label">Target Department</label>
                         <select className="form-input" value={department} onChange={e => setDepartment(e.target.value)}>
                             <option value="">Select Department...</option>
-                            {budgetsData.map(b => <option key={b.id} value={b.department}>{b.department}</option>)}
+                            {departmentsData.map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
                     </div>
 
@@ -162,6 +168,13 @@ const HiringRequests = () => {
                             <label className="form-label">Proposed Annual CTC (₹)</label>
                             <input type="number" className="form-input" placeholder="1000000" value={proposedCTC} onChange={e => setProposedCTC(e.target.value)} />
                         </div>
+                        <div className="form-group" style={{ flex: 1 }}>
+                            <label className="form-label">Grade</label>
+                            <select className="form-input" value={grade} onChange={e => setGrade(e.target.value)}>
+                                <option value="">Select Grade...</option>
+                                {['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8'].map(g => <option key={g} value={g}>{g}</option>)}
+                            </select>
+                        </div>
                     </div>
 
                     <div className="form-group">
@@ -170,22 +183,22 @@ const HiringRequests = () => {
                     </div>
 
                     {budgetContext && (
-                        <div style={{ padding: '1.25rem', borderRadius: '12px', marginBottom: '1.5rem', border: `2px solid ${budgetContext.isExceeded ? 'var(--color-danger)' : 'var(--color-success)'}`, backgroundColor: budgetContext.isExceeded ? 'rgba(239, 68, 68, 0.05)' : 'rgba(16, 185, 129, 0.05)' }}>
+                        <div style={{ padding: '1.25rem', borderRadius: '12px', marginBottom: '1.5rem', border: `2px solid ${budgetContext.isExceeded || budgetContext.noBudget ? 'var(--color-danger)' : 'var(--color-success)'}`, backgroundColor: budgetContext.isExceeded || budgetContext.noBudget ? 'rgba(239, 68, 68, 0.05)' : 'rgba(16, 185, 129, 0.05)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                    {budgetContext.isExceeded ? <ShieldAlert size={28} color="var(--color-danger)" /> : <CheckCircle size={28} color="var(--color-success)" />}
+                                    {budgetContext.noBudget ? <AlertTriangle size={28} color="var(--color-danger)" /> : budgetContext.isExceeded ? <ShieldAlert size={28} color="var(--color-danger)" /> : <CheckCircle size={28} color="var(--color-success)" />}
                                     <div>
-                                        <h4 style={{ margin: '0 0 0.25rem', color: budgetContext.isExceeded ? 'var(--color-danger)' : 'var(--color-success)' }}>
-                                            {budgetContext.isExceeded ? 'Approval Override Required' : 'Pre-Cleared: Within Allocated Budget'}
+                                        <h4 style={{ margin: '0 0 0.25rem', color: budgetContext.isExceeded || budgetContext.noBudget ? 'var(--color-danger)' : 'var(--color-success)' }}>
+                                            {budgetContext.noBudget ? 'Financial Risk: No Budget Defined' : budgetContext.isExceeded ? 'Approval Override Required' : 'Pre-Cleared: Within Allocated Budget'}
                                         </h4>
                                         <span style={{ fontSize: '0.85rem' }}>
-                                            Projected Dept CTC: {formatCurrency(budgetContext.projectedTotal)} / {formatCurrency(budgetContext.limit)}
+                                            {budgetContext.noBudget ? `Department "${department}" has no allocated budget. Submission requires manual CFO override.` : `Projected Dept CTC: ${formatCurrency(budgetContext.projectedTotal)} / ${formatCurrency(budgetContext.limit)}`}
                                         </span>
                                     </div>
                                 </div>
-                                {budgetContext.isExceeded && (
+                                {(budgetContext.isExceeded || budgetContext.noBudget) && (
                                     <div style={{ backgroundColor: 'white', padding: '0.5rem 1rem', borderRadius: '20px', fontSize: '0.875rem', fontWeight: 'bold', color: 'var(--color-danger)', border: '1px solid var(--color-danger)' }}>
-                                        + {formatCurrency(budgetContext.breachAmount)} Breach
+                                        {budgetContext.noBudget ? 'N/A Budget' : `+ ${formatCurrency(budgetContext.breachAmount)} Breach`}
                                     </div>
                                 )}
                             </div>
@@ -209,7 +222,7 @@ const HiringRequests = () => {
                              requestsData.slice(0,50).map(r => (
                                  <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', borderRadius: '8px' }}>
                                      <div style={{ flex: 1 }}>
-                                         <div style={{ fontWeight: '600', fontSize: '0.95rem' }}>{r.role}</div>
+                                         <div style={{ fontWeight: '600', fontSize: '0.95rem' }}>{r.role} {r.grade && <span style={{ color: 'var(--color-primary)', fontSize: '0.8rem', marginLeft: '0.5rem' }}>[{r.grade}]</span>}</div>
                                          <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>{r.department} • {formatCurrency(r.proposedCTC)}</div>
                                      </div>
                                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>

@@ -21,7 +21,8 @@ const VARIABLE_TAGS = [
     { tag: '{{contract_start_date}}', description: 'Contract Commencement Date' },
     { tag: '{{contract_end_date}}', description: 'Contract Expiry Date' },
     { tag: '{{company_name}}', description: 'Antigravity HR Solutions' },
-    { tag: '{{hr_name}}', description: 'Name of issuing HR Manager' }
+    { tag: '{{hr_name}}', description: 'Name of issuing HR Manager' },
+    { tag: '{{Grade}}', description: 'Assigned Employee Grade (G1-G8)' }
 ];
 
 const LetterTemplates = () => {

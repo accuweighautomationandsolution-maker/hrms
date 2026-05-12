@@ -78,8 +78,8 @@ app.post('/api/employees', authenticateToken, async (req, res) => {
   const emp = req.body;
   try {
     const sql = `
-      INSERT INTO HRMS_EMPLOYEES (EMP_CODE, NAME, ROLE, DEPARTMENT, EMAIL, GROSS_SALARY, CATEGORY, JOINING_DATE)
-      VALUES (:empCode, :name, :role, :department, :email, :grossSalary, :category, TO_DATE(:joiningDate, 'YYYY-MM-DD'))
+      INSERT INTO HRMS_EMPLOYEES (EMP_CODE, NAME, ROLE, DEPARTMENT, EMAIL, GROSS_SALARY, CATEGORY, JOINING_DATE, GRADE)
+      VALUES (:empCode, :name, :role, :department, :email, :grossSalary, :category, TO_DATE(:joiningDate, 'YYYY-MM-DD'), :grade)
     `;
     await db.execute(sql, {
       empCode: emp.empCode,
@@ -89,12 +89,49 @@ app.post('/api/employees', authenticateToken, async (req, res) => {
       email: emp.email,
       grossSalary: emp.grossSalary,
       category: emp.category,
-      joiningDate: emp.joiningDate
+      joiningDate: emp.joiningDate,
+      grade: emp.grade
     });
     res.json({ message: 'Employee created successfully' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to create employee.' });
+  }
+});
+
+app.put('/api/employees/:id', authenticateToken, async (req, res) => {
+  if (req.user.role !== 'management') return res.status(403).json({ error: 'Unauthorized.' });
+  
+  const id = req.params.id;
+  const emp = req.body;
+  try {
+    const sql = `
+      UPDATE HRMS_EMPLOYEES 
+      SET NAME = :name, 
+          ROLE = :role, 
+          DEPARTMENT = :department, 
+          EMAIL = :email, 
+          GROSS_SALARY = :grossSalary, 
+          CATEGORY = :category, 
+          JOINING_DATE = TO_DATE(:joiningDate, 'YYYY-MM-DD'),
+          GRADE = :grade
+      WHERE ID = :id
+    `;
+    await db.execute(sql, {
+      id,
+      name: emp.name,
+      role: emp.role,
+      department: emp.department,
+      email: emp.email,
+      grossSalary: emp.grossSalary,
+      category: emp.category,
+      joiningDate: emp.joiningDate,
+      grade: emp.grade
+    });
+    res.json({ message: 'Employee updated successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update employee.' });
   }
 });
 

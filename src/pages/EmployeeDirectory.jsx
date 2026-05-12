@@ -10,7 +10,7 @@ import { useNotification } from '../context/NotificationContext';
 
 const EmployeeDirectory = ({ userRole }) => {
   const { showNotification } = useNotification();
-  const isEmployee = userRole !== 'management';
+  const isEmployee = userRole !== 'management' && userRole !== 'admin';
   
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -116,7 +116,7 @@ const EmployeeDirectory = ({ userRole }) => {
       bankAccountName: '', bankAccountNumber: '', bankName: '', bankIfsc: '', bankBranch: '',
       hasMediclaim: false, mediclaimPolicies: [{ policyNo: '', amount: '', company: '' }],
       hasTermInsurance: false, termInsurancePolicies: [{ policyNo: '', amount: '', company: '' }],
-      empId: '', biometricCode: '', joinDate: '', probPeriod: '', probType: '', exitDate: '', empCategory: '',
+      empId: '', biometricCode: '', joinDate: '', probPeriod: '', probType: '', exitDate: '', empCategory: '', grade: '',
       presAddress: '', permAddress: '', sameAsPresent: false,
       hasPF: false, uan: '', pfMemberId: '',
       hasESIC: false, esicIp: '',
@@ -144,6 +144,7 @@ const EmployeeDirectory = ({ userRole }) => {
       role: emp.role || '',
       department: emp.department || '',
       joinDate: emp.joiningDate || '',
+      grade: emp.grade || '',
       presAddress: emp.presAddress || '',
       permAddress: emp.permAddress || '',
       sameAsPresent: emp.presAddress === emp.permAddress,
@@ -233,7 +234,7 @@ const EmployeeDirectory = ({ userRole }) => {
 
   const isFormValid = (
     form.firstName && form.lastName && form.email && form.contact &&
-    form.empId && form.biometricCode && form.joinDate && form.empCategory &&
+    form.empId && form.biometricCode && form.joinDate && form.empCategory && form.grade &&
     (!form.hasPF || (form.uan && form.pfMemberId)) &&
     (!form.hasESIC || form.esicIp)
   );
@@ -285,7 +286,8 @@ const EmployeeDirectory = ({ userRole }) => {
         termInsurancePolicies: form.hasTermInsurance ? form.termInsurancePolicies : [],
         documents: uploadedFiles,
         salaryConfig: form.salaryConfig,
-        grossSalary: form.salaryConfig?.targetSalary || 0
+        grossSalary: form.salaryConfig?.targetSalary || 0,
+        grade: form.grade
       };
 
       const savedEmp = await dataService.saveEmployee(empData);
@@ -344,7 +346,13 @@ const EmployeeDirectory = ({ userRole }) => {
 
   const handleExport = (format) => {
     const rawData = employees.map(e => ({
-      "Emp ID": e.empCode || `EMP-00${e.id}`, "Name": e.name, "Role": e.role, "Dept": e.department, "Status": e.status, "Gross": e.grossSalary || e.dayRate
+      "Emp ID": e.empCode || `EMP-00${e.id}`, 
+      "Name": e.name, 
+      "Role": e.role, 
+      "Dept": e.department, 
+      "Grade": e.grade || 'N/A',
+      "Status": e.status, 
+      "Gross": e.grossSalary || e.dayRate
     }));
     const worksheet = XLSX.utils.json_to_sheet(rawData);
     if (format === 'csv') {
@@ -425,6 +433,7 @@ const EmployeeDirectory = ({ userRole }) => {
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Employee Code</th>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Role</th>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Department</th>
+                <th style={{ padding: '1rem', fontWeight: '500' }}>Grade</th>
                 {isEmployee && <th style={{ padding: '1rem', fontWeight: '500' }}>Contact Number</th>}
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Status</th>
                 {!isEmployee && <th style={{ padding: '1rem', fontWeight: '500', textAlign: 'right' }}>Actions</th>}
@@ -464,6 +473,7 @@ const EmployeeDirectory = ({ userRole }) => {
                   </td>
                   <td style={{ padding: '1rem', color: 'var(--color-text-main)' }}>{emp.role || ''}</td>
                   <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{emp.department || ''}</td>
+                  <td style={{ padding: '1rem' }}><span className="badge badge-blue">{emp.grade || 'N/A'}</span></td>
                   {isEmployee && <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{emp.contact || '+91 98' + Math.floor(10000000 + Math.random() * 90000000)}</td>}
                   <td style={{ padding: '1rem' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
@@ -698,6 +708,14 @@ const EmployeeDirectory = ({ userRole }) => {
                   <div className="form-group"><label className="form-label">Employment Status</label><select className="form-input" style={{width:'100%'}} value={form.probType || ''} onChange={e => handleInput('probType', e.target.value)}><option>Select...</option><option>Temporary</option><option>Probation</option><option>Permanent</option></select></div>
                   <div className="form-group"><label className="form-label">Confirmation Date</label><input type="date" className="form-input" style={{width:'100%'}} value={form.exitDate || ''} onChange={e => handleInput('exitDate', e.target.value)} disabled={form.probType === 'Probation'} /></div>
                   <div className="form-group"><label className="form-label">Probation Period</label><select className="form-input" style={{width:'100%'}} value={form.probPeriod || ''} onChange={e => handleInput('probPeriod', e.target.value)} disabled={form.probType === 'Permanent'}><option>1 Month</option><option>2 Months</option><option>3 Months</option><option>4 Months</option><option>5 Months</option><option>6 Months</option></select></div>
+                  <div className="form-group">
+                    <label className="form-label">Grade *</label>
+                    <select className="form-input" style={{width:'100%', borderColor: !form.grade ? 'var(--color-danger)' : 'var(--color-border)'}} 
+                      value={form.grade || ''} onChange={e => handleInput('grade', e.target.value)}>
+                      <option value="">Select Grade...</option>
+                      {['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8'].map(g => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                  </div>
                 </div>
               )}
 

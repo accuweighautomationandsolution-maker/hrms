@@ -12,6 +12,7 @@ CREATE TABLE employees (
   department TEXT,
   joining_date DATE,
   status TEXT DEFAULT 'Active',
+  grade TEXT,
   role TEXT DEFAULT 'employee',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
