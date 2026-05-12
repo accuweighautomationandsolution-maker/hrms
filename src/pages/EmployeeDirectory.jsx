@@ -820,7 +820,11 @@ const EmployeeDirectory = ({ userRole }) => {
                         candidateName: form.firstName || '',
                         candidateMiddleName: form.middleName || '',
                         candidateLastName: form.lastName || '',
-                        roleApplied: form.role || ''
+                        roleApplied: form.role || '',
+                        empCode: form.empId || '',
+                        department: form.department || '',
+                        grade: form.grade || '',
+                        joinDate: form.joinDate || ''
                       }} 
                       empCategory={form.empCategory || ''} 
                       empId={form.id || ''}

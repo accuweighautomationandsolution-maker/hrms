@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Printer, Lock, CheckCircle, TrendingUp } from 'lucide-react';
+import { Printer, Lock, CheckCircle, TrendingUp, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { calculateSalaryComponents } from '../utils/payrollCalculator';
 import { dataService } from '../utils/dataService';
 
@@ -102,6 +104,172 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
 
   const canCommit = isBalanced && targetGross > 0;
 
+  const handleDownloadPDF = async () => {
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    // Helper to add a horizontal line
+    const addLine = (y) => {
+      doc.setDrawColor(200, 200, 200);
+      doc.line(15, y, pageWidth - 15, y);
+    };
+
+    // Header
+    doc.setFontSize(22);
+    doc.setTextColor(37, 99, 235); // var(--color-primary) blue
+    doc.text('ACCUWEIGH', 15, 20);
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text('Automation & Solution', 15, 25);
+    
+    doc.setFontSize(10);
+    doc.text('Employee Compensation Matrix', pageWidth - 15, 20, { align: 'right' });
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth - 15, 25, { align: 'right' });
+    
+    addLine(30);
+
+    // Document Title
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ANNEXURE - SALARY STRUCTURE', pageWidth / 2, 40, { align: 'center' });
+    
+    // Employee Details Table
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setFillColor(249, 250, 251); // Light gray
+    doc.rect(15, 48, pageWidth - 30, 45, 'F');
+    doc.rect(15, 48, pageWidth - 30, 45, 'S');
+
+    const startY = 55;
+    const col1 = 20;
+    const col2 = 60;
+    const col3 = 110;
+    const col4 = 150;
+
+    doc.setFont('helvetica', 'bold'); doc.text('Employee Name:', col1, startY);
+    doc.setFont('helvetica', 'normal'); doc.text(`${form.candidateName} ${form.candidateMiddleName || ''} ${form.candidateLastName || ''}`.trim(), col2, startY);
+    
+    doc.setFont('helvetica', 'bold'); doc.text('Employee ID:', col3, startY);
+    doc.setFont('helvetica', 'normal'); doc.text(form.empCode || 'N/A', col4, startY);
+
+    doc.setFont('helvetica', 'bold'); doc.text('Designation:', col1, startY + 8);
+    doc.setFont('helvetica', 'normal'); doc.text(form.roleApplied || 'N/A', col2, startY + 8);
+    
+    doc.setFont('helvetica', 'bold'); doc.text('Department:', col3, startY + 8);
+    doc.setFont('helvetica', 'normal'); doc.text(form.department || 'N/A', col4, startY + 8);
+
+    doc.setFont('helvetica', 'bold'); doc.text('Grade:', col1, startY + 16);
+    doc.setFont('helvetica', 'normal'); doc.text(form.grade || 'N/A', col2, startY + 16);
+    
+    doc.setFont('helvetica', 'bold'); doc.text('Date of Joining:', col3, startY + 16);
+    doc.setFont('helvetica', 'normal'); doc.text(form.joinDate || 'N/A', col4, startY + 16);
+
+    doc.setFont('helvetica', 'bold'); doc.text('Employee Category:', col1, startY + 24);
+    doc.setFont('helvetica', 'normal'); doc.text(empCategory || 'Staff Employee', col2, startY + 24);
+
+    // Earnings Table
+    let tableY = 105;
+    doc.setFillColor(37, 99, 235);
+    doc.setTextColor(255, 255, 255);
+    doc.rect(15, tableY, (pageWidth - 30) / 2, 8, 'F');
+    doc.text('EARNINGS COMPONENTS', 15 + (pageWidth - 30) / 4, tableY + 5.5, { align: 'center' });
+    
+    doc.setFillColor(239, 68, 68);
+    doc.rect(15 + (pageWidth - 30) / 2, tableY, (pageWidth - 30) / 2, 8, 'F');
+    doc.text('DEDUCTIONS & STATUTORY', 15 + 3 * (pageWidth - 30) / 4, tableY + 5.5, { align: 'center' });
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'bold');
+    tableY += 15;
+    
+    const drawRow = (label, value, y, isRight = false) => {
+      const x = isRight ? 15 + (pageWidth - 30) / 2 : 15;
+      const width = (pageWidth - 30) / 2;
+      doc.setFont('helvetica', 'normal');
+      doc.text(label, x + 5, y);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`INR ${value.toLocaleString()}`, x + width - 5, y, { align: 'right' });
+    };
+
+    drawRow('Basic Salary (50%)', earnings.basic, tableY);
+    drawRow('PF (Employee Share)', deductions.pf, tableY, true);
+    
+    tableY += 8;
+    drawRow('DA (Dearness Allowance)', earnings.da, tableY);
+    drawRow('ESIC (Employee Share)', deductions.esic, tableY, true);
+    
+    tableY += 8;
+    drawRow(`HRA (${form.hraPercent}%)`, earnings.hra, tableY);
+    drawRow('Professional Tax (PT)', deductions.pt, tableY, true);
+    
+    tableY += 8;
+    drawRow('Washing Allowance', earnings.washingAllowance, tableY);
+    drawRow('Employer PF Share', payroll.erTotalStatutory - payroll.esicReport.erShare, tableY, true);
+
+    tableY += 8;
+    drawRow('Conveyance & Fuel', Number(form.salConveyance) || 0, tableY);
+    drawRow('Employer ESIC Share', payroll.esicReport.erShare, tableY, true);
+
+    tableY += 8;
+    drawRow('Special Allowance', Number(form.salSpecial) || 0, tableY);
+    
+    tableY += 8;
+    drawRow('Performance Incentive', Number(form.salPerformance) || 0, tableY);
+
+    tableY += 8;
+    drawRow('Other Allowances', Number(form.salOther) || 0, tableY);
+
+    addLine(tableY + 5);
+    
+    tableY += 12;
+    doc.setFontSize(12);
+    drawRow('Monthly Gross Salary', earnings.totalEarnings, tableY);
+    drawRow('Total Monthly Deductions', deductions.total, tableY, true);
+
+    // Final Summary Box
+    tableY += 15;
+    doc.setFillColor(37, 99, 235, 0.05);
+    doc.setDrawColor(37, 99, 235);
+    doc.rect(15, tableY, pageWidth - 30, 35, 'FD');
+    
+    doc.setTextColor(37, 99, 235);
+    doc.setFontSize(14);
+    doc.text('NET TAKE-HOME SALARY:', 25, tableY + 12);
+    doc.setFontSize(18);
+    doc.text(`INR ${netPay.toLocaleString()} / Month`, pageWidth - 25, tableY + 12, { align: 'right' });
+    
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'italic');
+    doc.text(`(${numberToWords(netPay)})`, 25, tableY + 18);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('TOTAL ANNUAL CTC:', 25, tableY + 28);
+    doc.setFontSize(14);
+    doc.text(`INR ${annualCTC.toLocaleString()} Per Annum`, pageWidth - 25, tableY + 28, { align: 'right' });
+
+    // Signature Area
+    const sigY = tableY + 60;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.line(15, sigY, 75, sigY);
+    doc.text('Authorized HR Signatory', 15, sigY + 5);
+    doc.text('Accuweigh Automation', 15, sigY + 10);
+    
+    doc.line(pageWidth - 75, sigY, pageWidth - 15, sigY);
+    doc.text('Employee Acceptance', pageWidth - 75, sigY + 5);
+    doc.text('(Signature & Date)', pageWidth - 75, sigY + 10);
+
+    // Footer
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text('This is a computer generated salary structure and does not require a physical stamp unless requested.', pageWidth / 2, 285, { align: 'center' });
+
+    doc.save(`Salary_Structure_${form.candidateName || 'Employee'}.pdf`);
+  };
+
   const handlePrimaryAction = () => {
     if (!canCommit) {
       alert(`MISMATCH! You still need to allocate ₹${remainingAmount.toLocaleString()} to match the scale.`);
@@ -155,8 +323,11 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
             <p className="page-subtitle">{isAppraisal ? 'Restructure existing compensation.' : 'Define compensation prior to offer.'}</p>
           </div>
           <div style={{ display: 'flex', gap: '1rem' }}>
+            <button className="btn btn-outline" onClick={handleDownloadPDF}>
+              <Download size={18} style={{ marginRight: '0.5rem' }} /> Download PDF
+            </button>
             <button className="btn btn-outline" onClick={() => window.print()}>
-              <Printer size={18} style={{ marginRight: '0.5rem' }} /> Print / PDF
+              <Printer size={18} style={{ marginRight: '0.5rem' }} /> Print
             </button>
             <button 
               className="btn btn-primary" 
@@ -174,6 +345,17 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
               {isAppraisal ? 'Commit Appraisal' : 'Accept & Shift to Onboarding'}
             </button>
           </div>
+        </div>
+      )}
+
+      {isEmbedded && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem', gap: '0.75rem' }} className="hide-on-print">
+          <button className="btn btn-outline" onClick={handleDownloadPDF} style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
+            <Download size={16} style={{ marginRight: '0.5rem' }} /> Download PDF Structure
+          </button>
+          <button className="btn btn-outline" onClick={() => window.print()} style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
+            <Printer size={16} style={{ marginRight: '0.5rem' }} /> Print Structure
+          </button>
         </div>
       )}
 
