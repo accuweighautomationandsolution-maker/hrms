@@ -73,6 +73,10 @@ const Recruitment = () => {
                 onboardCandidate: true, 
                 candidateName: candidate.name,
                 candidateEmail: candidate.email,
+                candidateDOB: candidate.dob || candidate.data?.dob,
+                candidateGender: candidate.gender || candidate.data?.gender,
+                candidateMarital: candidate.marital || candidate.data?.marital,
+                candidateAltContact: candidate.altContact || candidate.data?.altContact,
                 role: candidate.role,
                 department: candidate.department,
                 salaryData: { grossSalary: candidate.ctc }

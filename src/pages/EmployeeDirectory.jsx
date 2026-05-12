@@ -136,11 +136,15 @@ const EmployeeDirectory = ({ userRole }) => {
       middleName: names.length > 2 ? names[1] : '',
       lastName: names.length > 2 ? names.slice(2).join(' ') : (names[1] || ''),
       email: emp.email,
+      dob: emp.dob || '',
+      gender: emp.gender || '',
+      marital: emp.marital || '',
       empId: emp.empCode || '',
       biometricCode: emp.biometricCode || '',
       probType: emp.empType || 'Select...',
       empCategory: emp.category,
       contact: emp.contact || '',
+      altContact: emp.altContact || '',
       role: emp.role || '',
       department: emp.department || '',
       joinDate: emp.joiningDate || '',
@@ -212,21 +216,30 @@ const EmployeeDirectory = ({ userRole }) => {
   };
 
   useEffect(() => {
-    if (location.state && location.state.onboardCandidate) {
-      const { candidateName, candidateMiddleName, candidateLastName, addressLine1, city, state, zipCode, salaryData, empCategory, hasPF, hasESIC, roleApplied } = location.state;
-      
-      setForm(prev => ({ 
-        ...prev, 
-        firstName: candidateName || '', 
-        middleName: candidateMiddleName || '',
-        lastName: candidateLastName || '',
-        presAddress: `${addressLine1 || ''} ${city || ''} ${state || ''} ${zipCode || ''}`.trim(),
-        role: roleApplied || '',
-        empCategory: empCategory || 'Staff Employee',
-        hasPF: hasPF || false,
-        hasESIC: hasESIC || false,
-        salaryConfig: salaryData || null
-      }));
+      if (location.state && location.state.onboardCandidate) {
+        const { 
+          candidateName, candidateMiddleName, candidateLastName, 
+          addressLine1, city, state, zipCode, 
+          salaryData, empCategory, hasPF, hasESIC, roleApplied,
+          candidateDOB, candidateGender, candidateMarital, candidateAltContact
+        } = location.state;
+        
+        setForm(prev => ({ 
+          ...prev, 
+          firstName: candidateName || '', 
+          middleName: candidateMiddleName || '',
+          lastName: candidateLastName || '',
+          dob: candidateDOB || '',
+          gender: candidateGender || '',
+          marital: candidateMarital || '',
+          altContact: candidateAltContact || '',
+          presAddress: `${addressLine1 || ''} ${city || ''} ${state || ''} ${zipCode || ''}`.trim(),
+          role: roleApplied || '',
+          empCategory: empCategory || 'Staff Employee',
+          hasPF: hasPF || false,
+          hasESIC: hasESIC || false,
+          salaryConfig: salaryData || null
+        }));
       setShowModal(true);
       window.history.replaceState({}, document.title);
     }
@@ -253,6 +266,9 @@ const EmployeeDirectory = ({ userRole }) => {
         isNew: !form.id,
         name: `${form.firstName} ${form.middleName ? form.middleName + ' ' : ''}${form.lastName}`.trim(),
         email: form.email,
+        dob: form.dob,
+        gender: form.gender,
+        marital: form.marital,
         role: form.role || 'Associate',
         department: form.department || 'Engineering',
         status: 'Active',
@@ -262,6 +278,7 @@ const EmployeeDirectory = ({ userRole }) => {
         empCode: form.empId,
         biometricCode: form.biometricCode,
         contact: form.contact,
+        altContact: form.altContact,
         presAddress: form.presAddress,
         permAddress: form.sameAsPresent ? form.presAddress : form.permAddress,
         uanNumber: form.hasPF ? form.uan : '',
@@ -352,6 +369,11 @@ const EmployeeDirectory = ({ userRole }) => {
       "Dept": e.department, 
       "Grade": e.grade || 'N/A',
       "Status": e.status, 
+      "DOB": e.dob || '',
+      "Gender": e.gender || '',
+      "Marital Status": e.marital || '',
+      "Contact": e.contact || '',
+      "Alt Contact": e.altContact || '',
       "Gross": e.grossSalary || e.dayRate
     }));
     const worksheet = XLSX.utils.json_to_sheet(rawData);
