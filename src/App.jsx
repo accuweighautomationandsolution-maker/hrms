@@ -52,10 +52,22 @@ function App() {
 
   // Logout handler
   const handleLogout = useCallback(async () => {
-    await authService.logout();
-    setCurrentUser(null);
-    // Force redirect to login with feedback
-    window.location.href = '/login?logout=success';
+    console.log("App: Initiating logout...");
+    try {
+      // Set a timeout for the logout call to prevent hanging the UI
+      const logoutPromise = authService.logout();
+      const timeoutPromise = new Promise(resolve => setTimeout(resolve, 1500));
+      await Promise.race([logoutPromise, timeoutPromise]);
+    } catch (err) {
+      console.error("App: Logout error:", err);
+    } finally {
+      console.log("App: Clearing session and redirecting...");
+      setCurrentUser(null);
+      localStorage.clear();
+      sessionStorage.clear();
+      // Force hard redirect to login page
+      window.location.href = '/login?logout=success';
+    }
   }, []);
 
   // Initialize Auth
