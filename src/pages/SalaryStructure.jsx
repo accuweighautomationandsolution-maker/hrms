@@ -207,24 +207,24 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     doc.setTextColor(0, 0, 0);
     tableY += 16;
 
-    // Official Indian Rupee (₹) Vector Drawing
+    // Arial-Style Indian Rupee (₹) Vector Drawing
     const drawRupee = (x, y, scale = 1) => {
       const w = 3.2 * scale;
       const h = 3.5 * scale;
-      doc.setLineWidth(0.3 * scale);
+      doc.setLineWidth(0.35 * scale); // Bolder Arial style
       doc.setDrawColor(0, 0, 0);
-
-      // Official Design: Two horizontal bars and a curved "R" shape
+      
+      // Arial Design: Flat horizontal bars, no serifs
       doc.line(x, y - h, x + w, y - h); // Top bar
       doc.line(x, y - h + (1.0 * scale), x + w, y - h + (1.0 * scale)); // Middle bar
-
-      // Curve part (simplified for vector rendering)
+      
+      // Clean sans-serif curve
       doc.line(x + (0.5 * scale), y - h, x + (0.5 * scale), y - (1.2 * scale));
-      doc.line(x + (0.5 * scale), y - (1.2 * scale), x + (2.5 * scale), y - (1.2 * scale));
-      doc.line(x + (2.5 * scale), y - (1.2 * scale), x + (2.5 * scale), y - h + (1.0 * scale));
-
-      // Diagonal leg
-      doc.line(x + (1.0 * scale), y - (1.0 * scale), x + (3.0 * scale), y + (0.5 * scale));
+      doc.line(x + (0.5 * scale), y - (1.2 * scale), x + (2.7 * scale), y - (1.2 * scale));
+      doc.line(x + (2.7 * scale), y - (1.2 * scale), x + (2.7 * scale), y - h + (1.0 * scale));
+      
+      // Straight diagonal leg
+      doc.line(x + (1.2 * scale), y - (1.2 * scale), x + (3.2 * scale), y + (0.5 * scale));
     };
 
     const drawRow = (label, value, y, isRight = false) => {
