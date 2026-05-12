@@ -84,35 +84,49 @@ const Dashboard = ({ userRole }) => {
   const [tempConfig, setTempConfig] = useState(bulletin);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchData = async () => {
+      // Safety timeout: Ensure loader is cleared even if network hangs
+      const loaderTimeout = setTimeout(() => {
+        if (isMounted) setLoading(false);
+      }, 10000);
+
       setLoading(true);
       try {
-        const stats = await dataService.getDashboardStats();
-        setDashboardStats(stats);
+        const stats = await dataService.getDashboardStats().catch(err => {
+          console.warn("Dashboard: Stats fetch failed:", err);
+          return { totalEmployees: 0, presentToday: 0, onLeave: 0 };
+        });
+        if (isMounted) setDashboardStats(stats);
 
         if (isEmployee) {
-          const attendance = await dataService.getPersonalAttendanceSummary(currentUser.id, new Date().getMonth(), new Date().getFullYear());
-          setPersonalAttendance(attendance);
-          const status = await dataService.getTodayAttendanceStatus(currentUser.id);
-          setTodayStatus(status);
-          const trajectory = await dataService.getPersonalAttendanceTrajectory(currentUser.id);
-          setPersonalTrajectory(trajectory);
+          const [attendance, status, trajectory] = await Promise.all([
+            dataService.getPersonalAttendanceSummary(currentUser.id, new Date().getMonth(), new Date().getFullYear()).catch(() => ({ present: 0 })),
+            dataService.getTodayAttendanceStatus(currentUser.id).catch(() => ({ punch_in: null, status: 'Not Marked' })),
+            dataService.getPersonalAttendanceTrajectory(currentUser.id).catch(() => [])
+          ]);
+          if (isMounted) {
+            setPersonalAttendance(attendance);
+            setTodayStatus(status);
+            setPersonalTrajectory(trajectory);
+          }
         }
 
         const [noticesList, probationList, holidayList, bulletinConfig, statutoryData] = await Promise.all([
-          dataService.getNotices(),
-          dataService.getUpcomingProbations(),
-          dataService.getCustomHolidays(),
-          dataService.getBulletinConfig(),
-          dataService.getStatutoryUpdates()
+          dataService.getNotices().catch(() => []),
+          dataService.getUpcomingProbations().catch(() => []),
+          dataService.getCustomHolidays().catch(() => []),
+          dataService.getBulletinConfig().catch(() => null),
+          dataService.getStatutoryUpdates().catch(() => [])
         ]);
+
+        if (!isMounted) return;
 
         if (bulletinConfig) setBulletinState(bulletinConfig);
         setStatutoryUpdates(statutoryData || []);
 
-        // Transform upcoming holidays into notice-like items for the timeline
         const now = new Date();
-        const upcomingHolidays = holidayList
+        const upcomingHolidays = (holidayList || [])
           .filter(h => new Date(h.fromDate) >= now)
           .map(h => ({
             id: `holiday-${h.id}`,
@@ -123,18 +137,24 @@ const Dashboard = ({ userRole }) => {
             isSystem: true
           }));
 
-        setNotices([...upcomingHolidays, ...noticesList].sort((a, b) => new Date(b.date) - new Date(a.date)));
-        setProbations(probationList);
-        const alerts = await alertEngine.getDashboardAlerts(currentUser);
+        setNotices([...upcomingHolidays, ...(noticesList || [])].sort((a, b) => new Date(b.date) - new Date(a.date)));
+        setProbations(probationList || []);
+        
+        const alerts = await alertEngine.getDashboardAlerts(currentUser).catch(err => {
+          console.error("Dashboard: Alerts engine failed:", err);
+          return [];
+        });
         setSmartAlerts(alerts);
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
       } finally {
-        setLoading(false);
+        clearTimeout(loaderTimeout);
+        if (isMounted) setLoading(false);
       }
     };
     fetchData();
-  }, [currentUser.id, isEmployee]);
+    return () => { isMounted = false; };
+  }, [currentUser?.id, isEmployee]);
 
   const [noticeModal, setNoticeModal] = useState(null); // { title, content } for editing
   const [viewingNotice, setViewingNotice] = useState(null);

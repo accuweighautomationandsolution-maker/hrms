@@ -270,39 +270,24 @@ export const dataService = {
     }));
   },
 
-  getAttendance: async () => {
-    if (!supabase) return {};
-    const { data } = await supabase.from('attendance').select('*');
-    const map = {};
-    (data || []).forEach(r => {
-      map[r.id] = {
-        punchIn: r.punch_in,
-        punchOut: r.punch_out,
-        remark: r.remark,
-        source: r.source
-      };
-    });
-    return map;
-  },
-
   saveAttendance: async (records) => {
     if (!supabase) return;
+    // records is a map of { empId_y_m_d: { punchIn, punchOut, remark, source } }
     const rows = Object.entries(records).map(([id, rec]) => {
       const parts = id.split('_'); // empId_year_month_day
       const emp_id = parts[0];
-      const date = new Date(parts[1], parts[2], parts[3]).toISOString().split('T')[0];
+      const date = `${parts[1]}-${String(Number(parts[2]) + 1).padStart(2, '0')}-${String(parts[3]).padStart(2, '0')}`;
       return {
         id,
         emp_id,
         date,
         punch_in: rec.punchIn,
         punch_out: rec.punchOut,
-        remark: rec.remark,
-        source: rec.source,
+        data: { remark: rec.remark, source: rec.source },
         updated_at: new Date().toISOString()
       };
     });
-    // Upsert in chunks to avoid URL length limits or payload issues if many records
+    // Upsert in chunks to avoid URL length limits
     for (let i = 0; i < rows.length; i += 100) {
       await supabase.from('attendance').upsert(rows.slice(i, i + 100));
     }
@@ -369,7 +354,12 @@ export const dataService = {
   getNotices: async () => {
     if (!supabase) return [];
     const { data } = await supabase.from('notices').select('*').order('created_at', { ascending: false });
-    return data || [];
+    return (data || []).map(r => r.data);
+  },
+
+  getPersonalNotices: async (empId) => {
+    // Notices are currently global, but we filter by targeting logic if implemented
+    return dataService.getNotices();
   },
 
   saveNotices: async (notices) => {
@@ -458,6 +448,11 @@ export const dataService = {
   // ── Advances & Payroll ─────────────────────────────────────────────────
   getAdvanceHistory: async () => sbGetAll('advances'),
   saveAdvanceHistory: async (history) => sbSaveAll('advances', history),
+  getPersonalAdvances: async (empId) => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('advances').select('data').eq('emp_id', empId);
+    return (data || []).map(r => r.data);
+  },
 
   getPayrollHistory: async () => sbGetAll('payroll_history'),
   savePayrollHistory: async (history) => sbSaveAll('payroll_history', history),
@@ -478,6 +473,12 @@ export const dataService = {
   getExpenses: async () => {
     if (!supabase) return [];
     const { data } = await supabase.from('expenses').select('*').order('date', { ascending: false });
+    return data || [];
+  },
+
+  getPersonalExpenses: async (empId) => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('expenses').select('*').eq('emp_id', empId).order('date', { ascending: false });
     return data || [];
   },
 
