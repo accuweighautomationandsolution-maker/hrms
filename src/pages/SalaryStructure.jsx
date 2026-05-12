@@ -212,7 +212,8 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
       const width = (pageWidth - 30) / 2;
       
       const xLabel = xStart + 5;
-      const xColon = xStart + 50;
+      const xColon = xStart + 45; // Shifted slightly for better gap
+      const xCurrency = xStart + 52; // Fixed vertical line for Rs.
       const xAmount = xStart + width - 5;
 
       doc.setFont('times', 'normal');
@@ -223,10 +224,12 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
       doc.setFont('times', 'bold');
       doc.text(':', xColon, y);
 
+      // Draw Rs. at fixed vertical position
+      doc.text('Rs.', xCurrency, y);
+
       doc.setFont('times', 'bold');
       doc.setTextColor(0, 0, 0);
-      const amountStr = `Rs. ${formatValue(value)}`;
-      doc.text(amountStr, xAmount, y, { align: 'right' });
+      doc.text(formatValue(value), xAmount, y, { align: 'right' });
     };
 
     // Earnings Data
@@ -278,10 +281,10 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     doc.setFont('times', 'bold');
     doc.text('NET TAKE-HOME SALARY :', 20, tableY);
 
-    const netPayStr = `Rs. ${formatValue(netPay)} / Month`;
     doc.setFont('times', 'bold');
+    doc.text('Rs.', pageWidth - 70, tableY); // Fixed position for vertical line
     doc.setFontSize(13);
-    doc.text(netPayStr, pageWidth - 20, tableY, { align: 'right' });
+    doc.text(`${formatValue(netPay)} / Month`, pageWidth - 20, tableY, { align: 'right' });
 
     tableY += 7;
     doc.setTextColor(100, 100, 100);
@@ -295,10 +298,10 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     doc.setTextColor(0, 0, 0);
     doc.text('TOTAL ANNUAL CTC :', 20, tableY);
 
-    const ctcStr = `Rs. ${formatValue(annualCTC)} Per Annum`;
     doc.setFont('times', 'bold');
+    doc.text('Rs.', pageWidth - 70, tableY); // Fixed position for vertical line
     doc.setFontSize(12);
-    doc.text(ctcStr, pageWidth - 20, tableY, { align: 'right' });
+    doc.text(`${formatValue(annualCTC)} Per Annum`, pageWidth - 20, tableY, { align: 'right' });
 
     doc.setLineWidth(0.1);
     doc.setDrawColor(200, 200, 200);
