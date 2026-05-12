@@ -207,34 +207,46 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     doc.setTextColor(0, 0, 0);
     tableY += 16;
     
-    // Professional Row Drawer with Vector Rupee Symbol and Monospaced Amounts
-    const drawRupee = (x, y) => {
-      doc.setLineWidth(0.35);
-      doc.setDrawColor(60, 60, 60);
-      // Draw a professional Rupee symbol using lines/paths for 100% compatibility
-      doc.line(x, y - 3, x + 3, y - 3); // top bar
-      doc.line(x, y - 2, x + 3, y - 2); // middle bar
-      doc.line(x + 0.5, y - 3, x + 0.5, y - 1.2); // vertical hook
-      doc.line(x + 0.5, y - 1.2, x + 2.8, y - 1.2); // curve top
-      doc.line(x + 2.8, y - 1.2, x + 2.8, y - 2.0); // curve side
-      doc.line(x + 1.0, y - 1.2, x + 3.0, y + 0.5); // slanted leg
+    // Enhanced Vector Rupee Symbol Drawing (Compact & Professional)
+    const drawRupee = (x, y, scale = 1) => {
+      const w = 2.8 * scale;
+      const h = 3.0 * scale;
+      doc.setLineWidth(0.25 * scale);
+      doc.setDrawColor(40, 40, 40);
+      
+      // Top horizontal lines
+      doc.line(x, y - h, x + w, y - h);
+      doc.line(x, y - h + (0.8 * scale), x + w, y - h + (0.8 * scale));
+      
+      // Vertical stem and curve
+      doc.line(x + (0.4 * scale), y - h, x + (0.4 * scale), y - (1.0 * scale));
+      doc.line(x + (0.4 * scale), y - (1.0 * scale), x + (2.2 * scale), y - (1.0 * scale));
+      doc.line(x + (2.2 * scale), y - (1.0 * scale), x + (2.2 * scale), y - h + (0.8 * scale));
+      
+      // Diagonal stroke
+      doc.line(x + (0.8 * scale), y - (1.0 * scale), x + (2.5 * scale), y + (0.2 * scale));
     };
 
     const drawRow = (label, value, y, isRight = false) => {
       const xStart = isRight ? 15 + (pageWidth - 30) / 2 : 15;
       const width = (pageWidth - 30) / 2;
-      const xSymbol = xStart + width - 38;
-      const xAmount = xStart + width - 5;
+      const xColon = xStart + width - 45; // Fixed colon position
+      const xSymbol = xStart + width - 38; // Fixed symbol position
+      const xAmount = xStart + width - 5; // Right aligned amount
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(60, 60, 60);
       doc.text(label, xStart + 5, y);
+      
+      // Vertically Aligned Colon
+      doc.setFont('helvetica', 'bold');
+      doc.text(':', xColon, y);
 
       // Draw Rupee Symbol (Vector)
       drawRupee(xSymbol, y);
 
-      // Draw Amount (Monospaced for perfect alignment)
+      // Draw Amount (Monospaced)
       doc.setFont('courier', 'bold');
       doc.setTextColor(0, 0, 0);
       doc.text(formatValue(value), xAmount, y, { align: 'right' });
@@ -277,7 +289,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     drawRow('Monthly Gross Salary', earnings.totalEarnings, tableY);
     drawRow('Total Monthly Deductions', deductions.total, tableY, true);
 
-    // 5. Final Summary (Clean White Background)
+    // 5. Final Summary (Clean White Design)
     tableY += 18;
     doc.setDrawColor(37, 99, 235);
     doc.setLineWidth(0.5);
@@ -287,12 +299,16 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     doc.setFontSize(12);
     doc.setTextColor(37, 99, 235);
     doc.setFont('helvetica', 'bold');
-    doc.text('NET TAKE-HOME SALARY:', 20, tableY);
+    doc.text('NET TAKE-HOME SALARY :', 20, tableY);
     
-    drawRupee(pageWidth - 60, tableY);
+    // Position symbol based on string length to avoid overwriting
+    const netPayStr = `${formatValue(netPay)} / Month`;
+    const netPayWidth = doc.getTextWidth(netPayStr);
+    drawRupee(pageWidth - 25 - netPayWidth - 8, tableY, 1.2); 
+    
     doc.setFont('courier', 'bold');
     doc.setFontSize(14);
-    doc.text(`${formatValue(netPay)} / Month`, pageWidth - 20, tableY, { align: 'right' });
+    doc.text(netPayStr, pageWidth - 20, tableY, { align: 'right' });
     
     tableY += 7;
     doc.setTextColor(100, 100, 100);
@@ -304,11 +320,14 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
-    doc.text('TOTAL ANNUAL CTC:', 20, tableY);
+    doc.text('TOTAL ANNUAL CTC :', 20, tableY);
     
-    drawRupee(pageWidth - 60, tableY);
+    const ctcStr = `${formatValue(annualCTC)} Per Annum`;
+    const ctcWidth = doc.getTextWidth(ctcStr);
+    drawRupee(pageWidth - 25 - ctcWidth - 8, tableY, 1.1);
+    
     doc.setFont('courier', 'bold');
-    doc.text(`${formatValue(annualCTC)} Per Annum`, pageWidth - 20, tableY, { align: 'right' });
+    doc.text(ctcStr, pageWidth - 20, tableY, { align: 'right' });
     
     doc.setLineWidth(0.1);
     doc.setDrawColor(200, 200, 200);
