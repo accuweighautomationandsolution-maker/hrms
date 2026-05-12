@@ -110,89 +110,123 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     
     // Helper to add a horizontal line
     const addLine = (y) => {
-      doc.setDrawColor(200, 200, 200);
+      doc.setDrawColor(220, 220, 220);
       doc.line(15, y, pageWidth - 15, y);
     };
 
-    // Header
-    doc.setFontSize(22);
-    doc.setTextColor(37, 99, 235); // var(--color-primary) blue
+    // Date Formatter
+    const formatDate = (dateStr) => {
+      if (!dateStr || dateStr === 'N/A') return 'N/A';
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return dateStr;
+      return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+    };
+
+    // Currency Formatter
+    const formatValue = (val) => {
+      return new Intl.NumberFormat('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(val);
+    };
+
+    // 1. Logo & Branding
+    // Using a professional text-based logo design since local image import is environment-dependent
+    doc.setFontSize(24);
+    doc.setTextColor(37, 99, 235);
+    doc.setFont('helvetica', 'bold');
     doc.text('ACCUWEIGH', 15, 20);
-    doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.text('Automation & Solution', 15, 25);
     
     doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Automation & Solution', 15, 25);
+    
+    doc.setFontSize(9);
+    doc.setTextColor(150, 150, 150);
     doc.text('Employee Compensation Matrix', pageWidth - 15, 20, { align: 'right' });
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth - 15, 25, { align: 'right' });
+    doc.text(`Generated: ${formatDate(new Date())}`, pageWidth - 15, 25, { align: 'right' });
     
     addLine(30);
 
-    // Document Title
+    // 2. Document Title
     doc.setFontSize(16);
     doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'bold');
-    doc.text('ANNEXURE - SALARY STRUCTURE', pageWidth / 2, 40, { align: 'center' });
+    doc.text('SALARY STRUCTURE', pageWidth / 2, 42, { align: 'center' });
     
-    // Employee Details Table
+    // 3. Employee Details Box
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.setFillColor(249, 250, 251); // Light gray
-    doc.rect(15, 48, pageWidth - 30, 45, 'F');
-    doc.rect(15, 48, pageWidth - 30, 45, 'S');
+    doc.setDrawColor(230, 230, 230);
+    doc.setFillColor(252, 252, 252); 
+    doc.rect(15, 50, pageWidth - 30, 42, 'FD');
 
-    const startY = 55;
+    const startY = 58;
     const col1 = 20;
-    const col2 = 60;
+    const col2 = 62;
     const col3 = 110;
-    const col4 = 150;
+    const col4 = 155;
 
-    doc.setFont('helvetica', 'bold'); doc.text('Employee Name:', col1, startY);
-    doc.setFont('helvetica', 'normal'); doc.text(`${form.candidateName} ${form.candidateMiddleName || ''} ${form.candidateLastName || ''}`.trim(), col2, startY);
-    
-    doc.setFont('helvetica', 'bold'); doc.text('Employee ID:', col3, startY);
-    doc.setFont('helvetica', 'normal'); doc.text(form.empCode || 'N/A', col4, startY);
-
-    doc.setFont('helvetica', 'bold'); doc.text('Designation:', col1, startY + 8);
-    doc.setFont('helvetica', 'normal'); doc.text(form.roleApplied || 'N/A', col2, startY + 8);
-    
-    doc.setFont('helvetica', 'bold'); doc.text('Department:', col3, startY + 8);
-    doc.setFont('helvetica', 'normal'); doc.text(form.department || 'N/A', col4, startY + 8);
-
-    doc.setFont('helvetica', 'bold'); doc.text('Grade:', col1, startY + 16);
-    doc.setFont('helvetica', 'normal'); doc.text(form.grade || 'N/A', col2, startY + 16);
-    
-    doc.setFont('helvetica', 'bold'); doc.text('Date of Joining:', col3, startY + 16);
-    doc.setFont('helvetica', 'normal'); doc.text(form.joinDate || 'N/A', col4, startY + 16);
-
-    doc.setFont('helvetica', 'bold'); doc.text('Employee Category:', col1, startY + 24);
-    doc.setFont('helvetica', 'normal'); doc.text(empCategory || 'Staff Employee', col2, startY + 24);
-
-    // Earnings Table
-    let tableY = 105;
-    doc.setFillColor(37, 99, 235);
-    doc.setTextColor(255, 255, 255);
-    doc.rect(15, tableY, (pageWidth - 30) / 2, 8, 'F');
-    doc.text('EARNINGS COMPONENTS', 15 + (pageWidth - 30) / 4, tableY + 5.5, { align: 'center' });
-    
-    doc.setFillColor(239, 68, 68);
-    doc.rect(15 + (pageWidth - 30) / 2, tableY, (pageWidth - 30) / 2, 8, 'F');
-    doc.text('DEDUCTIONS & STATUTORY', 15 + 3 * (pageWidth - 30) / 4, tableY + 5.5, { align: 'center' });
-
-    doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'bold');
-    tableY += 15;
-    
-    const drawRow = (label, value, y, isRight = false) => {
-      const x = isRight ? 15 + (pageWidth - 30) / 2 : 15;
-      const width = (pageWidth - 30) / 2;
-      doc.setFont('helvetica', 'normal');
-      doc.text(label, x + 5, y);
+    const drawDetail = (label, value, x1, x2, y) => {
       doc.setFont('helvetica', 'bold');
-      doc.text(`INR ${value.toLocaleString()}`, x + width - 5, y, { align: 'right' });
+      doc.setTextColor(80, 80, 80);
+      doc.text(label, x1, y);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0, 0, 0);
+      doc.text(String(value), x2, y);
     };
 
-    drawRow('Basic Salary (50%)', earnings.basic, tableY);
+    drawDetail('Employee Name:', `${form.candidateName} ${form.candidateMiddleName || ''} ${form.candidateLastName || ''}`.trim(), col1, col2, startY);
+    drawDetail('Employee ID:', form.empCode || 'N/A', col3, col4, startY);
+
+    drawDetail('Designation:', form.roleApplied || 'N/A', col1, col2, startY + 9);
+    drawDetail('Department:', form.department || 'N/A', col3, col4, startY + 9);
+
+    drawDetail('Grade:', form.grade || 'N/A', col1, col2, startY + 18);
+    drawDetail('Date of Joining:', formatDate(form.joinDate || 'N/A'), col3, col4, startY + 18);
+
+    drawDetail('Category:', empCategory || 'Staff Employee', col1, col2, startY + 27);
+
+    // 4. Tables Header
+    let tableY = 105;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    
+    // Earnings Header
+    doc.setFillColor(37, 99, 235);
+    doc.rect(15, tableY, (pageWidth - 30) / 2, 9, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.text('EARNINGS COMPONENTS', 15 + (pageWidth - 30) / 4, tableY + 6, { align: 'center' });
+    
+    // Deductions Header
+    doc.setFillColor(239, 68, 68);
+    doc.rect(15 + (pageWidth - 30) / 2, tableY, (pageWidth - 30) / 2, 9, 'F');
+    doc.text('DEDUCTIONS & STATUTORY', 15 + 3 * (pageWidth - 30) / 4, tableY + 6, { align: 'center' });
+
+    doc.setTextColor(0, 0, 0);
+    tableY += 16;
+    
+    // Professional Row Drawer with Vertical Rupee Symbol Alignment
+    const drawRow = (label, value, y, isRight = false) => {
+      const xStart = isRight ? 15 + (pageWidth - 30) / 2 : 15;
+      const width = (pageWidth - 30) / 2;
+      const xSymbol = xStart + width - 35;
+      const xAmount = xStart + width - 5;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(60, 60, 60);
+      doc.text(label, xStart + 5, y);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text('₹', xSymbol, y);
+      doc.text(formatValue(value), xAmount, y, { align: 'right' });
+    };
+
+    // Earnings Data
+    drawRow('Basic Salary', earnings.basic, tableY);
     drawRow('PF (Employee Share)', deductions.pf, tableY, true);
     
     tableY += 8;
@@ -200,7 +234,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     drawRow('ESIC (Employee Share)', deductions.esic, tableY, true);
     
     tableY += 8;
-    drawRow(`HRA (${form.hraPercent}%)`, earnings.hra, tableY);
+    drawRow('HRA', earnings.hra, tableY);
     drawRow('Professional Tax (PT)', deductions.pt, tableY, true);
     
     tableY += 8;
@@ -223,49 +257,66 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     addLine(tableY + 5);
     
     tableY += 12;
-    doc.setFontSize(12);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
     drawRow('Monthly Gross Salary', earnings.totalEarnings, tableY);
     drawRow('Total Monthly Deductions', deductions.total, tableY, true);
 
-    // Final Summary Box
-    tableY += 15;
-    doc.setFillColor(37, 99, 235, 0.05);
+    // 5. Final Summary (Clean White Background)
+    tableY += 18;
     doc.setDrawColor(37, 99, 235);
-    doc.rect(15, tableY, pageWidth - 30, 35, 'FD');
+    doc.setLineWidth(0.5);
+    doc.line(15, tableY, pageWidth - 15, tableY);
     
+    tableY += 10;
+    doc.setFontSize(12);
     doc.setTextColor(37, 99, 235);
-    doc.setFontSize(14);
-    doc.text('NET TAKE-HOME SALARY:', 25, tableY + 12);
-    doc.setFontSize(18);
-    doc.text(`INR ${netPay.toLocaleString()} / Month`, pageWidth - 25, tableY + 12, { align: 'right' });
+    doc.text('NET TAKE-HOME SALARY:', 20, tableY);
     
-    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(14);
+    doc.text('₹', pageWidth - 55, tableY);
+    doc.text(`${formatValue(netPay)} / Month`, pageWidth - 20, tableY, { align: 'right' });
+    
+    tableY += 7;
+    doc.setTextColor(100, 100, 100);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'italic');
-    doc.text(`(${numberToWords(netPay)})`, 25, tableY + 18);
+    doc.text(`(${numberToWords(netPay)})`, 20, tableY);
     
+    tableY += 12;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text('TOTAL ANNUAL CTC:', 25, tableY + 28);
-    doc.setFontSize(14);
-    doc.text(`INR ${annualCTC.toLocaleString()} Per Annum`, pageWidth - 25, tableY + 28, { align: 'right' });
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.text('TOTAL ANNUAL CTC:', 20, tableY);
+    
+    doc.text('₹', pageWidth - 55, tableY);
+    doc.text(`${formatValue(annualCTC)} Per Annum`, pageWidth - 20, tableY, { align: 'right' });
+    
+    doc.setLineWidth(0.1);
+    doc.setDrawColor(200, 200, 200);
+    doc.line(15, tableY + 6, pageWidth - 15, tableY + 6);
 
-    // Signature Area
-    const sigY = tableY + 60;
+    // 6. Signatory Section
+    const sigY = tableY + 55;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.line(15, sigY, 75, sigY);
-    doc.text('Authorized HR Signatory', 15, sigY + 5);
-    doc.text('Accuweigh Automation', 15, sigY + 10);
+    doc.setTextColor(0, 0, 0);
     
-    doc.line(pageWidth - 75, sigY, pageWidth - 15, sigY);
-    doc.text('Employee Acceptance', pageWidth - 75, sigY + 5);
-    doc.text('(Signature & Date)', pageWidth - 75, sigY + 10);
+    doc.line(20, sigY, 80, sigY);
+    doc.text('Authorized HR Signatory', 20, sigY + 6);
+    doc.setFontSize(8);
+    doc.text('Accuweigh Automation & Solution', 20, sigY + 11);
+    
+    doc.setFontSize(10);
+    doc.line(pageWidth - 80, sigY, pageWidth - 20, sigY);
+    doc.text('Employee Acceptance', pageWidth - 80, sigY + 6);
+    doc.setFontSize(8);
+    doc.text('(Signature & Date)', pageWidth - 80, sigY + 11);
 
-    // Footer
+    // 7. Footer
     doc.setFontSize(8);
     doc.setTextColor(150, 150, 150);
-    doc.text('This is a computer generated salary structure and does not require a physical stamp unless requested.', pageWidth / 2, 285, { align: 'center' });
+    doc.text('This is an electronically generated document and does not require a physical stamp.', pageWidth / 2, 285, { align: 'center' });
 
     doc.save(`Salary_Structure_${form.candidateName || 'Employee'}.pdf`);
   };
