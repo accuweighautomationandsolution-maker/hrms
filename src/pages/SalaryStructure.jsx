@@ -134,12 +134,12 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     // Using a professional text-based logo design since local image import is environment-dependent
     doc.setFontSize(24);
     doc.setTextColor(37, 99, 235);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('times', 'bold');
     doc.text('ACCUWEIGH', 15, 20);
 
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('times', 'normal');
     doc.text('Automation & Solution Pvt. Ltd.', 15, 25);
 
     doc.setFontSize(9);
@@ -152,12 +152,12 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     // 2. Document Title
     doc.setFontSize(16);
     doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('times', 'bold');
     doc.text('SALARY STRUCTURE', pageWidth / 2, 42, { align: 'center' });
 
     // 3. Employee Details Box
     doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('times', 'normal');
     doc.setDrawColor(230, 230, 230);
     doc.setFillColor(252, 252, 252);
     doc.rect(15, 50, pageWidth - 30, 42, 'FD');
@@ -169,10 +169,10 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     const col4 = 155;
 
     const drawDetail = (label, value, x1, x2, y) => {
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('times', 'bold');
       doc.setTextColor(80, 80, 80);
       doc.text(label, x1, y);
-      doc.setFont('helvetica', 'normal');
+      doc.setFont('times', 'normal');
       doc.setTextColor(0, 0, 0);
       doc.text(String(value), x2, y);
     };
@@ -191,7 +191,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     // 4. Tables Header
     let tableY = 105;
     doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('times', 'bold');
 
     // Earnings Header
     doc.setFillColor(37, 99, 235);
@@ -237,19 +237,19 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
       const xSymbol = xStart + 58;
       const xAmount = xStart + width - 5;
 
-      doc.setFont('helvetica', 'normal');
+      doc.setFont('times', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(60, 60, 60);
       doc.text(label, xLabel, y);
 
-      doc.setFont('helvetica', 'bold');
+      doc.setFont('times', 'bold');
       doc.text(':', xColon, y);
 
       // Draw Rupee Symbol (Official Design)
       drawRupee(xSymbol, y);
 
-      // Draw Amount (Courier for monospaced precision)
-      doc.setFont('courier', 'bold');
+      // Draw Amount (Times Bold for consistent look with tabular digits)
+      doc.setFont('times', 'bold');
       doc.setTextColor(0, 0, 0);
       doc.text(formatValue(value), xAmount, y, { align: 'right' });
     };
@@ -287,7 +287,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
 
     tableY += 12;
     doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('times', 'bold');
     drawRow('Monthly Gross Salary', earnings.totalEarnings, tableY);
     drawRow('Total Monthly Deductions', deductions.total, tableY, true);
 
@@ -300,29 +300,29 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     tableY += 10;
     doc.setFontSize(11);
     doc.setTextColor(37, 99, 235);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('times', 'bold');
     doc.text('NET TAKE-HOME SALARY :', 20, tableY);
 
     // Fixed Absolute Positioning to avoid overlap
     drawRupee(pageWidth - 75, tableY, 1.2);
-    doc.setFont('courier', 'bold');
+    doc.setFont('times', 'bold');
     doc.setFontSize(13);
     doc.text(`${formatValue(netPay)} / Month`, pageWidth - 20, tableY, { align: 'right' });
 
     tableY += 7;
     doc.setTextColor(100, 100, 100);
     doc.setFontSize(9);
-    doc.setFont('helvetica', 'italic');
+    doc.setFont('times', 'italic');
     doc.text(`(${numberToWords(netPay)})`, 20, tableY);
 
     tableY += 12;
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('times', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
     doc.text('TOTAL ANNUAL CTC :', 20, tableY);
 
     drawRupee(pageWidth - 75, tableY, 1.1);
-    doc.setFont('courier', 'bold');
+    doc.setFont('times', 'bold');
     doc.setFontSize(12);
     doc.text(`${formatValue(annualCTC)} Per Annum`, pageWidth - 20, tableY, { align: 'right' });
 
@@ -332,7 +332,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
 
     // 6. Signatory Section
     const sigY = tableY + 55;
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('times', 'normal');
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
 
