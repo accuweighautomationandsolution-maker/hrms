@@ -207,51 +207,26 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     doc.setTextColor(0, 0, 0);
     tableY += 16;
 
-    // Arial-Style Indian Rupee (₹) Vector Drawing
-    const drawRupee = (x, y, scale = 1) => {
-      const w = 3.2 * scale;
-      const h = 3.5 * scale;
-      doc.setLineWidth(0.35 * scale); // Bolder Arial style
-      doc.setDrawColor(0, 0, 0);
-      
-      // Arial Design: Flat horizontal bars, no serifs
-      doc.line(x, y - h, x + w, y - h); // Top bar
-      doc.line(x, y - h + (1.0 * scale), x + w, y - h + (1.0 * scale)); // Middle bar
-      
-      // Clean sans-serif curve
-      doc.line(x + (0.5 * scale), y - h, x + (0.5 * scale), y - (1.2 * scale));
-      doc.line(x + (0.5 * scale), y - (1.2 * scale), x + (2.7 * scale), y - (1.2 * scale));
-      doc.line(x + (2.7 * scale), y - (1.2 * scale), x + (2.7 * scale), y - h + (1.0 * scale));
-      
-      // Straight diagonal leg
-      doc.line(x + (1.2 * scale), y - (1.2 * scale), x + (3.2 * scale), y + (0.5 * scale));
-    };
-
     const drawRow = (label, value, y, isRight = false) => {
       const xStart = isRight ? 15 + (pageWidth - 30) / 2 : 15;
       const width = (pageWidth - 30) / 2;
-
-      // Absolute positions for perfect alignment
+      
       const xLabel = xStart + 5;
       const xColon = xStart + 50;
-      const xSymbol = xStart + 58;
       const xAmount = xStart + width - 5;
 
       doc.setFont('times', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(60, 60, 60);
       doc.text(label, xLabel, y);
-
+      
       doc.setFont('times', 'bold');
       doc.text(':', xColon, y);
 
-      // Draw Rupee Symbol (Official Design)
-      drawRupee(xSymbol, y);
-
-      // Draw Amount (Times Bold for consistent look with tabular digits)
       doc.setFont('times', 'bold');
       doc.setTextColor(0, 0, 0);
-      doc.text(formatValue(value), xAmount, y, { align: 'right' });
+      const amountStr = `Rs. ${formatValue(value)}`;
+      doc.text(amountStr, xAmount, y, { align: 'right' });
     };
 
     // Earnings Data
@@ -303,11 +278,10 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     doc.setFont('times', 'bold');
     doc.text('NET TAKE-HOME SALARY :', 20, tableY);
 
-    // Fixed Absolute Positioning to avoid overlap
-    drawRupee(pageWidth - 75, tableY, 1.2);
+    const netPayStr = `Rs. ${formatValue(netPay)} / Month`;
     doc.setFont('times', 'bold');
     doc.setFontSize(13);
-    doc.text(`${formatValue(netPay)} / Month`, pageWidth - 20, tableY, { align: 'right' });
+    doc.text(netPayStr, pageWidth - 20, tableY, { align: 'right' });
 
     tableY += 7;
     doc.setTextColor(100, 100, 100);
@@ -321,10 +295,10 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     doc.setTextColor(0, 0, 0);
     doc.text('TOTAL ANNUAL CTC :', 20, tableY);
 
-    drawRupee(pageWidth - 75, tableY, 1.1);
+    const ctcStr = `Rs. ${formatValue(annualCTC)} Per Annum`;
     doc.setFont('times', 'bold');
     doc.setFontSize(12);
-    doc.text(`${formatValue(annualCTC)} Per Annum`, pageWidth - 20, tableY, { align: 'right' });
+    doc.text(ctcStr, pageWidth - 20, tableY, { align: 'right' });
 
     doc.setLineWidth(0.1);
     doc.setDrawColor(200, 200, 200);
