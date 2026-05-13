@@ -114,23 +114,15 @@ export const dataService = {
     // They are safely stored inside the 'data' JSONB object above.
     
     try {
-      let dbError;
-      if (empData.isNew) {
-        // Use insert instead of upsert for new records to avoid RLS UPDATE privilege requirements
-        const { error } = await supabase.from('employees').insert(row);
-        dbError = error;
-      } else {
-        const { data, error } = await supabase.from('employees').update(row).eq('id', row.id).select();
-        if (error) {
-          dbError = error;
-        } else if (!data || data.length === 0) {
-          dbError = new Error("Update failed. Database Row Level Security (RLS) is blocking your account from updating this record.");
-        }
-      }
+      // Always use upsert so documents and profile updates are never silently dropped.
+      // Insert-only (isNew) is handled via onConflict behavior.
+      const { error } = await supabase
+        .from('employees')
+        .upsert(row, { onConflict: 'id' });
 
-      if (dbError) {
-        console.error("Error saving employee to Supabase:", dbError);
-        throw dbError;
+      if (error) {
+        console.error("Error saving employee to Supabase:", error);
+        throw error;
       }
       return row.data;
     } catch (err) {
@@ -728,9 +720,11 @@ export const dataService = {
       
       const updatedDocuments = [...(emp.documents || []), newDoc];
       
-      // 3. Save back to employees table
+      // 3. Save back to employees table via upsert (guaranteed persistence)
+      // Strip isNew so we always upsert, never insert-only
+      const { isNew: _ignored, ...empWithoutIsNew } = emp;
       await dataService.saveEmployee({
-        ...emp,
+        ...empWithoutIsNew,
         documents: updatedDocuments
       });
 
@@ -758,9 +752,11 @@ export const dataService = {
       const emp = employees.find(e => (e.documents || []).some(d => String(d.id) === String(id)));
       
       if (emp) {
-        const updatedDocuments = (emp.documents || []).filter(d => String(d.id) === String(id));
+        // FIX: Use !== to EXCLUDE the deleted document (was incorrectly using ===)
+        const updatedDocuments = (emp.documents || []).filter(d => String(d.id) !== String(id));
+        const { isNew: _ignored, ...empWithoutIsNew } = emp;
         await dataService.saveEmployee({
-          ...emp,
+          ...empWithoutIsNew,
           documents: updatedDocuments
         });
       }
