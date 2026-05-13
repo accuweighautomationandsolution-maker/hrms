@@ -81,23 +81,35 @@ const EmployeeDocumentsTab = ({ empId, employeeName }) => {
     if (!uploadForm.file) return alert('Please select a file.');
     
     setUploading(true);
+    
+    // Safety Timeout: 45 seconds for large files or slow networks
+    const timeout = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error("Network timeout: The upload is taking too long. Please check your connection or try a smaller file.")), 45000)
+    );
+
     try {
-      await dataService.addEmployeeDoc({
-        empId: empId,
-        category: uploadForm.category,
-        docType: uploadForm.docType,
-        uploadedBy: 'HR Admin',
-        status: 'Active',
-        version: 1,
-        ...uploadForm.file
-      });
-      alert('Document uploaded successfully.');
+      console.log(`Vault: Committing document for ${empId}...`);
+      
+      await Promise.race([
+        dataService.addEmployeeDoc({
+          empId: empId,
+          category: uploadForm.category,
+          docType: uploadForm.docType,
+          uploadedBy: 'HR Admin',
+          status: 'Active',
+          version: 1,
+          ...uploadForm.file
+        }),
+        timeout
+      ]);
+
+      alert('Document uploaded and synchronized successfully.');
       setShowUpload(false);
       setUploadForm(prev => ({ ...prev, file: null }));
-      await loadDocuments(); // Ensure we wait for reload
+      await loadDocuments();
     } catch (e) {
-      console.error("Vault: Upload error:", e);
-      alert(`Failed to upload document: ${e.message || 'Unknown Error'}`);
+      console.error("Vault: Upload failure:", e);
+      alert(`Upload Failed: ${e.message || 'The server did not respond. Please try again.'}`);
     } finally {
       setUploading(false);
     }
@@ -191,7 +203,7 @@ const EmployeeDocumentsTab = ({ empId, employeeName }) => {
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
             <button className="btn btn-ghost" onClick={() => setShowUpload(false)}>Dismiss</button>
             <button className="btn btn-success" onClick={handleUploadSubmit} disabled={!uploadForm.file || uploading}>
-              {uploading ? 'Processing...' : <><Save size={18} /> Commit to Vault</>}
+              {uploading ? 'Uploading...' : <><Save size={18} /> Commit to Vault</>}
             </button>
           </div>
         </div>
