@@ -331,12 +331,22 @@ const EmployeeDirectory = ({ userRole }) => {
 
       const savedEmp = await dataService.saveEmployee(empData);
       
-      if (form.salaryConfig) {
+      // Always save salary structure for every employee when profile is saved
+      // Uses upsert internally so works for both new hires and profile updates
+      const salaryToSave = form.salaryConfig || {
+        targetSalary: 0,
+        empId: savedEmp.id,
+        candidateName: savedEmp.name
+      };
+      try {
         await dataService.saveSalaryStructure(savedEmp.id, {
-          ...form.salaryConfig,
+          ...salaryToSave,
           empId: savedEmp.id,
           candidateName: savedEmp.name
-        }, empData.isNew);
+        });
+      } catch (salaryErr) {
+        // Salary save failure should not block the profile save
+        console.error('Salary structure save failed (non-blocking):', salaryErr.message);
       }
 
       const emps = await dataService.getEmployees();

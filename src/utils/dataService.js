@@ -6,9 +6,15 @@ import { supabase } from './supabaseClient';
 const sbGetAll = async (table, defaultVal = []) => {
   if (!supabase) return defaultVal;
   try {
-    const { data, error } = await supabase.from(table).select('data').order('created_at', { ascending: false });
-    if (error) { console.error(`sbGetAll(${table}):`, error); return defaultVal; }
-    return data.map(r => r.data);
+    // Order by id desc as a safe fallback — created_at may not exist in all tables
+    const { data, error } = await supabase.from(table).select('data').order('id', { ascending: false });
+    if (error) {
+      // If id ordering fails, try without ordering
+      const { data: d2, error: e2 } = await supabase.from(table).select('data');
+      if (e2) { console.error(`sbGetAll(${table}):`, e2); return defaultVal; }
+      return (d2 || []).filter(r => r.data != null).map(r => r.data);
+    }
+    return (data || []).filter(r => r.data != null).map(r => r.data);
   } catch (e) { console.error(`sbGetAll(${table}) exception:`, e); return defaultVal; }
 };
 
@@ -79,6 +85,46 @@ const saveConfig = async (key, value) => {
   }
 };
 
+// ── Supabase Storage Helper ──────────────────────────────────────────────
+// Bucket: 'hrms-files' — must be created in the Supabase dashboard with public access disabled.
+// Path pattern: {folder}/{timestamp}_{filename}
+const storageUpload = async (folder, file) => {
+  if (!supabase) throw new Error('Supabase not connected');
+  const ext = file.name.split('.').pop();
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `${folder}/${Date.now()}_${safeName}`;
+  const { error } = await supabase.storage.from('hrms-files').upload(path, file, {
+    cacheControl: '3600',
+    upsert: false,
+    contentType: file.type || 'application/octet-stream'
+  });
+  if (error) throw new Error(`Storage upload failed: ${error.message}`);
+  // Return a signed URL valid for 10 years (max)
+  const { data: urlData } = await supabase.storage.from('hrms-files').createSignedUrl(path, 315360000);
+  return { path, url: urlData?.signedUrl || path };
+};
+
+// Upload base64 data URL to Supabase Storage
+const storageUploadBase64 = async (folder, base64DataUrl, filename, mimeType) => {
+  if (!supabase) throw new Error('Supabase not connected');
+  // Convert base64 to Blob
+  const base64 = base64DataUrl.split(',')[1];
+  if (!base64) throw new Error('Invalid base64 data');
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: mimeType || 'application/octet-stream' });
+  const safeName = (filename || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `${folder}/${Date.now()}_${safeName}`;
+  const { error } = await supabase.storage.from('hrms-files').upload(path, blob, {
+    cacheControl: '3600',
+    upsert: false,
+    contentType: mimeType || 'application/octet-stream'
+  });
+  if (error) throw new Error(`Storage upload failed: ${error.message}`);
+  const { data: urlData } = await supabase.storage.from('hrms-files').createSignedUrl(path, 315360000);
+  return { path, url: urlData?.signedUrl || path };
+};
 
 export const dataService = {
   // ── Employees ─────────────────────────────────────────────────────────────
@@ -287,20 +333,6 @@ export const dataService = {
     await supabase.from('attendance').upsert(record);
   },
 
-  getPersonalAttendanceTrajectory: async (userId) => {
-    if (!supabase) return [];
-    const { data } = await supabase.from('attendance')
-      .select('date, punch_in')
-      .eq('emp_id', userId)
-      .order('date', { ascending: false })
-      .limit(5);
-    
-    return (data || []).reverse().map(r => ({
-      day: new Date(r.date).toLocaleDateString('en-US', { weekday: 'short' }),
-      present: r.punch_in ? 1 : 0
-    }));
-  },
-
   saveAttendance: async (records) => {
     if (!supabase) return;
     // records is a map of { empId_y_m_d: { punchIn, punchOut, remark, source } }
@@ -308,12 +340,29 @@ export const dataService = {
       const parts = id.split('_'); // empId_year_month_day
       const emp_id = parts[0];
       const date = `${parts[1]}-${String(Number(parts[2]) + 1).padStart(2, '0')}-${String(parts[3]).padStart(2, '0')}`;
+      
+      // Construct timestamps for DB columns if present
+      let punchInTs = null;
+      if (rec.punchIn && rec.punchIn.includes(':')) {
+        punchInTs = new Date(`${date}T${rec.punchIn}:00`).toISOString();
+      } else if (rec.punchIn) {
+        punchInTs = rec.punchIn; // assume already ISO or valid
+      }
+
+      let punchOutTs = null;
+      if (rec.punchOut && rec.punchOut.includes(':')) {
+        punchOutTs = new Date(`${date}T${rec.punchOut}:00`).toISOString();
+      } else if (rec.punchOut) {
+        punchOutTs = rec.punchOut; // assume already ISO or valid
+      }
+
       return {
         id,
         emp_id,
         date,
-        punch_in: rec.punchIn,
-        punch_out: rec.punchOut,
+        punch_in: punchInTs,
+        punch_out: punchOutTs,
+        status: rec.punchOut ? 'Present' : (rec.punchIn ? 'Incomplete' : 'Absent'),
         data: { remark: rec.remark, source: rec.source },
         updated_at: new Date().toISOString()
       };
@@ -346,17 +395,20 @@ export const dataService = {
 
   saveLeaveRequests: async (reqs) => {
     if (!supabase) return reqs;
-    const rows = reqs.map(r => ({
-      id: r.id || Date.now() + Math.random(),
-      emp_id: r.emp_id || r.empId,
-      type: r.type,
-      start_date: r.start_date || r.startDate,
-      end_date: r.end_date || r.endDate,
-      reason: r.reason,
-      status: r.status,
-      data: r
-    }));
-    await supabase.from('leave_requests').upsert(rows);
+    const rows = reqs.map(r => {
+      const id = r.id || `LV_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      return {
+        id,
+        emp_id: String(r.emp_id || r.empId),
+        type: r.type,
+        start_date: r.start_date || r.startDate,
+        end_date: r.end_date || r.endDate,
+        reason: r.reason,
+        status: r.status,
+        data: { ...r, id } // Ensure data field also has the stable ID
+      };
+    });
+    await supabase.from('leave_requests').upsert(rows, { onConflict: 'id' });
     return reqs;
   },
 
@@ -440,9 +492,8 @@ export const dataService = {
   },
 
   uploadPolicyFile: async (file) => {
-    // Placeholder: In a real app, use supabase.storage.from('policies').upload(...)
-    console.log("Mock file upload:", file.name);
-    return `/mock-storage/policies/${file.name}`;
+    const { url } = await storageUpload('policies', file);
+    return url;
   },
 
   getAcknowledgments: async () => sbGetAll('policy_acks'),
@@ -478,21 +529,41 @@ export const dataService = {
 
   // ── Advances & Payroll ─────────────────────────────────────────────────
   getAdvanceHistory: async () => sbGetAll('advances'),
-  saveAdvanceHistory: async (history) => sbSaveAll('advances', history),
+  saveAdvanceHistory: async (history) => {
+    if (!supabase || !history || history.length === 0) return history;
+    try {
+      const rows = history.map(r => ({
+        id: String(r.id),
+        emp_id: String(r.empId || r.emp_id),
+        data: r
+      }));
+      await supabase.from('advances').upsert(rows, { onConflict: 'id' });
+    } catch (e) { console.error(`saveAdvanceHistory exception:`, e); }
+    return history;
+  },
   getPersonalAdvances: async (empId) => {
     if (!supabase) return [];
-    const { data } = await supabase.from('advances').select('data').eq('emp_id', empId);
+    const { data } = await supabase.from('advances').select('data').eq('emp_id', String(empId));
     return (data || []).map(r => r.data);
   },
 
   getPayrollHistory: async () => sbGetAll('payroll_history'),
-  savePayrollHistory: async (history) => sbSaveAll('payroll_history', history),
+  savePayrollHistory: async (history) => {
+    if (!supabase || !history || history.length === 0) return history;
+    const rows = history.map(h => ({
+      id: `PAY_${h.year}_${h.month}_${h.empId}`,
+      data: h,
+      created_at: h.createdAt || new Date().toISOString()
+    }));
+    await supabase.from('payroll_history').upsert(rows, { onConflict: 'id' });
+    return history;
+  },
 
-  getManpowerRequests: async () => sbGetAll('recruitment_requests'),
-  saveManpowerRequests: async (reqs) => sbSaveAll('recruitment_requests', reqs),
-  
-  getDeptBudgets: async () => getConfig('dept_budgets', {}),
-  saveDeptBudgets: async (budgets) => saveConfig('dept_budgets', budgets),
+  getManpowerRequests: async () => sbGetAll('manpower_requests'),
+  saveManpowerRequests: async (list) => sbSaveAll('manpower_requests', list),
+
+  getDeptBudgets: async () => sbGetAll('dept_budgets'),
+  saveDeptBudgets: async (list) => sbSaveAll('dept_budgets', list),
 
   getBonusPayments: async () => sbGetAll('bonus_payments'),
   saveBonusPayments: async (list) => sbSaveAll('bonus_payments', list),
@@ -555,7 +626,7 @@ export const dataService = {
     if (!supabase) return;
     const { data } = await supabase.from('projects').select('status').eq('id', id).single();
     const newStatus = data?.status === 'Active' ? 'Inactive' : 'Active';
-    await supabase.from('projects').update({ status: newStatus }).eq('id', id);
+    await supabase.from('projects').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', id);
   },
 
 
@@ -575,8 +646,8 @@ export const dataService = {
 
 
   // ── App Configs (Bulletin, Biometrics, etc) ──────────────────────────
-  getBiometricConfig: async () => getConfig('biometric_config', { ip: '192.168.1.201', port: '4370' }),
-  saveBiometricConfig: async (conf) => saveConfig('biometric_config', conf),
+  getBiometricConfig: async () => getConfig('biometric', { ip: '192.168.1.201', port: '4370', isEnabled: true }),
+  saveBiometricConfig: async (conf) => saveConfig('biometric', conf),
 
   getGratuityConfig: async () => getConfig('gratuity_config', { enabled: true, minYearsStandard: 5 }),
   saveGratuityConfig: async (conf) => saveConfig('gratuity_config', conf),
@@ -688,8 +759,10 @@ export const dataService = {
   },
 
   getPersonalNotices: async (userId) => {
-    const all = await dataService.getNotices();
-    return all.filter(n => !n.data?.targetUserId || n.data.targetUserId === Number(userId));
+    if (!supabase) return [];
+    const { data } = await supabase.from('notices').select('data').order('id', { ascending: false });
+    const all = (data || []).map(r => r.data);
+    return all.filter(n => !n.targetUserId || String(n.targetUserId) === String(userId));
   },
 
   getSalaryByMonth: async (month, year) => {
@@ -775,14 +848,31 @@ export const dataService = {
     localStorage.setItem(localKey, JSON.stringify(updated));
     console.log(`Vault: ${newDoc.id} cached in localStorage for emp ${doc.empId}`);
 
-    // Step 3: AWAIT Supabase save (this is now required, not fire-and-forget)
-    // If Supabase fails, we still have localStorage. But we log the failure clearly.
+    // Step 3: AWAIT Supabase Storage & Config save
     if (supabase) {
-      const saved = await saveConfig(localKey, updated);
-      if (saved) {
-        console.log(`Vault: ${newDoc.id} persisted to Supabase successfully.`);
-      } else {
-        console.error(`Vault: Supabase save FAILED for ${newDoc.id}. Document is in localStorage only (current session).`);
+      try {
+        let finalDoc = { ...newDoc };
+        // If there's content (base64), upload it to Storage instead of DB
+        if (doc.content && doc.content.startsWith('data:')) {
+          console.log(`Vault: Uploading file for ${newDoc.id} to Supabase Storage...`);
+          const { path, url } = await storageUploadBase64('vault', doc.content, newDoc.name, newDoc.type);
+          finalDoc.content = url; // Replace base64 with signed URL
+          finalDoc.storagePath = path; // Store the actual storage path
+          console.log(`Vault: Storage upload success for ${newDoc.id}`);
+        }
+
+        // Update local and remote with the URL version
+        const updatedWithUrl = updated.map(d => d.id === newDoc.id ? finalDoc : d);
+        localStorage.setItem(localKey, JSON.stringify(updatedWithUrl));
+        
+        const saved = await saveConfig(localKey, updatedWithUrl);
+        if (saved) {
+          console.log(`Vault: ${newDoc.id} persisted to Supabase successfully.`);
+        } else {
+          console.error(`Vault: Supabase config save FAILED for ${newDoc.id}.`);
+        }
+      } catch (err) {
+        console.error(`Vault: Critical upload failure for ${newDoc.id}:`, err.message);
       }
     }
   },
@@ -805,12 +895,6 @@ export const dataService = {
   getComplianceManuals: async () => sbGetAll('compliance_manuals'),
   saveComplianceManuals: async (list) => sbSaveAll('compliance_manuals', list),
 
-  getManpowerRequests: async () => sbGetAll('manpower_requests'),
-  saveManpowerRequests: async (list) => sbSaveAll('manpower_requests', list),
-
-  getDeptBudgets: async () => sbGetAll('dept_budgets'),
-  saveDeptBudgets: async (list) => sbSaveAll('dept_budgets', list),
-
   getBudgetUtilization: async (dept) => {
     if (!supabase) return 0;
     const reqs = await dataService.getManpowerRequests();
@@ -826,30 +910,18 @@ export const dataService = {
     return data ? data.data : null;
   },
 
-  saveSalaryStructure: async (empId, structData, isNew = false) => {
+  saveSalaryStructure: async (empId, structData) => {
     if (!supabase) return;
     try {
-      const snapshot = { ...structData, lastUpdated: new Date().toISOString() };
-      
-      let dbError;
-      if (isNew) {
-        const { error } = await supabase.from('salary_structures_ext').insert({
-          emp_id: empId,
-          data: snapshot,
-          last_updated: new Date().toISOString()
-        });
-        dbError = error;
-      } else {
-        const { error } = await supabase.from('salary_structures_ext').update({
-          data: snapshot,
-          last_updated: new Date().toISOString()
-        }).eq('emp_id', empId);
-        dbError = error;
-      }
-      
-      if (dbError) throw dbError;
+      const snapshot = { ...structData, empId: String(empId), lastUpdated: new Date().toISOString() };
+      // Use upsert so it works for both new and existing employees
+      const { error } = await supabase.from('salary_structures_ext').upsert({
+        emp_id: String(empId),
+        data: snapshot
+      }, { onConflict: 'emp_id' });
+      if (error) throw error;
     } catch (err) {
-      console.error("Exception in saveSalaryStructure:", err);
+      console.error('Exception in saveSalaryStructure:', err);
       throw err;
     }
   },
@@ -885,7 +957,11 @@ export const dataService = {
   savePayrollSnapshot: async (data) => {
     if (!supabase) return;
     const id = `PAY_${data.year}_${data.month}_${data.empId}`;
-    await supabase.from('payroll_history').upsert({ id, data, created_at: new Date().toISOString() });
+    await supabase.from('payroll_history').upsert({ 
+      id, 
+      data, 
+      created_at: new Date().toISOString() 
+    }, { onConflict: 'id' });
   },
 
   getLeaveAnalytics: (leaves) => {
@@ -939,12 +1015,6 @@ export const dataService = {
 
 
 
-  getBiometricConfig: async () => {
-    return await getConfig('biometric', { ip: '192.168.1.201', port: '4370', isEnabled: true });
-  },
-
-  saveBiometricConfig: async (config) => {
-    if (!supabase) return;
-    await supabase.from('app_config').upsert({ key: 'biometric', value: config, updated_at: new Date().toISOString() });
-  }
+  getBiometricConfig: async () => dataService.getBiometricConfig(),
+  saveBiometricConfig: async (config) => dataService.saveBiometricConfig(config)
 };
