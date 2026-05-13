@@ -495,6 +495,7 @@ export const dataService = {
     await supabase.from('expenses').delete().eq('id', id);
   },
 
+
   // ── Projects ──────────────────────────────────────────────────────────
   getProjects: async () => {
     if (!supabase) return [];
@@ -684,8 +685,10 @@ export const dataService = {
   getEmployeeDocs: async (empId = null) => {
     if (!supabase) return [];
     try {
+      // The schema confirmedly lacks explicit columns like 'category', 
+      // so we use the 'data' JSONB column pattern which is standard for this app.
       let query = supabase.from('employee_documents').select('*');
-      if (empId) query = query.eq('emp_id', String(empId)); // Ensure string comparison for IDs
+      if (empId) query = query.eq('emp_id', String(empId));
       
       const { data, error } = await query;
       if (error) {
@@ -693,17 +696,21 @@ export const dataService = {
         return [];
       }
       
-      return (data || []).map(r => ({
-        ...(r.file_data || {}),
-        id: r.id,
-        empId: r.emp_id,
-        category: r.category,
-        docType: r.doc_type,
-        status: r.status,
-        uploadedBy: r.uploaded_by,
-        version: r.version,
-        createdAt: r.created_at
-      }));
+      return (data || []).map(r => {
+        const docData = r.data || r.file_data || {};
+        return {
+          ...docData,
+          id: r.id,
+          empId: r.emp_id,
+          // Fallback mappings if they were top-level columns in some environments
+          category: r.category || docData.category || 'General',
+          docType: r.doc_type || docData.docType || 'Document',
+          status: r.status || docData.status || 'Active',
+          uploadedBy: r.uploaded_by || docData.uploadedBy || 'System',
+          version: r.version || docData.version || 1,
+          createdAt: r.created_at || docData.createdAt
+        };
+      });
     } catch (e) {
       console.error("DataService: Exception in getEmployeeDocs:", e);
       return [];
@@ -714,22 +721,26 @@ export const dataService = {
     if (!supabase) return;
     try {
       const id = `DOC_${Date.now()}`;
-      const file_data = { 
+      const docRecord = {
+        id,
+        empId: String(doc.empId),
         name: doc.name || doc.docType || 'Document', 
         size: doc.size || 0, 
         type: doc.type || 'text/html',
-        content: doc.content || '' // Base64 or HTML string
+        content: doc.content || '',
+        category: doc.category || 'General',
+        docType: doc.docType || 'Document',
+        status: doc.status || 'Active',
+        uploadedBy: doc.uploadedBy || 'System',
+        version: doc.version || 1,
+        createdAt: new Date().toISOString()
       };
       
-      const { error } = await supabase.from('employee_documents').insert({ 
+      // Save using the robust {id, emp_id, data} pattern
+      const { error } = await supabase.from('employee_documents').upsert({ 
         id, 
-        emp_id: String(doc.empId), 
-        category: doc.category || 'General',
-        doc_type: doc.docType || 'Document',
-        status: doc.status || 'Active',
-        uploaded_by: doc.uploadedBy || 'System',
-        version: doc.version || 1,
-        file_data 
+        emp_id: String(doc.empId),
+        data: docRecord
       });
 
       if (error) {
