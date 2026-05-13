@@ -165,8 +165,9 @@ const Attendance = () => {
         ]);
 
         if (isMounted) {
-          console.log("Attendance: Data Load Success", { emps: emps.length, att: Object.keys(att || {}).length });
+          console.log("Attendance: Data Load Success", { emps: emps.length, att: Object.keys(att || {}).length, userRole });
           setEmployeesList(emps);
+          if (emps.length === 0) console.warn("Attendance: Employee list is empty. Check RLS or data existence.");
           setRecords(att);
           setHolidayList(hol);
           if (bConf) setBioConfig(bConf);
@@ -278,8 +279,12 @@ const Attendance = () => {
 
       alert(`${addedCount} new logs successfully synchronized from hardware terminal.`);
     } catch (err) {
-      console.error("Sync Error:", err);
-      alert('Failed to connect to Biometric Device. Please check IP/Port settings and network.');
+      console.error("Sync Error Detailed:", err);
+      if (err.message.includes("Permission Denied")) {
+        alert(err.message);
+      } else {
+        alert('Connectivity Issue: Failed to reach the Biometric Terminal at ' + bioConfig.ip + '. Please verify the device is powered on and the IP is reachable from your browser.');
+      }
     } finally {
       setSyncLoading(false);
     }

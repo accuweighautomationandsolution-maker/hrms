@@ -167,8 +167,8 @@ export const dataService = {
       
       console.log(`dataService: Successfully fetched ${data.length} employees.`);
       
-      const userRole = typeof authService !== 'undefined' ? authService.getUserRole() : 'employee';
-      const isEmployeeUser = userRole !== 'management' && userRole !== 'admin';
+      const userRole = (typeof authService !== 'undefined' && authService.getUserRole) ? authService.getUserRole() : null;
+      const isEmployeeUser = userRole === 'employee';
 
       return data.map(r => {
         let parsedData = {};
@@ -428,7 +428,12 @@ export const dataService = {
     });
     // Upsert in chunks to avoid URL length limits
     for (let i = 0; i < rows.length; i += 100) {
-      await supabase.from('attendance').upsert(rows.slice(i, i + 100));
+      const { error } = await supabase.from('attendance').upsert(rows.slice(i, i + 100));
+      if (error) {
+        console.error("Supabase attendance upsert error:", error.message);
+        if (error.code === '42501') throw new Error("Permission Denied: Row Level Security (RLS) policy prevents saving attendance. Please contact the Database Admin.");
+        throw new Error(`Database Error: ${error.message}`);
+      }
     }
   },
 
