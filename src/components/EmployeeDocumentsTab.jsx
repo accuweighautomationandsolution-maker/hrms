@@ -33,6 +33,7 @@ const EmployeeDocumentsTab = ({ empId, employeeName }) => {
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadForm, setUploadForm] = useState({ category: Object.keys(CATEGORIES)[0], docType: CATEGORIES[Object.keys(CATEGORIES)[0]].types[0], file: null });
 
   useEffect(() => {
     if (empId) {
