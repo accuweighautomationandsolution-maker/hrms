@@ -85,6 +85,22 @@ const EmployeeDocumentsTab = ({ empId, employeeName }) => {
     setUploading(true);
     setStatusMsg(null);
     
+    // Build the document object locally first for optimistic UI
+    const optimisticDoc = {
+      id: `DOC_${Date.now()}`,
+      empId: String(empId),
+      name: uploadForm.file.name,
+      size: uploadForm.file.size,
+      type: uploadForm.file.type,
+      content: uploadForm.file.content,
+      category: uploadForm.category,
+      docType: uploadForm.docType,
+      status: 'Active',
+      uploadedBy: 'HR Admin',
+      version: 1,
+      createdAt: new Date().toISOString()
+    };
+
     // Safety Timeout: 30 seconds
     const timeout = new Promise((_, reject) => 
       setTimeout(() => reject(new Error('Network timeout after 30s. Check your connection and try again.')), 30000)
@@ -106,10 +122,14 @@ const EmployeeDocumentsTab = ({ empId, employeeName }) => {
         timeout
       ]);
 
-      setStatusMsg({ type: 'success', text: `✓ "${uploadForm.file.name}" uploaded successfully.` });
+      // ✅ Optimistic update: add document to local state immediately so it appears in Vault NOW
+      setDocuments(prev => [...prev, optimisticDoc]);
+      setStatusMsg({ type: 'success', text: `✓ "${uploadForm.file.name}" uploaded and saved successfully.` });
       setShowUpload(false);
       setUploadForm(prev => ({ ...prev, file: null }));
-      await loadDocuments();
+      
+      // Background sync to confirm DB state (non-blocking)
+      loadDocuments().catch(err => console.warn('Vault: Background sync failed:', err));
     } catch (e) {
       console.error('Vault: Upload failure:', e);
       setStatusMsg({ type: 'error', text: `Upload Failed: ${e.message || 'Server did not respond. Try again.'}` });

@@ -35,16 +35,31 @@ const sbDelete = async (table, id) => {
 const getConfig = async (key, defaultVal) => {
   if (!supabase) return defaultVal;
   try {
-    const { data, error } = await supabase.from('app_config').select('value').eq('key', key).maybeSingle();
-    if (error) return defaultVal;
-    return data ? data.value : defaultVal;
-  } catch (e) { return defaultVal; }
+    // Use order+limit(1) so we always get the most recent value even if duplicates exist
+    const { data, error } = await supabase
+      .from('app_config')
+      .select('value')
+      .eq('key', key)
+      .order('updated_at', { ascending: false })
+      .limit(1);
+    if (error) { console.error(`getConfig(${key}):`, error); return defaultVal; }
+    return (data && data.length > 0) ? data[0].value : defaultVal;
+  } catch (e) { console.error(`getConfig(${key}) exception:`, e); return defaultVal; }
 };
 
 const saveConfig = async (key, value) => {
   if (!supabase) return;
   try {
-    await supabase.from('app_config').upsert({ key, value, updated_at: new Date().toISOString() });
+    // Specify onConflict:'key' so Supabase updates the existing row instead of inserting a duplicate
+    const { error } = await supabase
+      .from('app_config')
+      .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+    if (error) {
+      console.warn(`saveConfig(${key}) upsert failed, trying delete+insert:`, error);
+      // Fallback: delete existing row then insert fresh
+      await supabase.from('app_config').delete().eq('key', key);
+      await supabase.from('app_config').insert({ key, value, updated_at: new Date().toISOString() });
+    }
   } catch (e) { console.error(`saveConfig(${key}):`, e); }
 };
 
