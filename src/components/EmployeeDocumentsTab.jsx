@@ -46,9 +46,23 @@ const EmployeeDocumentsTab = ({ empId, employeeName }) => {
     setLoading(true);
     try {
       const docs = await dataService.getEmployeeDocs(empId);
-      setDocuments(docs || []);
+      // Only update state if we get actual documents back, or if we're doing initial load
+      // This prevents the background sync from wiping optimistic updates
+      if (docs && docs.length > 0) {
+        setDocuments(docs);
+      } else {
+        // Check localStorage directly as fallback
+        const localKey = `vault_${empId}`;
+        const localRaw = localStorage.getItem(localKey);
+        const localDocs = localRaw ? JSON.parse(localRaw) : [];
+        setDocuments(localDocs);
+      }
     } catch (e) {
-      console.error("Vault: Failed to load documents:", e);
+      console.error('Vault: Failed to load documents:', e);
+      // Fallback to localStorage
+      const localKey = `vault_${empId}`;
+      const localRaw = localStorage.getItem(localKey);
+      setDocuments(localRaw ? JSON.parse(localRaw) : []);
     } finally {
       setLoading(false);
     }

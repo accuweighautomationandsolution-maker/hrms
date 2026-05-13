@@ -690,78 +690,99 @@ export const dataService = {
   saveLetterTemplates: async (list) => sbSaveAll('letter_templates', list),
 
   // ── Employee Vault Documents ───────────────────────────────────────────
-  // Storage Strategy: Uses the proven app_config table with key='vault_{empId}'.
-  // This is the same mechanism used for biometric_config, departments, etc.
-  // It is guaranteed schema-compatible and avoids row-size limits on the employees table.
+  // Storage: localStorage is PRIMARY (instant, no schema issues, persists across refresh).
+  // Supabase app_config is SECONDARY (background sync for cross-device).
+  // localStorage key pattern: vault_{empId}
 
   getEmployeeDocs: async (empId = null) => {
-    if (!supabase) return [];
-    try {
-      if (empId) {
-        // Fetch docs for a specific employee
-        const docs = await getConfig(`vault_${empId}`, []);
-        return Array.isArray(docs) ? docs : [];
-      }
-      // Fetch ALL vault entries (for the Document Hub global view)
-      const { data, error } = await supabase
-        .from('app_config')
-        .select('key, value')
-        .like('key', 'vault_%');
-      if (error) { console.error('getEmployeeDocs(all):', error); return []; }
-      return (data || []).reduce((acc, row) => {
-        const docs = Array.isArray(row.value) ? row.value : [];
-        return [...acc, ...docs];
-      }, []);
-    } catch (e) {
-      console.error('DataService: Exception in getEmployeeDocs:', e);
+    const localRead = (key) => {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : [];
+      } catch { return []; }
+    };
+
+    if (empId) {
+      const localKey = `vault_${empId}`;
+      // 1. Always read from localStorage first (guaranteed)
+      const localDocs = localRead(localKey);
+      if (localDocs.length > 0) return localDocs;
+      // 2. Fallback: try Supabase and cache result locally
+      try {
+        const remoteDocs = await getConfig(localKey, []);
+        if (Array.isArray(remoteDocs) && remoteDocs.length > 0) {
+          localStorage.setItem(localKey, JSON.stringify(remoteDocs));
+          return remoteDocs;
+        }
+      } catch (e) { /* ignore */ }
       return [];
     }
+    // Return all (for Document Hub): scan localStorage for all vault_* keys
+    const allDocs = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('vault_')) {
+        allDocs.push(...localRead(key));
+      }
+    }
+    return allDocs;
   },
 
   addEmployeeDoc: async (doc) => {
-    if (!supabase) throw new Error('Database not connected');
+    const localKey = `vault_${String(doc.empId)}`;
+    // 1. Build document record
+    const newDoc = {
+      id: `DOC_${Date.now()}`,
+      empId: String(doc.empId),
+      name: doc.name || 'Document',
+      size: doc.size || 0,
+      type: doc.type || 'application/octet-stream',
+      content: doc.content || '',
+      category: doc.category || 'General',
+      docType: doc.docType || 'Document',
+      status: doc.status || 'Active',
+      uploadedBy: doc.uploadedBy || 'HR Admin',
+      version: doc.version || 1,
+      createdAt: new Date().toISOString()
+    };
+    // 2. Read existing from localStorage and append
+    let existing = [];
     try {
-      const vaultKey = `vault_${String(doc.empId)}`;
-      // 1. Read existing docs for this employee
-      const existing = await getConfig(vaultKey, []);
-      const docList = Array.isArray(existing) ? existing : [];
-      // 2. Build new document record (exclude raw file content from metadata, keep it for download)
-      const newDoc = {
-        id: `DOC_${Date.now()}`,
-        empId: String(doc.empId),
-        name: doc.name || 'Document',
-        size: doc.size || 0,
-        type: doc.type || 'application/octet-stream',
-        content: doc.content || '',   // base64 data URL for download
-        category: doc.category || 'General',
-        docType: doc.docType || 'Document',
-        status: doc.status || 'Active',
-        uploadedBy: doc.uploadedBy || 'HR Admin',
-        version: doc.version || 1,
-        createdAt: new Date().toISOString()
-      };
-      // 3. Append and save back
-      await saveConfig(vaultKey, [...docList, newDoc]);
-      console.log(`Vault: Document ${newDoc.id} committed for employee ${doc.empId}`);
-    } catch (e) {
-      console.error('DataService: Exception in addEmployeeDoc:', e);
-      throw e;
+      const raw = localStorage.getItem(localKey);
+      existing = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(existing)) existing = [];
+    } catch { existing = []; }
+    const updated = [...existing, newDoc];
+    // 3. Write to localStorage SYNCHRONOUSLY — guaranteed instant persistence
+    localStorage.setItem(localKey, JSON.stringify(updated));
+    console.log(`Vault: Document ${newDoc.id} saved to localStorage for emp ${doc.empId}`);
+    // 4. Background sync to Supabase (fire-and-forget, never blocks UI)
+    if (supabase) {
+      saveConfig(localKey, updated).catch(e =>
+        console.warn('Vault: Supabase sync failed (localStorage is still intact):', e)
+      );
     }
   },
-  
+
   deleteEmployeeDoc: async (docId, empId) => {
-    if (!supabase) return;
+    if (!empId) throw new Error('empId required to delete document');
+    const localKey = `vault_${String(empId)}`;
+    // 1. Delete from localStorage immediately
+    let existing = [];
     try {
-      if (!empId) throw new Error('empId required to delete document');
-      const vaultKey = `vault_${String(empId)}`;
-      const existing = await getConfig(vaultKey, []);
-      const updated = (Array.isArray(existing) ? existing : []).filter(d => String(d.id) !== String(docId));
-      await saveConfig(vaultKey, updated);
-    } catch (e) {
-      console.error('DataService: Exception in deleteEmployeeDoc:', e);
-      throw e;
+      const raw = localStorage.getItem(localKey);
+      existing = raw ? JSON.parse(raw) : [];
+    } catch { existing = []; }
+    const updated = existing.filter(d => String(d.id) !== String(docId));
+    localStorage.setItem(localKey, JSON.stringify(updated));
+    // 2. Background sync to Supabase
+    if (supabase) {
+      saveConfig(localKey, updated).catch(e =>
+        console.warn('Vault delete: Supabase sync failed:', e)
+      );
     }
   },
+
 
   getStatutoryUpdates: async () => sbGetAll('statutory_updates'),
   saveStatutoryUpdates: async (list) => sbSaveAll('statutory_updates', list),
