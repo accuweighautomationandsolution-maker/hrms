@@ -35,47 +35,55 @@ const sbDelete = async (table, id) => {
 const getConfig = async (key, defaultVal) => {
   if (!supabase) return defaultVal;
   try {
-    // Use order+limit(1) so we always get the most recent value even if duplicates exist
+    // Use maybeSingle() - if there are duplicates, just catch and return default
     const { data, error } = await supabase
       .from('app_config')
       .select('value')
       .eq('key', key)
-      .order('updated_at', { ascending: false })
-      .limit(1);
-    if (error) { console.error(`getConfig(${key}):`, error); return defaultVal; }
-    return (data && data.length > 0) ? data[0].value : defaultVal;
-  } catch (e) { console.error(`getConfig(${key}) exception:`, e); return defaultVal; }
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      console.warn(`getConfig(${key}) error:`, error.message);
+      return defaultVal;
+    }
+    return data ? data.value : defaultVal;
+  } catch (e) {
+    console.warn(`getConfig(${key}) exception:`, e.message);
+    return defaultVal;
+  }
 };
 
 const saveConfig = async (key, value) => {
   if (!supabase) return;
   try {
-    // Specify onConflict:'key' so Supabase updates the existing row instead of inserting a duplicate
-    const { error } = await supabase
+    await supabase
       .from('app_config')
-      .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
-    if (error) {
-      console.warn(`saveConfig(${key}) upsert failed, trying delete+insert:`, error);
-      // Fallback: delete existing row then insert fresh
-      await supabase.from('app_config').delete().eq('key', key);
-      await supabase.from('app_config').insert({ key, value, updated_at: new Date().toISOString() });
-    }
-  } catch (e) { console.error(`saveConfig(${key}):`, e); }
+      .upsert({ key, value }, { onConflict: 'key' });
+  } catch (e) {
+    console.error(`saveConfig(${key}):`, e);
+  }
 };
+
 
 export const dataService = {
   // ── Employees ─────────────────────────────────────────────────────────────
   getEmployees: async () => {
     if (!supabase) return [];
     try {
-      // Fetch everything to ensure we don't miss rows with missing 'data' column
-      const { data, error } = await supabase
+      // 8-second timeout — if Supabase is slow, return [] so the page renders instead of hanging
+      const fetchPromise = supabase
         .from('employees')
         .select('*')
         .order('id', { ascending: false });
       
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('getEmployees timed out after 8s')), 8000)
+      );
+
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+
       if (error) {
-        console.error("Error fetching employees:", error);
+        console.error('Error fetching employees:', error);
         return [];
       }
       
@@ -87,7 +95,6 @@ export const dataService = {
           parsedData = r.data;
         }
         
-        // Merge top-level columns into data to ensure consistency
         return {
           ...parsedData,
           id: r.id,
@@ -101,7 +108,7 @@ export const dataService = {
         };
       });
     } catch (err) {
-      console.error("Exception in getEmployees:", err);
+      console.error('Exception in getEmployees:', err.message);
       return [];
     }
   },
