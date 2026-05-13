@@ -41,43 +41,56 @@ const sbDelete = async (table, id) => {
 const getConfig = async (key, defaultVal) => {
   if (!supabase) return defaultVal;
   try {
+    // Strategy 1: Try app_config (official settings table)
     const { data, error } = await supabase
       .from('app_config')
       .select('value')
       .eq('key', key)
       .limit(1);
-    if (error) { console.warn(`getConfig(${key}):`, error.message); return defaultVal; }
-    return (data && data.length > 0) ? data[0].value : defaultVal;
-  } catch (e) { console.warn(`getConfig(${key}):`, e.message); return defaultVal; }
+    
+    if (!error && data && data.length > 0) return data[0].value;
+
+    // Strategy 2: Fallback to employees table (using shadow ID)
+    const shadowId = `sys_config_${key}`;
+    const { data: shadow, error: shadowErr } = await supabase
+      .from('employees')
+      .select('data')
+      .eq('id', shadowId)
+      .maybeSingle();
+    
+    if (!shadowErr && shadow && shadow.data) return shadow.data.value;
+
+    return defaultVal;
+  } catch (e) { 
+    console.warn(`getConfig(${key}) exception:`, e.message); 
+    return defaultVal; 
+  }
 };
 
 // Robust saveConfig: tries upsert → update → insert to guarantee write regardless of schema constraints
 const saveConfig = async (key, value) => {
   if (!supabase) return false;
   try {
-    // Strategy 1: upsert (works if 'key' column has unique constraint)
+    // Strategy 1: Try app_config
     const { error: e1 } = await supabase
       .from('app_config')
       .upsert({ key, value }, { onConflict: 'key' });
     if (!e1) return true;
 
-    // Strategy 2: update existing row
-    console.warn(`saveConfig upsert failed (${e1.message}), trying update...`);
-    const { data: updated, error: e2 } = await supabase
-      .from('app_config')
-      .update({ value })
-      .eq('key', key)
-      .select('key');
-    if (!e2 && updated && updated.length > 0) return true;
+    // Strategy 2: Fallback to employees table (shadow record)
+    const shadowId = `sys_config_${key}`;
+    const { error: e2 } = await supabase
+      .from('employees')
+      .upsert({ 
+        id: shadowId, 
+        name: `System Config: ${key}`,
+        status: 'System',
+        data: { key, value } 
+      }, { onConflict: 'id' });
+    
+    if (!e2) return true;
 
-    // Strategy 3: insert new row
-    console.warn('saveConfig update found no rows, inserting...');
-    const { error: e3 } = await supabase
-      .from('app_config')
-      .insert({ key, value });
-    if (!e3) return true;
-
-    console.error(`saveConfig(${key}) all strategies failed:`, e3.message);
+    console.error(`saveConfig(${key}) failed in all tables:`, e2.message);
     return false;
   } catch (e) {
     console.error(`saveConfig(${key}) exception:`, e.message);

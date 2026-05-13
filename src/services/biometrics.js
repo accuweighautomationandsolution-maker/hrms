@@ -12,15 +12,32 @@ export const BiometricService = {
     return new Promise((resolve) => {
       // Simulate network latency for a punch-clock pull
       setTimeout(() => {
-        resolve([
-          { empId: 1, day: 10, punchIn: '08:45', punchOut: '17:30', remark: 'Auto-Sync' },
-          { empId: 2, day: 10, punchIn: '09:15', punchOut: '18:05', remark: 'Auto-Sync' },
-          { empId: 3, day: 10, punchIn: '08:55', punchOut: '17:45', remark: 'Auto-Sync' },
-          { empId: 4, day: 10, punchIn: '08:30', punchOut: '17:20', remark: 'Auto-Sync' },
-          { empId: 5, day: 10, punchIn: '09:05', punchOut: '18:15', remark: 'Auto-Sync' },
-          { empId: 1, day: 11, punchIn: '08:50', punchOut: '17:40', remark: 'Auto-Sync' },
-          { empId: 2, day: 11, punchIn: '09:10', punchOut: '18:00', remark: 'Auto-Sync' },
-        ]);
+        const now = new Date();
+        const logs = [];
+        
+        // Fetch ALL missing logs simulation (last 30 days instead of 7)
+        for (let dayOffset = 0; dayOffset < 30; dayOffset++) {
+          const logDate = new Date();
+          logDate.setDate(now.getDate() - dayOffset);
+          
+          // Skip Sundays
+          if (logDate.getDay() === 0) continue;
+          
+          // Generate 5 employee punches per day
+          for (let empId = 1; empId <= 5; empId++) {
+            logs.push({
+              empId,
+              day: logDate.getDate(),
+              month: logDate.getMonth(),
+              year: logDate.getFullYear(),
+              punchIn: '09:' + String(Math.floor(Math.random() * 30)).padStart(2, '0'),
+              punchOut: '18:' + String(Math.floor(Math.random() * 30)).padStart(2, '0'),
+              remark: 'Hardware Sync',
+              timestamp: logDate.toISOString()
+            });
+          }
+        }
+        resolve(logs);
       }, 2000);
     });
   },
@@ -32,17 +49,22 @@ export const BiometricService = {
   subscribeToPushEvents: (onPunch) => {
     console.log("Subscribing to Real-time Push Events from Identix X2008...");
     
-    // Simulate a random punch event every 30-60 seconds for demonstration
+    // Simulate a random punch event every 15-30 seconds for demonstration
     const interval = setInterval(() => {
       const now = new Date();
+      // Pick a random employee from a larger pool
+      const empId = Math.floor(Math.random() * 10) + 1;
       const mockPunch = {
-        empId: Math.floor(Math.random() * 5) + 1,
+        empId,
         time: `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`,
         type: Math.random() > 0.5 ? 'Punch In' : 'Punch Out',
-        timestamp: now.toISOString()
+        timestamp: now.toISOString(),
+        day: now.getDate(),
+        month: now.getMonth(),
+        year: now.getFullYear()
       };
       onPunch(mockPunch);
-    }, 45000);
+    }, 20000);
 
     return () => clearInterval(interval);
   },

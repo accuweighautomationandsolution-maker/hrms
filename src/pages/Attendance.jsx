@@ -143,6 +143,7 @@ const Attendance = () => {
   const [syncLoading,   setSyncLoading]   = useState(false);
   const [showBioConfig, setShowBioConfig] = useState(false);
   const [bioConfig,     setBioConfig]     = useState({ ip: '192.168.1.201', port: '4370', isEnabled: true });
+  const [lastSync,      setLastSync]      = useState(null);
   const [holidayList,   setHolidayList]   = useState([]);
   const [loading,       setLoading]       = useState(true);
 
@@ -155,11 +156,12 @@ const Attendance = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [emps, att, hol, bConf] = await Promise.all([
+        const [emps, att, hol, bConf, lSync] = await Promise.all([
           dataService.getEmployees().catch(() => []),
           dataService.getAttendance().catch(() => ({})),
           dataService.getCustomHolidays().catch(() => []),
-          dataService.getBiometricConfig().catch(() => null)
+          dataService.getBiometricConfig().catch(() => null),
+          dataService.getConfig('biometric_last_sync', null).catch(() => null)
         ]);
         
         if (isMounted) {
@@ -168,6 +170,7 @@ const Attendance = () => {
           setRecords(att);
           setHolidayList(hol);
           if (bConf) setBioConfig(bConf);
+          if (lSync) setLastSync(lSync);
 
           if (isEmployee) {
             if (emps.length > 0) {
@@ -201,28 +204,37 @@ const Attendance = () => {
     BiometricService.getDeviceStatus(bioConfig.ip, bioConfig.port).then(d => setDevices(d));
     
     // Subscribe to Push events for real-time reflection
-    const unsubscribe = BiometricService.subscribeToPushEvents((punch) => {
-      const now = new Date();
-      const day = now.getDate();
-      const m = now.getMonth();
-      const y = now.getFullYear();
+    const unsubscribe = BiometricService.subscribeToPushEvents(async (punch) => {
+      // Real-time Background Sync Logic
+      const pDay = punch.day;
+      const pMonth = punch.month;
+      const pYear = punch.year;
       
-      // Only process if it's for the current displayed month/year (or always in background)
-      const punchKey = `${punch.empId}_${y}_${m}_${day}`;
+      const punchKey = `${punch.empId}_${pYear}_${pMonth}_${pDay}`;
       
+      let updatedRecord = null;
+
       setRecords(prev => {
         const existing = prev[punchKey] || {};
+        updatedRecord = {
+          ...existing,
+          punchIn: punch.type === 'Punch In' ? punch.time : (existing.punchIn || '09:00'),
+          punchOut: punch.type === 'Punch Out' ? punch.time : (existing.punchOut || ''),
+          remark: existing.remark || 'Real-time Push Sync',
+          source: 'Biometric (Push)'
+        };
         return {
           ...prev,
-          [punchKey]: {
-            ...existing,
-            punchIn: punch.type === 'Punch In' ? punch.time : (existing.punchIn || '09:00'),
-            punchOut: punch.type === 'Punch Out' ? punch.time : (existing.punchOut || ''),
-            remark: existing.remark || 'Real-time Push Sync',
-            source: 'Biometric (Push)'
-          }
+          [punchKey]: updatedRecord
         };
       });
+
+      // Automatically persist the punch to Supabase in background
+      if (updatedRecord) {
+        dataService.saveAttendance({ [punchKey]: updatedRecord }).catch(err => {
+          console.error("Real-time sync background save failed:", err);
+        });
+      }
     });
 
     return () => unsubscribe();
@@ -241,19 +253,33 @@ const Attendance = () => {
     try {
       const logs = await BiometricService.fetchLogs(bioConfig.ip, bioConfig.port);
       const newRecords = { ...records };
+      let addedCount = 0;
+
       logs.forEach(log => {
-        newRecords[key(log.empId, log.day)] = {
-          punchIn: log.punchIn,
-          punchOut: log.punchOut,
-          remark: log.remark,
-          source: 'Biometric'
-        };
+        const logKey = `${log.empId}_${log.year}_${log.month}_${log.day}`;
+        // Prevent overwriting existing manual entries or already synced logs
+        if (!newRecords[logKey] || newRecords[logKey].source === 'Biometric') {
+          newRecords[logKey] = {
+            punchIn: log.punchIn,
+            punchOut: log.punchOut,
+            remark: log.remark || 'Hardware Sync',
+            source: 'Biometric'
+          };
+          addedCount++;
+        }
       });
+
       setRecords(newRecords);
       await dataService.saveAttendance(newRecords);
-      alert(`${logs.length} logs successfully synchronized from Identix Device.`);
+      
+      const timestamp = new Date().toLocaleString();
+      setLastSync(timestamp);
+      await dataService.saveConfig('biometric_last_sync', timestamp);
+
+      alert(`${addedCount} new logs successfully synchronized from hardware terminal.`);
     } catch (err) {
-      alert('Failed to connect to Biometric Device. Please check IP/Port settings.');
+      console.error("Sync Error:", err);
+      alert('Failed to connect to Biometric Device. Please check IP/Port settings and network.');
     } finally {
       setSyncLoading(false);
     }
@@ -343,9 +369,12 @@ const Attendance = () => {
         {!isEmployee && (
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             {bioConfig.isEnabled && devices[0] && (
-               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', padding: '0.4rem 0.6rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: devices[0]?.status === 'Online' ? 'var(--color-success)' : 'var(--color-danger)' }}></div>
-                  <span style={{ fontWeight: '600' }}>X2008: {devices[0]?.status || 'Checking...'}</span>
+               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', padding: '0.4rem 0.6rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px' }}>
+                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: devices[0]?.status === 'Online' ? 'var(--color-success)' : 'var(--color-danger)' }}></div>
+                   <span style={{ fontWeight: '600' }}>X2008: {devices[0]?.status || 'Checking...'}</span>
+                </div>
+                {lastSync && <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>Last Sync: {lastSync}</span>}
                </div>
             )}
             <button 
@@ -659,9 +688,10 @@ const Attendance = () => {
               <button className="btn btn-ghost" onClick={() => setShowBioConfig(false)}>Cancel</button>
               <button className="btn btn-primary" 
                 disabled={!bioConfig.ip || !bioConfig.port}
-                onClick={() => {
-                dataService.saveBiometricConfig(bioConfig);
+                onClick={async () => {
+                await dataService.saveBiometricConfig(bioConfig);
                 setShowBioConfig(false);
+                alert("Biometric configuration saved permanently.");
               }}>Save Configuration</button>
             </div>
           </div>
