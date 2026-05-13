@@ -105,13 +105,13 @@ export const dataService = {
       id,
       name: empData.name || '',
       email: empData.email || '',
-      emp_code: empData.empCode || '',
-      designation: empData.designation || '',
-      department: empData.department || '',
       status,
-      employment_type: empData.empType || 'Probation',
-      data: { ...empData, id, status, empType: empData.empType || 'Probation' }
+      data: { ...empData, id, status }
     };
+    
+    // We omit employment_type, designation, and department from the top-level row
+    // because they are confirmed missing in some schema versions. 
+    // They are safely stored inside the 'data' JSONB object above.
     
     try {
       let dbError;
