@@ -81,7 +81,8 @@ export const dataService = {
           empCode: r.emp_code || parsedData.empCode || '',
           role: r.designation || parsedData.role || 'Associate',
           department: r.department || parsedData.department || 'Engineering',
-          status: r.status || parsedData.status || 'Active'
+          status: r.status || parsedData.status || 'Active',
+          empType: r.employment_type || parsedData.empType || 'Probation'
         };
       });
     } catch (err) {
@@ -108,7 +109,8 @@ export const dataService = {
       designation: empData.designation || '',
       department: empData.department || '',
       status,
-      data: { ...empData, id, status }
+      employment_type: empData.empType || 'Probation',
+      data: { ...empData, id, status, empType: empData.empType || 'Probation' }
     };
     
     try {

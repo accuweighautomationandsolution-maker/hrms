@@ -24,24 +24,33 @@ const LeaveManagement = () => {
 
   const [requests, setRequests] = useState([]);
   const [balances, setBalances] = useState({ Paid: 0, Sick: 0, Casual: 0 });
-  const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [activeEmp, setActiveEmp] = useState(null);
+  
+  // Real-time synchronization of employment status for leave eligibility
+  const isProbation = activeEmp?.empType === 'Probation' || currentUser?.empType === 'Probation';
 
   useEffect(() => {
-    const fetchLeaves = async () => {
+    const fetchData = async () => {
       setLoading(true);
       try {
-        const [all, paidBal, sickBal, casualBal] = await Promise.all([
+        const [leaves, emps, paidBal, sickBal, casualBal] = await Promise.all([
           dataService.getLeaveRequests(),
-          dataService.getEmployeeBalance(isEmployee ? currentUser.id : 1, 'Paid'),
-          dataService.getEmployeeBalance(isEmployee ? currentUser.id : 1, 'Sick'),
-          dataService.getEmployeeBalance(isEmployee ? currentUser.id : 1, 'Casual')
+          dataService.getEmployees(),
+          dataService.getEmployeeBalance(currentUser.id, 'Paid'),
+          dataService.getEmployeeBalance(currentUser.id, 'Sick'),
+          dataService.getEmployeeBalance(currentUser.id, 'Casual')
         ]);
         
+        // Find current user's employee record to get real status
+        const myRecord = emps.find(e => e.id === currentUser.id || e.empCode === currentUser.empCode);
+        if (myRecord) setActiveEmp(myRecord);
+
         if (isEmployee) {
-          setRequests(all.filter(r => r.empId === Number(currentUser.id)));
+          setRequests(leaves.filter(l => l.empId === currentUser.id || l.empId === currentUser.empCode));
         } else {
-          setRequests(all);
+          setRequests(leaves);
         }
         setBalances({ Paid: paidBal, Sick: sickBal, Casual: casualBal });
       } catch (err) {
@@ -50,7 +59,7 @@ const LeaveManagement = () => {
         setLoading(false);
       }
     };
-    fetchLeaves();
+    fetchData();
   }, [currentUser?.id, isEmployee]);
   
   // Form State
@@ -58,7 +67,6 @@ const LeaveManagement = () => {
   const [startDate,   setStartDate]   = useState('');
   const [endDate,     setEndDate]     = useState('');
   const [reason,      setReason]      = useState('');
-  const [isProbation, setIsProbation] = useState(false);
 
   const [showExportMenu, setShowExportMenu] = useState(false);
 
@@ -121,7 +129,6 @@ const LeaveManagement = () => {
         <SummaryCard title="Casual Leave Balance" value={balances.Casual} colorClass="bg-amber-500" />
       </div>
       
-      {/* We need some utility classes here for the inline bg colors */}
       <style>{`
         .bg-blue-500 { background-color: var(--color-primary); }
         .bg-emerald-500 { background-color: var(--color-success); }
@@ -143,7 +150,7 @@ const LeaveManagement = () => {
             <div key={request.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem', border: '1px solid var(--color-border)', borderRadius: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div className="avatar" style={{ width: '40px', height: '40px' }}>
-                  {request.name.split(' ').map(n => n[0]).join('')}
+                  {request.name?.split(' ').map(n => n[0]).join('') || '??'}
                 </div>
                 <div>
                   <h4 style={{ fontWeight: '600' }}>{request.name}</h4>
@@ -160,11 +167,12 @@ const LeaveManagement = () => {
               </div>
             </div>
           ))}
+          {requests.length === 0 && <p style={{textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)'}}>No leave records found.</p>}
         </div>
       </div>
 
       {showModal && (
-        <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div className="card" style={{ width: '100%', maxWidth: '500px', display: 'flex', flexDirection: 'column', gap: '1.5rem', margin: '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem' }}>
               <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Submit Leave Request</h2>
@@ -175,15 +183,15 @@ const LeaveManagement = () => {
               <div className="form-group">
                 <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   Leave Type
-                  <label style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer', color: 'var(--color-text-muted)' }}>
-                    <input type="checkbox" checked={isProbation} onChange={(e) => setIsProbation(e.target.checked)} style={{ width: '12px', height: '12px' }} /> Enable Probation Profile (Mock)
-                  </label>
+                  <span style={{ fontSize: '0.75rem', color: isProbation ? 'var(--color-warning)' : 'var(--color-success)', fontWeight: '600' }}>
+                    Status: {isProbation ? 'PROBATION' : 'PERMANENT'}
+                  </span>
                 </label>
-                <select className="form-input" style={{ width: '100%' }}>
-                  {!isProbation && <option>Annual Leave</option>}
-                  {!isProbation && <option>Sick Leave</option>}
-                  {!isProbation && <option>Personal Leave</option>}
-                  <option>Unpaid Leave</option>
+                <select className="form-input" style={{ width: '100%' }} value={leaveType} onChange={e => setLeaveType(e.target.value)}>
+                  {!isProbation && <option value="Annual Leave">Annual Leave</option>}
+                  {!isProbation && <option value="Sick Leave">Sick Leave</option>}
+                  {!isProbation && <option value="Personal Leave">Personal Leave</option>}
+                  <option value="Unpaid Leave">Unpaid Leave</option>
                 </select>
                 {isProbation && (
                   <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: 'var(--color-warning)', fontWeight: '600' }}>

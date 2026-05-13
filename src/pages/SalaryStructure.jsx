@@ -27,9 +27,28 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
 
     const fetchExisting = async () => {
       if (effectiveEmpId && !isEmbedded) {
-        const existing = await dataService.getSalaryStructure(effectiveEmpId);
-        if (existing) {
-          setForm(prev => ({ ...prev, ...existing }));
+        try {
+          const [existing, emp] = await Promise.all([
+            dataService.getSalaryStructure(effectiveEmpId),
+            dataService.getEmployees().then(list => list.find(e => e.id === effectiveEmpId))
+          ]);
+          
+          if (existing) {
+            setForm(prev => ({ 
+              ...prev, 
+              ...existing,
+              empType: emp?.empType || prev.empType || 'Probation'
+            }));
+          } else if (emp) {
+            setForm(prev => ({
+              ...prev,
+              candidateName: emp.name,
+              roleApplied: emp.role,
+              empType: emp.empType || 'Probation'
+            }));
+          }
+        } catch (err) {
+          console.error("Error fetching salary/employee details:", err);
         }
       }
     };
@@ -41,7 +60,8 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
         ...prev,
         candidateName: location.state.employeeName,
         roleApplied: location.state.employeeRole,
-        empId: location.state.empId
+        empId: location.state.empId,
+        empType: location.state.empType || 'Permanent' // Appraisals usually mean they are permanent or moving to it
       }));
     } else if (passedState && Object.keys(passedState).length > 0) {
       // Guard: Only update internal form if passedState is actually different to avoid cycles
@@ -500,9 +520,13 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
             <label className="form-label">State</label>
             <input type="text" className="form-input" style={{ width: '100%' }} value={form.state} onChange={e => handleInput('state', e.target.value)} />
           </div>
-          <div className="form-group">
+          <div className="form-group hide-on-print-border">
             <label className="form-label">ZIP Code</label>
             <input type="text" className="form-input" style={{ width: '100%' }} value={form.zipCode} onChange={e => handleInput('zipCode', e.target.value)} />
+          </div>
+          <div className="form-group hide-on-print-border">
+            <label className="form-label">Employment Status</label>
+            <input type="text" className="form-input" style={{ width: '100%', fontWeight: '600', color: 'var(--color-primary)' }} value={form.empType || 'Probation'} disabled />
           </div>
         </div>
 

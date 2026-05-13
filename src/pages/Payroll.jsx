@@ -457,12 +457,12 @@ const Payroll = () => {
         const basePay = Math.round((Number(emp.dayRate) || 0) * presentDays);
         rawData.push({
           "Emp Code": emp.empCode, "Name": emp.name, "Category": emp.category, "UAN": emp.uanNumber || 'N/A', "Bank A/c": emp.bankAccount,
-          "Gross Salary/Rate": emp.dayRate, "Basic": basePay, "DA": 0, "HRA": 0, "Washing": 0, "Special": 0, "Other OT": 0, "Total Earnings": basePay,
+          "Gross Salary/Rate": emp.dayRate, "Status": emp.empType || 'Probation', "Basic": basePay, "DA": 0, "HRA": 0, "Washing": 0, "Special": 0, "Other OT": 0, "Total Earnings": basePay,
           "PF": 0, "ESIC": 0, "PT": 0, "TDS": 0, "Advances": 0, "Total Deductions": 0, "Net Pay": basePay
         });
       } else if (ctx) {
         rawData.push({
-          "Emp Code": emp.empCode, "Name": emp.name, "Category": emp.category, "UAN": emp.uanNumber || 'N/A', "Bank A/c": emp.bankAccount,
+          "Emp Code": emp.empCode, "Name": emp.name, "Category": emp.category, "Status": emp.empType || 'Probation', "UAN": emp.uanNumber || 'N/A', "Bank A/c": emp.bankAccount,
           "Gross Salary/Rate": emp.grossSalary, "Basic": ctx.earnings.basic, "DA": ctx.earnings.da, "HRA": ctx.earnings.hra, "Washing": ctx.earnings.washingAllowance, 
           "Special": ctx.earnings.specialAllowance, "Other OT": 0, "Total Earnings": ctx.earnings.totalEarnings,
           "PF": ctx.deductions.pf, "ESIC": ctx.deductions.esic, "PT": ctx.deductions.pt, "TDS": ctx.deductions.tds, "Advances": ctx.deductions.advance, 
@@ -577,6 +577,7 @@ const Payroll = () => {
               <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Code</th>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Employee</th>
+                <th style={{ padding: '1rem', fontWeight: '500' }}>Status</th>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Category</th>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Gross / Day Rate</th>
                 <th style={{ padding: '1rem', fontWeight: '500', color: 'var(--color-danger)' }}>PF</th>
@@ -603,7 +604,12 @@ const Payroll = () => {
                       <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: '400' }}>{emp.role}</div>
                     </td>
                     <td style={{ padding: '1rem' }}>
-                      <span className={`badge ${isC ? 'badge-warning' : emp.category === 'On role worker' ? 'badge-primary' : 'badge-default'}`} style={{ fontSize: '0.75rem' }}>
+                      <span className={`badge ${emp.empType === 'Probation' ? 'badge-primary' : 'badge-default'}`} style={{ fontSize: '0.75rem' }}>
+                        {emp.empType || 'Probation'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '1rem' }}>
+                      <span className={`badge ${isC ? 'badge-warning' : 'badge-primary'}`} style={{ fontSize: '0.75rem' }}>
                         {emp.category}
                       </span>
                     </td>
