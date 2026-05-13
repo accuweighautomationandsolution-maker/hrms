@@ -280,10 +280,13 @@ const Attendance = () => {
       alert(`${addedCount} new logs successfully synchronized from hardware terminal.`);
     } catch (err) {
       console.error("Sync Error Detailed:", err);
-      if (err.message.includes("Permission Denied")) {
-        alert(err.message);
+      // Surface the actual error message to the user for better debugging
+      const errorMsg = err.message || 'Unknown Error';
+      
+      if (errorMsg.includes("Permission Denied") || errorMsg.includes("Database Error")) {
+        alert("📊 " + errorMsg + "\n\nThis usually means the biometric terminal is reached, but the HRMS cannot save the logs to the database. Please check your internet connection or database permissions.");
       } else {
-        alert('Connectivity Issue: Failed to reach the Biometric Terminal at ' + bioConfig.ip + '. Please verify the device is powered on and the IP is reachable from your browser.');
+        alert("🔌 Connectivity Issue\n\nTechnical Error: " + errorMsg + "\n\nFailed to reach the terminal at " + bioConfig.ip + ". Even if Ethernet is connected, ensure your local firewall allows traffic on port " + bioConfig.port + ".");
       }
     } finally {
       setSyncLoading(false);
