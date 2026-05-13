@@ -40,8 +40,9 @@ const StatCard = ({ title, value, icon: Icon, colorClass }) => (
 const Dashboard = ({ userRole }) => {
   const currentUser = authService.getCurrentUser();
   const [smartAlerts, setSmartAlerts] = useState([]);
-  const [personalAttendance, setPersonalAttendance] = useState(null);
-  const [todayStatus, setTodayStatus] = useState(null);
+  const [personalAttendance, setPersonalAttendance] = useState({ present: 0 });
+  const [todayStatus, setTodayStatus] = useState({ punchIn: null, status: 'Not Marked' });
+  const [personalLeaveBalance, setPersonalLeaveBalance] = useState(0);
   const [personalTrajectory, setPersonalTrajectory] = useState([]);
   const [notices, setNotices] = useState([]);
   const [probations, setProbations] = useState([]);
@@ -100,15 +101,17 @@ const Dashboard = ({ userRole }) => {
         if (isMounted) setDashboardStats(stats);
 
         if (isEmployee) {
-          const [attendance, status, trajectory] = await Promise.all([
+          const [attendance, status, trajectory, leaveBal] = await Promise.all([
             dataService.getPersonalAttendanceSummary(currentUser.id, new Date().getMonth(), new Date().getFullYear()).catch(() => ({ present: 0 })),
             dataService.getTodayAttendanceStatus(currentUser.id).catch(() => ({ punch_in: null, status: 'Not Marked' })),
-            dataService.getPersonalAttendanceTrajectory(currentUser.id).catch(() => [])
+            dataService.getPersonalAttendanceTrajectory(currentUser.id).catch(() => []),
+            dataService.getEmployeeBalance(currentUser.id).catch(() => 0)
           ]);
           if (isMounted) {
             setPersonalAttendance(attendance);
             setTodayStatus(status);
             setPersonalTrajectory(trajectory);
+            setPersonalLeaveBalance(leaveBal);
           }
         }
 
@@ -300,9 +303,9 @@ const Dashboard = ({ userRole }) => {
       <div className="grid-3" style={{ marginBottom: '2rem' }}>
         {isEmployee ? (
           <>
-            <StatCard title="Today's Log" value={todayStatus.punchIn || 'Not Marked'} icon={Clock} colorClass="bg-blue-500" />
-            <StatCard title="Days Present" value={personalAttendance.present} icon={UserCheck} colorClass="bg-emerald-500" />
-            <StatCard title="My Leave Balance" value={personalLeaveBalance} icon={CalendarOff} colorClass="bg-amber-500" />
+            <StatCard title="Today's Log" value={todayStatus?.punchIn || 'Not Marked'} icon={Clock} colorClass="bg-blue-500" />
+            <StatCard title="Days Present" value={personalAttendance?.present || 0} icon={UserCheck} colorClass="bg-emerald-500" />
+            <StatCard title="My Leave Balance" value={personalLeaveBalance || 0} icon={CalendarOff} colorClass="bg-amber-500" />
           </>
         ) : (
           <>
