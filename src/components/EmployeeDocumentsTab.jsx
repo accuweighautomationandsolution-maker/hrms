@@ -32,10 +32,12 @@ const EmployeeDocumentsTab = ({ empId, employeeName }) => {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
-  const [uploadForm, setUploadForm] = useState({ category: Object.keys(CATEGORIES)[0], docType: CATEGORIES[Object.keys(CATEGORIES)[0]].types[0], file: null });
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
-    loadDocuments();
+    if (empId) {
+      loadDocuments();
+    }
   }, [empId]);
 
   const loadDocuments = async () => {
@@ -44,7 +46,7 @@ const EmployeeDocumentsTab = ({ empId, employeeName }) => {
       const docs = await dataService.getEmployeeDocs(empId);
       setDocuments(docs || []);
     } catch (e) {
-      console.error(e);
+      console.error("Vault: Failed to load documents:", e);
     } finally {
       setLoading(false);
     }
@@ -53,14 +55,23 @@ const EmployeeDocumentsTab = ({ empId, employeeName }) => {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert("File size exceeds 5MB limit.");
+      if (file.size > 10 * 1024 * 1024) { // Increased to 10MB
+        alert("File size exceeds 10MB limit.");
         return;
       }
       const reader = new FileReader();
       reader.onload = (ev) => {
-        setUploadForm(prev => ({ ...prev, file: { name: file.name, size: file.size, type: file.type, content: ev.target.result } }));
+        setUploadForm(prev => ({ 
+          ...prev, 
+          file: { 
+            name: file.name, 
+            size: file.size, 
+            type: file.type, 
+            content: ev.target.result 
+          } 
+        }));
       };
+      reader.onerror = () => alert("Failed to read file.");
       reader.readAsDataURL(file);
     }
   };
@@ -68,12 +79,13 @@ const EmployeeDocumentsTab = ({ empId, employeeName }) => {
   const handleUploadSubmit = async () => {
     if (!uploadForm.file) return alert('Please select a file.');
     
+    setUploading(true);
     try {
       await dataService.addEmployeeDoc({
         empId: empId,
         category: uploadForm.category,
         docType: uploadForm.docType,
-        uploadedBy: 'HR Admin', // In a real app, from auth state
+        uploadedBy: 'HR Admin',
         status: 'Active',
         version: 1,
         ...uploadForm.file
@@ -81,133 +93,167 @@ const EmployeeDocumentsTab = ({ empId, employeeName }) => {
       alert('Document uploaded successfully.');
       setShowUpload(false);
       setUploadForm(prev => ({ ...prev, file: null }));
-      loadDocuments();
+      await loadDocuments(); // Ensure we wait for reload
     } catch (e) {
-      console.error(e);
-      alert('Failed to upload document.');
+      console.error("Vault: Upload error:", e);
+      alert(`Failed to upload document: ${e.message || 'Unknown Error'}`);
+    } finally {
+      setUploading(false);
     }
   };
 
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this document permanently?")) {
-      await dataService.deleteEmployeeDoc(id);
-      loadDocuments();
+      try {
+        await dataService.deleteEmployeeDoc(id);
+        await loadDocuments();
+      } catch (e) {
+        alert("Failed to delete document.");
+      }
     }
   };
 
   const downloadDoc = (doc) => {
-    if (doc.type === 'text/html') {
-       // Convert HTML to a printable window
-       const printWindow = window.open('', '_blank');
-       printWindow.document.write(doc.content);
-       printWindow.document.close();
-       setTimeout(() => {
-         printWindow.print();
-       }, 500);
-    } else {
-       // Data URL download (e.g. base64 image or PDF)
-       const a = document.createElement('a');
-       a.href = doc.content;
-       a.download = doc.name;
-       a.click();
+    try {
+      if (doc.type === 'text/html' || (doc.content && doc.content.startsWith('<!DOCTYPE'))) {
+         const printWindow = window.open('', '_blank');
+         printWindow.document.write(doc.content);
+         printWindow.document.close();
+         setTimeout(() => {
+           printWindow.print();
+         }, 500);
+      } else {
+         const a = document.createElement('a');
+         a.href = doc.content;
+         a.download = doc.name;
+         a.click();
+      }
+    } catch (e) {
+      alert("Failed to open document.");
     }
   };
 
+  // Grouping including "Other" for anything not in CATEGORIES
   const groupedDocs = documents.reduce((acc, doc) => {
-    acc[doc.category] = acc[doc.category] || [];
-    acc[doc.category].push(doc);
+    const cat = CATEGORIES[doc.category] ? doc.category : 'Other / Uncategorized';
+    acc[cat] = acc[cat] || [];
+    acc[cat].push(doc);
     return acc;
   }, {});
 
-  if (loading) return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>Loading documents...</div>;
+  // Extended categories list for rendering including 'Other' if it has docs
+  const renderCategories = [...Object.keys(CATEGORIES)];
+  if (groupedDocs['Other / Uncategorized']) {
+    renderCategories.push('Other / Uncategorized');
+  }
+
+  if (loading) return (
+    <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+      <div className="spinner" style={{ margin: '0 auto 1rem' }}></div>
+      <p>Syncing Vault Records...</p>
+    </div>
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h3 style={{ fontSize: '1.25rem', color: 'var(--color-text-main)', margin: 0 }}>Official Documents</h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: 0 }}>Manage records for {employeeName}</p>
+          <h3 style={{ fontSize: '1.25rem', color: 'var(--color-text-main)', margin: 0 }}>Employee Profile Vault</h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: 0 }}>Official digital records for {employeeName}</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowUpload(!showUpload)}>
-          {showUpload ? 'Cancel Upload' : <><UploadCloud size={18} /> Upload New</>}
+          {showUpload ? 'Cancel' : <><UploadCloud size={18} /> Upload Document</>}
         </button>
       </div>
 
       {showUpload && (
-        <div style={{ padding: '1.5rem', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <h4 style={{ margin: 0, fontSize: '1rem' }}>Upload Document</h4>
+        <div style={{ padding: '1.5rem', backgroundColor: 'var(--color-background)', border: '1px solid var(--color-border)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+          <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--color-primary)' }}>Secure Upload Pipeline</h4>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div className="form-group">
-              <label className="form-label">Category</label>
+              <label className="form-label">Classification Category</label>
               <select className="form-input" style={{ width: '100%' }} value={uploadForm.category} onChange={e => setUploadForm(prev => ({ ...prev, category: e.target.value, docType: CATEGORIES[e.target.value].types[0] }))}>
                 {Object.keys(CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">Document Type</label>
+              <label className="form-label">Document Designation</label>
               <select className="form-input" style={{ width: '100%' }} value={uploadForm.docType} onChange={e => setUploadForm(prev => ({ ...prev, docType: e.target.value }))}>
                 {CATEGORIES[uploadForm.category].types.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
           </div>
           <div className="form-group">
-            <label className="form-label">Select File (PDF, Image - Max 5MB)</label>
-            <input type="file" className="form-input" style={{ width: '100%' }} onChange={handleFileChange} />
+            <label className="form-label">Target File (PDF, Images - Max 10MB)</label>
+            <input type="file" className="form-input" style={{ width: '100%' }} onChange={handleFileChange} accept=".pdf,image/*" />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="btn btn-success" onClick={handleUploadSubmit} disabled={!uploadForm.file}>
-              <Save size={18} /> Save to Profile
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+            <button className="btn btn-ghost" onClick={() => setShowUpload(false)}>Dismiss</button>
+            <button className="btn btn-success" onClick={handleUploadSubmit} disabled={!uploadForm.file || uploading}>
+              {uploading ? 'Processing...' : <><Save size={18} /> Commit to Vault</>}
             </button>
           </div>
         </div>
       )}
 
       {documents.length === 0 && !showUpload && (
-        <div style={{ padding: '3rem', textAlign: 'center', border: '1px dashed var(--color-border)', borderRadius: '8px', color: 'var(--color-text-muted)' }}>
-          <FilePlus size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
-          <p>No official documents found for this employee.</p>
+        <div style={{ padding: '4rem 2rem', textAlign: 'center', border: '2px dashed var(--color-border)', borderRadius: '12px', backgroundColor: 'var(--color-surface)' }}>
+          <ShieldCheck size={64} style={{ opacity: 0.1, marginBottom: '1.5rem', color: 'var(--color-primary)' }} />
+          <h3 style={{ margin: '0 0 0.5rem', color: 'var(--color-text-main)' }}>Vault is Empty</h3>
+          <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto' }}>No official documents have been uploaded for this profile yet. Use the upload button to add records.</p>
         </div>
       )}
 
-      {Object.keys(CATEGORIES).map(cat => {
+      {renderCategories.map(cat => {
         const docs = groupedDocs[cat] || [];
         if (docs.length === 0) return null;
         
+        const isStandard = CATEGORIES[cat];
+        
         return (
-          <div key={cat} style={{ border: '1px solid var(--color-border)', borderRadius: '8px', overflow: 'hidden' }}>
-            <div style={{ backgroundColor: 'var(--color-background)', padding: '1rem', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: '600' }}>
-              <span style={{ color: 'var(--color-primary)' }}>{CATEGORIES[cat].icon}</span>
-              {cat} <span className="badge badge-blue" style={{ marginLeft: 'auto' }}>{docs.length}</span>
+          <div key={cat} style={{ border: '1px solid var(--color-border)', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+            <div style={{ backgroundColor: 'var(--color-background)', padding: '1rem', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: '600' }}>
+              <span style={{ color: isStandard ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
+                {isStandard ? CATEGORIES[cat].icon : <FileText size={18} />}
+              </span>
+              <span style={{ fontSize: '0.95rem' }}>{cat}</span>
+              <span className="badge badge-blue" style={{ marginLeft: 'auto', fontSize: '0.75rem' }}>{docs.length} Records</span>
             </div>
             <div style={{ backgroundColor: 'var(--color-surface)' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                <thead style={{ backgroundColor: 'var(--color-background)', borderBottom: '1px solid var(--color-border)' }}>
+                <thead style={{ backgroundColor: 'rgba(0,0,0,0.02)', borderBottom: '1px solid var(--color-border)' }}>
                   <tr>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--color-text-muted)', fontWeight: '500' }}>Document Type</th>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--color-text-muted)', fontWeight: '500' }}>Issue/Upload Date</th>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--color-text-muted)', fontWeight: '500' }}>Status</th>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--color-text-muted)', fontWeight: '500' }}>Ver</th>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--color-text-muted)', fontWeight: '500' }}>Actions</th>
+                    <th style={{ padding: '0.85rem 1rem', textAlign: 'left', color: 'var(--color-text-muted)', fontWeight: '600' }}>Designation</th>
+                    <th style={{ padding: '0.85rem 1rem', textAlign: 'left', color: 'var(--color-text-muted)', fontWeight: '600' }}>Timestamp</th>
+                    <th style={{ padding: '0.85rem 1rem', textAlign: 'left', color: 'var(--color-text-muted)', fontWeight: '600' }}>Status</th>
+                    <th style={{ padding: '0.85rem 1rem', textAlign: 'left', color: 'var(--color-text-muted)', fontWeight: '600' }}>Vers</th>
+                    <th style={{ padding: '0.85rem 1rem', textAlign: 'right', color: 'var(--color-text-muted)', fontWeight: '600' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {docs.map(d => (
-                    <tr key={d.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                    <tr key={d.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background 0.2s' }} className="hover-row">
                       <td style={{ padding: '1rem', fontWeight: '500' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <FileText size={16} color="var(--color-primary)" /> {d.docType}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <div style={{ padding: '6px', backgroundColor: 'rgba(37,99,235,0.08)', borderRadius: '6px' }}>
+                            <FileText size={14} color="var(--color-primary)" />
+                          </div>
+                          <div>
+                            <div style={{ color: 'var(--color-text-main)' }}>{d.docType}</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>{d.name} ({(d.size / 1024).toFixed(1)} KB)</div>
+                          </div>
                         </div>
                       </td>
-                      <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{new Date(d.createdAt).toLocaleDateString()}</td>
-                      <td style={{ padding: '1rem' }}><span className="badge badge-success">{d.status}</span></td>
+                      <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{d.createdAt ? new Date(d.createdAt).toLocaleString() : '—'}</td>
+                      <td style={{ padding: '1rem' }}><span className="badge badge-success" style={{ fontSize: '0.7rem' }}>{d.status}</span></td>
                       <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>v{d.version}</td>
                       <td style={{ padding: '1rem', textAlign: 'right' }}>
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                          <button className="btn btn-ghost" style={{ padding: '0.25rem 0.5rem', color: 'var(--color-primary)' }} onClick={() => downloadDoc(d)} title="View / Download">
-                            <Download size={16} />
+                          <button className="btn btn-ghost" style={{ padding: '0.4rem', color: 'var(--color-primary)' }} onClick={() => downloadDoc(d)} title="View / Download">
+                            <Download size={18} />
                           </button>
-                          <button className="btn btn-ghost" style={{ padding: '0.25rem 0.5rem', color: 'var(--color-danger)' }} onClick={() => handleDelete(d.id)} title="Delete">
-                            <Trash2 size={16} />
+                          <button className="btn btn-ghost" style={{ padding: '0.4rem', color: 'var(--color-danger)' }} onClick={() => handleDelete(d.id)} title="Purge Record">
+                            <Trash2 size={18} />
                           </button>
                         </div>
                       </td>

@@ -683,47 +683,77 @@ export const dataService = {
 
   getEmployeeDocs: async (empId = null) => {
     if (!supabase) return [];
-    let query = supabase.from('employee_documents').select('*');
-    if (empId) query = query.eq('emp_id', empId);
-    const { data } = await query;
-    return (data || []).map(r => ({
-      ...r.file_data,
-      id: r.id,
-      empId: r.emp_id,
-      category: r.category,
-      docType: r.doc_type,
-      status: r.status,
-      uploadedBy: r.uploaded_by,
-      version: r.version,
-      createdAt: r.created_at
-    }));
+    try {
+      let query = supabase.from('employee_documents').select('*');
+      if (empId) query = query.eq('emp_id', String(empId)); // Ensure string comparison for IDs
+      
+      const { data, error } = await query;
+      if (error) {
+        console.error("DataService: Error fetching employee docs:", error);
+        return [];
+      }
+      
+      return (data || []).map(r => ({
+        ...(r.file_data || {}),
+        id: r.id,
+        empId: r.emp_id,
+        category: r.category,
+        docType: r.doc_type,
+        status: r.status,
+        uploadedBy: r.uploaded_by,
+        version: r.version,
+        createdAt: r.created_at
+      }));
+    } catch (e) {
+      console.error("DataService: Exception in getEmployeeDocs:", e);
+      return [];
+    }
   },
 
   addEmployeeDoc: async (doc) => {
     if (!supabase) return;
-    const id = `DOC_${Date.now()}`;
-    const file_data = { 
-      name: doc.name || doc.docType || 'Document', 
-      size: doc.size || 0, 
-      type: doc.type || 'text/html',
-      content: doc.content || '' // Base64 or HTML string
-    };
-    
-    await supabase.from('employee_documents').insert({ 
-      id, 
-      emp_id: doc.empId, 
-      category: doc.category || 'General',
-      doc_type: doc.docType || 'Document',
-      status: doc.status || 'Active',
-      uploaded_by: doc.uploadedBy || 'System',
-      version: doc.version || 1,
-      file_data 
-    });
+    try {
+      const id = `DOC_${Date.now()}`;
+      const file_data = { 
+        name: doc.name || doc.docType || 'Document', 
+        size: doc.size || 0, 
+        type: doc.type || 'text/html',
+        content: doc.content || '' // Base64 or HTML string
+      };
+      
+      const { error } = await supabase.from('employee_documents').insert({ 
+        id, 
+        emp_id: String(doc.empId), 
+        category: doc.category || 'General',
+        doc_type: doc.docType || 'Document',
+        status: doc.status || 'Active',
+        uploaded_by: doc.uploadedBy || 'System',
+        version: doc.version || 1,
+        file_data 
+      });
+
+      if (error) {
+        console.error("DataService: Error adding employee doc:", error);
+        throw error;
+      }
+    } catch (e) {
+      console.error("DataService: Exception in addEmployeeDoc:", e);
+      throw e;
+    }
   },
   
   deleteEmployeeDoc: async (id) => {
     if (!supabase) return;
-    await supabase.from('employee_documents').delete().eq('id', id);
+    try {
+      const { error } = await supabase.from('employee_documents').delete().eq('id', id);
+      if (error) {
+        console.error("DataService: Error deleting employee doc:", error);
+        throw error;
+      }
+    } catch (e) {
+      console.error("DataService: Exception in deleteEmployeeDoc:", e);
+      throw e;
+    }
   },
 
   getStatutoryUpdates: async () => sbGetAll('statutory_updates'),
