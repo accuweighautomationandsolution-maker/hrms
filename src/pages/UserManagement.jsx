@@ -88,7 +88,7 @@ const UserManagement = () => {
       try {
         await authService.resetUserPassword(userId, newPwd);
         loadData();
-        alert("Password has been reset. User will be forced to change it on next login.");
+        alert("Password has been reset instantly. You can now provide the new password to the user.");
       } catch (err) {
         alert(err.message);
       }
@@ -336,9 +336,12 @@ const UserManagement = () => {
       {showNewUserModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', padding: '1rem' }}>
           <div className="card" style={{ width: '100%', maxWidth: '450px', padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--color-border)' }}>
-              <h3 style={{ fontSize: '1.25rem', margin: 0 }}>Provision New Access</h3>
-              <p className="page-subtitle" style={{ margin: 0 }}>Create a login account for an employee.</p>
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--color-border)', backgroundColor: 'rgba(16, 185, 129, 0.05)' }}>
+              <h3 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--color-success)' }}>Provision New Access</h3>
+              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: 'var(--color-success)', fontWeight: '600' }}>
+                <CheckCircle2 size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                Internal Mode: No email verification required.
+              </p>
             </div>
             <form onSubmit={handleCreateUser}>
               <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -402,7 +405,7 @@ const UserManagement = () => {
               </div>
               <div style={{ padding: '1.5rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
                 <button type="button" className="btn btn-ghost" onClick={() => setShowNewUserModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" style={{ backgroundColor: 'var(--color-text-main)' }}>Create Account</button>
+                <button type="submit" className="btn btn-primary" style={{ backgroundColor: 'var(--color-text-main)' }}>Activate & Create Account</button>
               </div>
             </form>
           </div>
