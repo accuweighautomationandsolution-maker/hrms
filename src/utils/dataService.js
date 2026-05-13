@@ -129,26 +129,37 @@ const storageUploadBase64 = async (folder, base64DataUrl, filename, mimeType) =>
 export const dataService = {
   // ── Employees ─────────────────────────────────────────────────────────────
   getEmployees: async () => {
-    if (!supabase) return [];
+    if (!supabase) {
+      console.warn('dataService: Supabase client is null. Returning empty employee list.');
+      return [];
+    }
     try {
-      // 8-second timeout — if Supabase is slow, return [] so the page renders instead of hanging
+      console.log('dataService: Fetching employees from Supabase...');
+      // 15-second timeout — some networks are slow
       const fetchPromise = supabase
         .from('employees')
         .select('*')
         .order('id', { ascending: false });
       
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('getEmployees timed out after 8s')), 8000)
+        setTimeout(() => reject(new Error('getEmployees query timed out after 15s')), 15000)
       );
 
       const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (error) {
-        console.error('Error fetching employees:', error);
+        console.error('Supabase Query Error (employees):', error.message, error.details, error.hint);
         return [];
       }
       
-      return (data || []).map(r => {
+      if (!data || data.length === 0) {
+        console.warn('dataService: query successful but returned 0 employees. Check RLS or table content.');
+        return [];
+      }
+
+      console.log(`dataService: Successfully fetched ${data.length} employees.`);
+      
+      return data.map(r => {
         let parsedData = {};
         if (typeof r.data === 'string') {
           try { parsedData = JSON.parse(r.data); } catch(e) { parsedData = {}; }
@@ -169,7 +180,7 @@ export const dataService = {
         };
       });
     } catch (err) {
-      console.error('Exception in getEmployees:', err.message);
+      console.error('Critical Exception in getEmployees:', err.message);
       return [];
     }
   },
