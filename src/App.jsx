@@ -61,10 +61,17 @@ function App() {
     } catch (err) {
       console.error("App: Logout error:", err);
     } finally {
-      console.log("App: Clearing session and redirecting...");
+      console.log('App: Clearing session and redirecting...');
       setCurrentUser(null);
+      // Preserve vault_* keys so documents survive logout
+      const vaultBackup = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('vault_')) vaultBackup[k] = localStorage.getItem(k);
+      }
       localStorage.clear();
       sessionStorage.clear();
+      Object.entries(vaultBackup).forEach(([k, v]) => localStorage.setItem(k, v));
       // Force hard redirect to login page
       window.location.href = '/login?logout=success';
     }
@@ -78,9 +85,16 @@ function App() {
       // Version check for cache busting
       const cachedVersion = localStorage.getItem('APP_VERSION');
       if (cachedVersion !== APP_VERSION) {
-        console.log("App: Version changed, clearing cache.", cachedVersion, '->', APP_VERSION);
+        console.log('App: Version changed, clearing cache.', cachedVersion, '->', APP_VERSION);
+        // Preserve vault_* keys so documents survive version updates
+        const vaultBackup = {};
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('vault_')) vaultBackup[k] = localStorage.getItem(k);
+        }
         localStorage.clear();
         sessionStorage.clear();
+        Object.entries(vaultBackup).forEach(([k, v]) => localStorage.setItem(k, v));
         localStorage.setItem('APP_VERSION', APP_VERSION);
         window.location.reload(true);
         return;

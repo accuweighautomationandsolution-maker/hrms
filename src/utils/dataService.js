@@ -35,32 +35,47 @@ const sbDelete = async (table, id) => {
 const getConfig = async (key, defaultVal) => {
   if (!supabase) return defaultVal;
   try {
-    // Use maybeSingle() - if there are duplicates, just catch and return default
     const { data, error } = await supabase
       .from('app_config')
       .select('value')
       .eq('key', key)
-      .limit(1)
-      .maybeSingle();
-    if (error) {
-      console.warn(`getConfig(${key}) error:`, error.message);
-      return defaultVal;
-    }
-    return data ? data.value : defaultVal;
-  } catch (e) {
-    console.warn(`getConfig(${key}) exception:`, e.message);
-    return defaultVal;
-  }
+      .limit(1);
+    if (error) { console.warn(`getConfig(${key}):`, error.message); return defaultVal; }
+    return (data && data.length > 0) ? data[0].value : defaultVal;
+  } catch (e) { console.warn(`getConfig(${key}):`, e.message); return defaultVal; }
 };
 
+// Robust saveConfig: tries upsert → update → insert to guarantee write regardless of schema constraints
 const saveConfig = async (key, value) => {
-  if (!supabase) return;
+  if (!supabase) return false;
   try {
-    await supabase
+    // Strategy 1: upsert (works if 'key' column has unique constraint)
+    const { error: e1 } = await supabase
       .from('app_config')
       .upsert({ key, value }, { onConflict: 'key' });
+    if (!e1) return true;
+
+    // Strategy 2: update existing row
+    console.warn(`saveConfig upsert failed (${e1.message}), trying update...`);
+    const { data: updated, error: e2 } = await supabase
+      .from('app_config')
+      .update({ value })
+      .eq('key', key)
+      .select('key');
+    if (!e2 && updated && updated.length > 0) return true;
+
+    // Strategy 3: insert new row
+    console.warn('saveConfig update found no rows, inserting...');
+    const { error: e3 } = await supabase
+      .from('app_config')
+      .insert({ key, value });
+    if (!e3) return true;
+
+    console.error(`saveConfig(${key}) all strategies failed:`, e3.message);
+    return false;
   } catch (e) {
-    console.error(`saveConfig(${key}):`, e);
+    console.error(`saveConfig(${key}) exception:`, e.message);
+    return false;
   }
 };
 
@@ -697,47 +712,43 @@ export const dataService = {
   saveLetterTemplates: async (list) => sbSaveAll('letter_templates', list),
 
   // ── Employee Vault Documents ───────────────────────────────────────────
-  // Storage: localStorage is PRIMARY (instant, no schema issues, persists across refresh).
-  // Supabase app_config is SECONDARY (background sync for cross-device).
-  // localStorage key pattern: vault_{empId}
+  // Primary storage: Supabase app_config with key='vault_{empId}' (cross-device, cross-session)
+  // Secondary/cache: localStorage with key='vault_{empId}' (instant read, survives network issues)
+  // localStorage is PRESERVED across logout and version updates (see App.jsx)
 
   getEmployeeDocs: async (empId = null) => {
     const localRead = (key) => {
-      try {
-        const raw = localStorage.getItem(key);
-        return raw ? JSON.parse(raw) : [];
-      } catch { return []; }
+      try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : []; }
+      catch { return []; }
+    };
+    const localWrite = (key, docs) => {
+      try { localStorage.setItem(key, JSON.stringify(docs)); } catch { }
     };
 
     if (empId) {
       const localKey = `vault_${empId}`;
-      // 1. Always read from localStorage first (guaranteed)
-      const localDocs = localRead(localKey);
-      if (localDocs.length > 0) return localDocs;
-      // 2. Fallback: try Supabase and cache result locally
       try {
-        const remoteDocs = await getConfig(localKey, []);
+        // 1. Read from Supabase (source of truth, cross-device)
+        const remoteDocs = await getConfig(localKey, null);
         if (Array.isArray(remoteDocs) && remoteDocs.length > 0) {
-          localStorage.setItem(localKey, JSON.stringify(remoteDocs));
+          localWrite(localKey, remoteDocs); // Update local cache
           return remoteDocs;
         }
-      } catch (e) { /* ignore */ }
-      return [];
+      } catch (e) { console.warn('getEmployeeDocs Supabase read failed, using localStorage'); }
+      // 2. Fallback: localStorage cache
+      return localRead(localKey);
     }
-    // Return all (for Document Hub): scan localStorage for all vault_* keys
+    // All employees: scan localStorage
     const allDocs = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith('vault_')) {
-        allDocs.push(...localRead(key));
-      }
+      if (key && key.startsWith('vault_')) allDocs.push(...localRead(key));
     }
     return allDocs;
   },
 
   addEmployeeDoc: async (doc) => {
     const localKey = `vault_${String(doc.empId)}`;
-    // 1. Build document record
     const newDoc = {
       id: `DOC_${Date.now()}`,
       empId: String(doc.empId),
@@ -752,42 +763,39 @@ export const dataService = {
       version: doc.version || 1,
       createdAt: new Date().toISOString()
     };
-    // 2. Read existing from localStorage and append
+
+    // Step 1: Read existing from localStorage (fast)
     let existing = [];
-    try {
-      const raw = localStorage.getItem(localKey);
-      existing = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(existing)) existing = [];
-    } catch { existing = []; }
+    try { const r = localStorage.getItem(localKey); existing = r ? JSON.parse(r) : []; }
+    catch { existing = []; }
+    if (!Array.isArray(existing)) existing = [];
     const updated = [...existing, newDoc];
-    // 3. Write to localStorage SYNCHRONOUSLY — guaranteed instant persistence
+
+    // Step 2: Write to localStorage immediately (instant UI update)
     localStorage.setItem(localKey, JSON.stringify(updated));
-    console.log(`Vault: Document ${newDoc.id} saved to localStorage for emp ${doc.empId}`);
-    // 4. Background sync to Supabase (fire-and-forget, never blocks UI)
+    console.log(`Vault: ${newDoc.id} cached in localStorage for emp ${doc.empId}`);
+
+    // Step 3: AWAIT Supabase save (this is now required, not fire-and-forget)
+    // If Supabase fails, we still have localStorage. But we log the failure clearly.
     if (supabase) {
-      saveConfig(localKey, updated).catch(e =>
-        console.warn('Vault: Supabase sync failed (localStorage is still intact):', e)
-      );
+      const saved = await saveConfig(localKey, updated);
+      if (saved) {
+        console.log(`Vault: ${newDoc.id} persisted to Supabase successfully.`);
+      } else {
+        console.error(`Vault: Supabase save FAILED for ${newDoc.id}. Document is in localStorage only (current session).`);
+      }
     }
   },
 
   deleteEmployeeDoc: async (docId, empId) => {
     if (!empId) throw new Error('empId required to delete document');
     const localKey = `vault_${String(empId)}`;
-    // 1. Delete from localStorage immediately
     let existing = [];
-    try {
-      const raw = localStorage.getItem(localKey);
-      existing = raw ? JSON.parse(raw) : [];
-    } catch { existing = []; }
+    try { const r = localStorage.getItem(localKey); existing = r ? JSON.parse(r) : []; }
+    catch { existing = []; }
     const updated = existing.filter(d => String(d.id) !== String(docId));
     localStorage.setItem(localKey, JSON.stringify(updated));
-    // 2. Background sync to Supabase
-    if (supabase) {
-      saveConfig(localKey, updated).catch(e =>
-        console.warn('Vault delete: Supabase sync failed:', e)
-      );
-    }
+    if (supabase) saveConfig(localKey, updated).catch(e => console.warn('Vault delete sync:', e));
   },
 
 
