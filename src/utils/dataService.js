@@ -685,8 +685,8 @@ export const dataService = {
   getEmployeeDocs: async (empId = null) => {
     if (!supabase) return [];
     try {
-      // The schema confirmedly lacks explicit columns like 'category', 
-      // so we use the 'data' JSONB column pattern which is standard for this app.
+      // The schema confirmedly has 'id', 'emp_id', and 'file_data' (JSONB).
+      // It lacks top-level 'category' and 'data' columns.
       let query = supabase.from('employee_documents').select('*');
       if (empId) query = query.eq('emp_id', String(empId));
       
@@ -697,18 +697,18 @@ export const dataService = {
       }
       
       return (data || []).map(r => {
-        const docData = r.data || r.file_data || {};
+        // We use 'file_data' as the primary JSONB source
+        const docData = r.file_data || r.data || {};
         return {
           ...docData,
           id: r.id,
           empId: r.emp_id,
-          // Fallback mappings if they were top-level columns in some environments
-          category: r.category || docData.category || 'General',
-          docType: r.doc_type || docData.docType || 'Document',
-          status: r.status || docData.status || 'Active',
-          uploadedBy: r.uploaded_by || docData.uploadedBy || 'System',
-          version: r.version || docData.version || 1,
-          createdAt: r.created_at || docData.createdAt
+          category: docData.category || r.category || 'General',
+          docType: docData.docType || r.doc_type || 'Document',
+          status: docData.status || r.status || 'Active',
+          uploadedBy: docData.uploadedBy || r.uploaded_by || 'System',
+          version: docData.version || r.version || 1,
+          createdAt: docData.createdAt || r.created_at
         };
       });
     } catch (e) {
@@ -721,7 +721,7 @@ export const dataService = {
     if (!supabase) return;
     try {
       const id = `DOC_${Date.now()}`;
-      const docRecord = {
+      const file_data = {
         id,
         empId: String(doc.empId),
         name: doc.name || doc.docType || 'Document', 
@@ -736,11 +736,11 @@ export const dataService = {
         createdAt: new Date().toISOString()
       };
       
-      // Save using the robust {id, emp_id, data} pattern
+      // Save using the confirmed {id, emp_id, file_data} pattern
       const { error } = await supabase.from('employee_documents').upsert({ 
         id, 
         emp_id: String(doc.empId),
-        data: docRecord
+        file_data: file_data
       });
 
       if (error) {
