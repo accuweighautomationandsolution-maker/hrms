@@ -484,13 +484,13 @@ const EmployeeDirectory = ({ userRole }) => {
             <thead>
               <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Name</th>
-                <th style={{ padding: '1rem', fontWeight: '500' }}>Employee Code</th>
+                {!isEmployee && <th style={{ padding: '1rem', fontWeight: '500' }}>Employee Code</th>}
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Role</th>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Department</th>
-                <th style={{ padding: '1rem', fontWeight: '500' }}>Grade</th>
                 {isEmployee && <th style={{ padding: '1rem', fontWeight: '500' }}>Contact Number</th>}
-                <th style={{ padding: '1rem', fontWeight: '500' }}>Status</th>
-                {!isEmployee && <th style={{ padding: '1rem', fontWeight: '500', textAlign: 'right' }}>Actions</th>}
+                {!isEmployee && <th style={{ padding: '1rem', fontWeight: '500' }}>Grade</th>}
+                {!isEmployee && <th style={{ padding: '1rem', fontWeight: '500' }}>Status</th>}
+                <th style={{ padding: '1rem', fontWeight: '500', textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -517,33 +517,37 @@ const EmployeeDirectory = ({ userRole }) => {
                       </div>
                       <div>
                         <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>{emp.name || ''}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{emp.email || ''}</div>
+                        {!isEmployee && <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{emp.email || ''}</div>}
                       </div>
                     </div>
                   </td>
-                  <td style={{ padding: '1rem' }}>
-                    <div style={{ fontWeight: '600', color: 'var(--color-text-main)' }}>{emp.empCode || ''}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Bio: {emp.biometricCode || ''}</div>
-                  </td>
+                  {!isEmployee && (
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ fontWeight: '600', color: 'var(--color-text-main)' }}>{emp.empCode || ''}</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Bio: {emp.biometricCode || ''}</div>
+                    </td>
+                  )}
                   <td style={{ padding: '1rem', color: 'var(--color-text-main)' }}>{emp.role || ''}</td>
                   <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{emp.department || ''}</td>
-                  <td style={{ padding: '1rem' }}><span className="badge badge-blue">{emp.grade || 'N/A'}</span></td>
-                  {isEmployee && <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{emp.contact || '+91 98' + Math.floor(10000000 + Math.random() * 90000000)}</td>}
-                  <td style={{ padding: '1rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
-                      <span className={`badge ${emp.status === 'Active' ? 'badge-success' : emp.status === 'On Leave' ? 'badge-warning' : 'badge-danger'}`}>
-                        {emp.status || 'Inactive'}
-                      </span>
-                      {emp.empType && (
-                        <span className={`badge ${emp.empType === 'Probation' ? 'badge-primary' : emp.empType === 'Temporary' ? 'badge-warning' : 'badge-default'}`} style={{ opacity: 0.85, fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}>
-                          {emp.empType}
-                        </span>
-                      )}
-                    </div>
-                  </td>
+                  {isEmployee && <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{emp.contact || ''}</td>}
+                  {!isEmployee && <td style={{ padding: '1rem' }}><span className="badge badge-blue">{emp.grade || 'N/A'}</span></td>}
                   {!isEmployee && (
-                    <td style={{ padding: '1rem', textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
+                        <span className={`badge ${emp.status === 'Active' ? 'badge-success' : emp.status === 'On Leave' ? 'badge-warning' : 'badge-danger'}`}>
+                          {emp.status || 'Inactive'}
+                        </span>
+                        {emp.empType && (
+                          <span className={`badge ${emp.empType === 'Probation' ? 'badge-primary' : emp.empType === 'Temporary' ? 'badge-warning' : 'badge-default'}`} style={{ opacity: 0.85, fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}>
+                            {emp.empType}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  )}
+                  <td style={{ padding: '1rem', textAlign: 'right' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                      {!isEmployee && (
                         <button 
                           className="btn btn-ghost" 
                           style={{ color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
@@ -551,9 +555,11 @@ const EmployeeDirectory = ({ userRole }) => {
                         >
                           <MessageSquareShare size={12}/> Feedback
                         </button>
-                        <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', gap: '0.25rem' }} onClick={() => handleEditEmployee(emp)}>
-                          <FileText size={12} /> Profile
-                        </button>
+                      )}
+                      <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', gap: '0.25rem' }} onClick={() => handleEditEmployee(emp)}>
+                        <FileText size={12} /> {isEmployee ? 'View Profile' : 'Profile'}
+                      </button>
+                      {!isEmployee && (
                         <button 
                           className="btn btn-ghost" 
                           style={{ padding: '0.5rem', color: 'var(--color-danger)', borderRadius: '50%', backgroundColor: 'rgba(239, 68, 68, 0.05)' }} 
@@ -562,9 +568,9 @@ const EmployeeDirectory = ({ userRole }) => {
                         >
                           <Trash2 size={18} />
                         </button>
-                      </div>
-                    </td>
-                  )}
+                      )}
+                    </div>
+                  </td>
                 </tr>
               )))}
             </tbody>
@@ -607,11 +613,15 @@ const EmployeeDirectory = ({ userRole }) => {
               >
                 <TabButton num={1} label="Identity" icon={FileText} />
                 <TabButton num={2} label="Employment" icon={Briefcase} />
-                <TabButton num={3} label="Address" icon={MapPin} />
-                <TabButton num={4} label="Compliance" icon={ShieldCheck} />
-                <TabButton num={5} label="Docs & Vault" icon={UploadCloud} />
-                <TabButton num={6} label="Compensation" icon={IndianRupee} />
-                <TabButton num={7} label="Banking & Ins." icon={CreditCard} />
+                {!isEmployee && (
+                  <>
+                    <TabButton num={3} label="Address" icon={MapPin} />
+                    <TabButton num={4} label="Compliance" icon={ShieldCheck} />
+                    <TabButton num={5} label="Docs & Vault" icon={UploadCloud} />
+                    <TabButton num={6} label="Compensation" icon={IndianRupee} />
+                    <TabButton num={7} label="Banking & Ins." icon={CreditCard} />
+                  </>
+                )}
               </div>
 
               <button 
@@ -634,143 +644,159 @@ const EmployeeDirectory = ({ userRole }) => {
                       <div className="form-group">
                         <label className="form-label">First Name *</label>
                         <input type="text" className="form-input" style={{width:'100%', borderColor: !form.firstName ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                          value={form.firstName || ''} onChange={(e) => handleInput('firstName', e.target.value)} />
+                          value={form.firstName || ''} onChange={(e) => handleInput('firstName', e.target.value)} disabled={isEmployee} />
                       </div>
                       <div className="form-group">
                         <label className="form-label">Middle Name</label>
                         <input type="text" className="form-input" style={{width:'100%'}} 
-                          value={form.middleName || ''} onChange={(e) => handleInput('middleName', e.target.value)} />
+                          value={form.middleName || ''} onChange={(e) => handleInput('middleName', e.target.value)} disabled={isEmployee} />
                       </div>
                       <div className="form-group">
                         <label className="form-label">Last Name *</label>
                         <input type="text" className="form-input" style={{width:'100%', borderColor: !form.lastName ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                          value={form.lastName || ''} onChange={(e) => handleInput('lastName', e.target.value)} />
+                          value={form.lastName || ''} onChange={(e) => handleInput('lastName', e.target.value)} disabled={isEmployee} />
                       </div>
-                      <div className="form-group"><label className="form-label">Date of Birth</label><input type="date" className="form-input" style={{width:'100%'}} value={form.dob || ''} onChange={e => handleInput('dob', e.target.value)} /></div>
-                      <div className="form-group">
-                        <label className="form-label">Gender</label>
-                        <select className="form-input" style={{width:'100%'}} value={form.gender || ''} onChange={e => handleInput('gender', e.target.value)}>
-                          <option>Select...</option><option>Male</option><option>Female</option><option>Other</option>
-                        </select>
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">Blood Group</label>
-                        <select className="form-input" style={{width:'100%'}} value={form.bloodGroup || ''} onChange={e => handleInput('bloodGroup', e.target.value)}>
-                          <option>Select...</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
-                        </select>
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">Marital Status</label>
-                        <select className="form-input" style={{width:'100%'}} value={form.marital || ''} onChange={e => handleInput('marital', e.target.value)}>
-                          <option>Select...</option><option>Single</option><option>Married</option>
-                        </select>
-                      </div>
+                      {!isEmployee && (
+                        <>
+                          <div className="form-group"><label className="form-label">Date of Birth</label><input type="date" className="form-input" style={{width:'100%'}} value={form.dob || ''} onChange={e => handleInput('dob', e.target.value)} /></div>
+                          <div className="form-group">
+                            <label className="form-label">Gender</label>
+                            <select className="form-input" style={{width:'100%'}} value={form.gender || ''} onChange={e => handleInput('gender', e.target.value)}>
+                              <option>Select...</option><option>Male</option><option>Female</option><option>Other</option>
+                            </select>
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Blood Group</label>
+                            <select className="form-input" style={{width:'100%'}} value={form.bloodGroup || ''} onChange={e => handleInput('bloodGroup', e.target.value)}>
+                              <option>Select...</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+                            </select>
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Marital Status</label>
+                            <select className="form-input" style={{width:'100%'}} value={form.marital || ''} onChange={e => handleInput('marital', e.target.value)}>
+                              <option>Select...</option><option>Single</option><option>Married</option>
+                            </select>
+                          </div>
+                        </>
+                      )}
                       <div className="form-group">
                         <label className="form-label">Contact Number *</label>
                         <input type="tel" className="form-input" style={{width:'100%', borderColor: !form.contact ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                          value={form.contact || ''} onChange={e => handleInput('contact', e.target.value)} />
+                          value={form.contact || ''} onChange={e => handleInput('contact', e.target.value)} disabled={isEmployee} />
                       </div>
-                      <div className="form-group"><label className="form-label">Alternate Contact</label><input type="tel" className="form-input" style={{width:'100%'}} value={form.altContact || ''} onChange={e => handleInput('altContact', e.target.value)} /></div>
-                      <div className="form-group">
-                        <label className="form-label">Personal Mail ID *</label>
-                        <input type="email" className="form-input" style={{width:'100%', borderColor: !form.email ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                          value={form.email || ''} onChange={e => handleInput('email', e.target.value)} />
-                      </div>
+                      {!isEmployee && (
+                        <>
+                          <div className="form-group"><label className="form-label">Alternate Contact</label><input type="tel" className="form-input" style={{width:'100%'}} value={form.altContact || ''} onChange={e => handleInput('altContact', e.target.value)} /></div>
+                          <div className="form-group">
+                            <label className="form-label">Personal Mail ID *</label>
+                            <input type="email" className="form-input" style={{width:'100%', borderColor: !form.email ? 'var(--color-danger)' : 'var(--color-border)'}} 
+                              value={form.email || ''} onChange={e => handleInput('email', e.target.value)} />
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
-                  <div>
-                    <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--color-primary)' }}>Government ID Details</h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
-                      <div className="form-group">
-                        <label className="form-label">Aadhar Card No.</label>
-                        <input type="text" className="form-input" style={{width:'100%'}} value={form.aadharNo || ''} onChange={e => handleInput('aadharNo', e.target.value)} />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">PAN Card No.</label>
-                        <input type="text" className="form-input" style={{width:'100%'}} value={form.panNo || ''} onChange={e => handleInput('panNo', e.target.value)} />
-                      </div>
-                      <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
+                  {!isEmployee && (
+                    <div>
+                      <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--color-primary)' }}>Government ID Details</h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
                         <div className="form-group">
-                          <label className="form-label">Driving License No.</label>
-                          <input type="text" className="form-input" style={{width:'100%'}} value={form.dlNo || ''} onChange={e => handleInput('dlNo', e.target.value)} />
+                          <label className="form-label">Aadhar Card No.</label>
+                          <input type="text" className="form-input" style={{width:'100%'}} value={form.aadharNo || ''} onChange={e => handleInput('aadharNo', e.target.value)} />
                         </div>
                         <div className="form-group">
-                          <label className="form-label">DL Expiry Date</label>
-                          <input type="date" className="form-input" style={{width:'100%'}} value={form.dlExpiry || ''} onChange={e => handleInput('dlExpiry', e.target.value)} />
+                          <label className="form-label">PAN Card No.</label>
+                          <input type="text" className="form-input" style={{width:'100%'}} value={form.panNo || ''} onChange={e => handleInput('panNo', e.target.value)} />
                         </div>
-                        <div className="form-group">
-                          <label className="form-label">Type of License</label>
-                          <select className="form-input" style={{width:'100%'}} value={form.dlType || ''} onChange={e => handleInput('dlType', e.target.value)}>
-                            <option value="">Select...</option>
-                            <option value="2-Wheeler">2-Wheeler</option>
-                            <option value="4-Wheeler">4-Wheeler</option>
-                            <option value="Both">Both (2W & 4W)</option>
-                            <option value="Commercial">Commercial</option>
-                          </select>
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label">Passport No.</label>
-                          <input type="text" className="form-input" style={{width:'100%'}} value={form.passportNo || ''} onChange={e => handleInput('passportNo', e.target.value)} />
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label">Passport Expiry Date</label>
-                          <input type="date" className="form-input" style={{width:'100%'}} value={form.passportExpiry || ''} onChange={e => handleInput('passportExpiry', e.target.value)} />
+                        <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
+                          <div className="form-group">
+                            <label className="form-label">Driving License No.</label>
+                            <input type="text" className="form-input" style={{width:'100%'}} value={form.dlNo || ''} onChange={e => handleInput('dlNo', e.target.value)} />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">DL Expiry Date</label>
+                            <input type="date" className="form-input" style={{width:'100%'}} value={form.dlExpiry || ''} onChange={e => handleInput('dlExpiry', e.target.value)} />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Type of License</label>
+                            <select className="form-input" style={{width:'100%'}} value={form.dlType || ''} onChange={e => handleInput('dlType', e.target.value)}>
+                              <option value="">Select...</option>
+                              <option value="2-Wheeler">2-Wheeler</option>
+                              <option value="4-Wheeler">4-Wheeler</option>
+                              <option value="Both">Both (2W & 4W)</option>
+                              <option value="Commercial">Commercial</option>
+                            </select>
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Passport No.</label>
+                            <input type="text" className="form-input" style={{width:'100%'}} value={form.passportNo || ''} onChange={e => handleInput('passportNo', e.target.value)} />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Passport Expiry Date</label>
+                            <input type="date" className="form-input" style={{width:'100%'}} value={form.passportExpiry || ''} onChange={e => handleInput('passportExpiry', e.target.value)} />
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
 
               {/* SECTION 2: Employment */}
               {activeTab === 2 && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
-                  <div className="form-group">
-                    <label className="form-label">Employee Code * (Company Identity)</label>
-                    <input type="text" className="form-input" placeholder="e.g. ABC-001" style={{width:'100%', borderColor: !form.empId ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                      value={form.empId || ''} onChange={e => handleInput('empId', e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Biometric Code *</label>
-                    <input type="text" className="form-input" placeholder="e.g. 101" style={{width:'100%', borderColor: !form.biometricCode ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                      value={form.biometricCode || ''} onChange={e => handleInput('biometricCode', e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Joining Date *</label>
-                    <input type="date" className="form-input" style={{width:'100%', borderColor: !form.joinDate ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                      value={form.joinDate || ''} onChange={e => handleInput('joinDate', e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Employment Category *</label>
-                    <select className="form-input" style={{width:'100%', borderColor: !form.empCategory ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                      value={form.empCategory || ''} onChange={(e) => handleInput('empCategory', e.target.value)}>
-                      <option value="">Select...</option>
-                      <option value="Staff Employee">Staff Employee</option>
-                      <option value="On role worker">On role worker</option>
-                      <option value="Contractual Worker">Contractual Worker</option>
-                    </select>
-                  </div>
+                  {!isEmployee && (
+                    <>
+                      <div className="form-group">
+                        <label className="form-label">Employee Code * (Company Identity)</label>
+                        <input type="text" className="form-input" placeholder="e.g. ABC-001" style={{width:'100%', borderColor: !form.empId ? 'var(--color-danger)' : 'var(--color-border)'}} 
+                          value={form.empId || ''} onChange={e => handleInput('empId', e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Biometric Code *</label>
+                        <input type="text" className="form-input" placeholder="e.g. 101" style={{width:'100%', borderColor: !form.biometricCode ? 'var(--color-danger)' : 'var(--color-border)'}} 
+                          value={form.biometricCode || ''} onChange={e => handleInput('biometricCode', e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Joining Date *</label>
+                        <input type="date" className="form-input" style={{width:'100%', borderColor: !form.joinDate ? 'var(--color-danger)' : 'var(--color-border)'}} 
+                          value={form.joinDate || ''} onChange={e => handleInput('joinDate', e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Employment Category *</label>
+                        <select className="form-input" style={{width:'100%', borderColor: !form.empCategory ? 'var(--color-danger)' : 'var(--color-border)'}} 
+                          value={form.empCategory || ''} onChange={(e) => handleInput('empCategory', e.target.value)}>
+                          <option value="">Select...</option>
+                          <option value="Staff Employee">Staff Employee</option>
+                          <option value="On role worker">On role worker</option>
+                          <option value="Contractual Worker">Contractual Worker</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
                   <div className="form-group">
                     <label className="form-label">Department *</label>
-                    <select className="form-input" style={{width:'100%'}} value={form.department || ''} onChange={e => handleInput('department', e.target.value)}>
+                    <select className="form-input" style={{width:'100%'}} value={form.department || ''} onChange={e => handleInput('department', e.target.value)} disabled={isEmployee}>
                       <option value="">Select Department...</option>
                       {departments.map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
                   </div>
-                  <div className="form-group"><label className="form-label">Designation</label><input type="text" className="form-input" style={{width:'100%'}} value={form.role || ''} onChange={e => handleInput('role', e.target.value)} /></div>
-                  <div className="form-group"><label className="form-label">Employment Status</label><select className="form-input" style={{width:'100%'}} value={form.probType || ''} onChange={e => handleInput('probType', e.target.value)}><option>Select...</option><option>Temporary</option><option>Probation</option><option>Permanent</option></select></div>
-                  <div className="form-group"><label className="form-label">Confirmation Date</label><input type="date" className="form-input" style={{width:'100%'}} value={form.exitDate || ''} onChange={e => handleInput('exitDate', e.target.value)} disabled={form.probType === 'Probation'} /></div>
-                  <div className="form-group"><label className="form-label">Probation Period</label><select className="form-input" style={{width:'100%'}} value={form.probPeriod || ''} onChange={e => handleInput('probPeriod', e.target.value)} disabled={form.probType === 'Permanent'}><option>1 Month</option><option>2 Months</option><option>3 Months</option><option>4 Months</option><option>5 Months</option><option>6 Months</option></select></div>
-                  <div className="form-group">
-                    <label className="form-label">Grade *</label>
-                    <select className="form-input" style={{width:'100%', borderColor: !form.grade ? 'var(--color-danger)' : 'var(--color-border)'}} 
-                      value={form.grade || ''} onChange={e => handleInput('grade', e.target.value)}>
-                      <option value="">Select Grade...</option>
-                      {['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8'].map(g => <option key={g} value={g}>{g}</option>)}
-                    </select>
-                  </div>
-                </div>
+                  <div className="form-group"><label className="form-label">Designation</label><input type="text" className="form-input" style={{width:'100%'}} value={form.role || ''} onChange={e => handleInput('role', e.target.value)} disabled={isEmployee} /></div>
+                  {!isEmployee && (
+                    <>
+                      <div className="form-group"><label className="form-label">Employment Status</label><select className="form-input" style={{width:'100%'}} value={form.probType || ''} onChange={e => handleInput('probType', e.target.value)}><option>Select...</option><option>Temporary</option><option>Probation</option><option>Permanent</option></select></div>
+                      <div className="form-group"><label className="form-label">Confirmation Date</label><input type="date" className="form-input" style={{width:'100%'}} value={form.exitDate || ''} onChange={e => handleInput('exitDate', e.target.value)} disabled={form.probType === 'Probation'} /></div>
+                      <div className="form-group"><label className="form-label">Probation Period</label><select className="form-input" style={{width:'100%'}} value={form.probPeriod || ''} onChange={e => handleInput('probPeriod', e.target.value)} disabled={form.probType === 'Permanent'}><option>1 Month</option><option>2 Months</option><option>3 Months</option><option>4 Months</option><option>5 Months</option><option>6 Months</option></select></div>
+                      <div className="form-group">
+                        <label className="form-label">Grade *</label>
+                        <select className="form-input" style={{width:'100%', borderColor: !form.grade ? 'var(--color-danger)' : 'var(--color-border)'}} 
+                          value={form.grade || ''} onChange={e => handleInput('grade', e.target.value)}>
+                          <option value="">Select Grade...</option>
+                          {['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8'].map(g => <option key={g} value={g}>{g}</option>)}
+                        </select>
+                      </div>
+                    </>
+                  )}
               )}
 
               {/* SECTION 3: Address */}
@@ -1028,19 +1054,26 @@ const EmployeeDirectory = ({ userRole }) => {
               <button className="btn btn-outline" onClick={() => setActiveTab(Math.max(1, activeTab - 1))} disabled={activeTab === 1}>← Previous Block</button>
               
               <div style={{ display: 'flex', gap: '1rem' }}>
-                <button className="btn btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
-                {activeTab < 7 ? (
+                <button className="btn btn-ghost" onClick={() => setShowModal(false)}>Close</button>
+                {!isEmployee && (
+                  <>
+                    {activeTab < 7 ? (
+                      <button className="btn btn-primary" onClick={() => setActiveTab(activeTab + 1)}>Next Block →</button>
+                    ) : (
+                      <button className="btn btn-primary" 
+                        onClick={handleSave} 
+                        style={{ 
+                          backgroundColor: isFormValid ? 'var(--color-success)' : 'var(--color-text-muted)', 
+                          borderColor: isFormValid ? 'var(--color-success)' : 'var(--color-border)',
+                          cursor: 'pointer'
+                        }}>
+                        <Save size={16} /> Save & Complete Onboarding
+                      </button>
+                    )}
+                  </>
+                )}
+                {isEmployee && activeTab < 2 && (
                   <button className="btn btn-primary" onClick={() => setActiveTab(activeTab + 1)}>Next Block →</button>
-                ) : (
-                  <button className="btn btn-primary" 
-                    onClick={handleSave} 
-                    style={{ 
-                      backgroundColor: isFormValid ? 'var(--color-success)' : 'var(--color-text-muted)', 
-                      borderColor: isFormValid ? 'var(--color-success)' : 'var(--color-border)',
-                      cursor: 'pointer'
-                    }}>
-                    <Save size={16} /> Save & Complete Onboarding
-                  </button>
                 )}
               </div>
             </div>

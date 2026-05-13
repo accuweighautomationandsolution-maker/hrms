@@ -152,13 +152,11 @@ export const dataService = {
         return [];
       }
       
-      if (!data || data.length === 0) {
-        console.warn('dataService: query successful but returned 0 employees. Check RLS or table content.');
-        return [];
-      }
-
       console.log(`dataService: Successfully fetched ${data.length} employees.`);
       
+      const userRole = typeof authService !== 'undefined' ? authService.getUserRole() : 'employee';
+      const isEmployeeUser = userRole === 'employee';
+
       return data.map(r => {
         let parsedData = {};
         if (typeof r.data === 'string') {
@@ -167,7 +165,7 @@ export const dataService = {
           parsedData = r.data;
         }
         
-        return {
+        const fullProfile = {
           ...parsedData,
           id: r.id,
           name: r.name || parsedData.name || 'Unnamed Employee',
@@ -178,6 +176,29 @@ export const dataService = {
           status: r.status || parsedData.status || 'Active',
           empType: r.employment_type || parsedData.empType || 'Probation'
         };
+
+        // Strict Access Control: Scrub sensitive data for employee-level users
+        if (isEmployeeUser) {
+          return {
+            id: fullProfile.id,
+            name: fullProfile.name,
+            role: fullProfile.role,
+            department: fullProfile.department,
+            contact: fullProfile.contact || '', // Allowed per requirements
+            // Scrub everything else
+            email: '', 
+            empCode: '', 
+            status: 'Active',
+            empType: '',
+            salaryConfig: null,
+            bankAccountNumber: '',
+            aadharNo: '',
+            panNo: '',
+            documents: []
+          };
+        }
+
+        return fullProfile;
       });
     } catch (err) {
       console.error('Critical Exception in getEmployees:', err.message);
@@ -188,7 +209,21 @@ export const dataService = {
   getEmployeeById: async (id) => {
     if (!supabase) return null;
     const { data, error } = await supabase.from('employees').select('data').eq('id', id).maybeSingle();
-    return (data && data.data) ? data.data : null;
+    const profile = (data && data.data) ? data.data : null;
+    if (!profile) return null;
+
+    const userRole = typeof authService !== 'undefined' ? authService.getUserRole() : 'employee';
+    if (userRole === 'employee') {
+      return {
+        id: profile.id,
+        name: profile.name,
+        role: profile.role,
+        department: profile.department,
+        contact: profile.contact || '',
+        // All other fields hidden
+      };
+    }
+    return profile;
   },
 
   saveEmployee: async (empData) => {
