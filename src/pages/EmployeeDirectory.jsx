@@ -45,22 +45,44 @@ const EmployeeDirectory = ({ userRole }) => {
   const [uploadedFiles, setUploadedFiles] = useState([]);
 
   useEffect(() => {
+    let isMounted = true;
+    const safetyTimeout = setTimeout(() => {
+      if (isMounted) {
+        setLoading(false);
+        setErrorMsg('Network Timeout: Employee records taking longer than expected to load.');
+      }
+    }, 10000);
+
     const fetchData = async () => {
       setLoading(true);
       try {
         const [emps, depts] = await Promise.all([
-          dataService.getEmployees(),
-          dataService.getDepartments()
+          dataService.getEmployees().catch(err => {
+            console.warn("Directory: Employees fetch failed:", err);
+            return [];
+          }),
+          dataService.getDepartments().catch(err => {
+            console.warn("Directory: Departments fetch failed:", err);
+            return [];
+          })
         ]);
-        setEmployees(emps);
-        setDepartments(depts);
+        
+        if (isMounted) {
+          setEmployees(emps);
+          setDepartments(depts);
+        }
       } catch (err) {
         console.error("Failed to load directory data:", err);
       } finally {
-        setLoading(false);
+        clearTimeout(safetyTimeout);
+        if (isMounted) setLoading(false);
       }
     };
     fetchData();
+    return () => {
+      isMounted = false;
+      clearTimeout(safetyTimeout);
+    };
   }, []);
 
   const handleInput = (field, val) => {

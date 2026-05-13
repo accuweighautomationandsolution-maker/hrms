@@ -21,38 +21,51 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     dayRate: ''
   });
 
+  const hasFetched = useRef(false);
+
   useEffect(() => {
-    // Determine the ID to fetch for (from props, location state, or passedState)
+    let isMounted = true;
     const effectiveEmpId = empId || (location.state && location.state.empId);
 
+    const safetyTimeout = setTimeout(() => {
+      // We don't have a global loading state here, but we can log
+      if (isMounted) console.warn("SalaryStructure: Fetch timeout reached.");
+    }, 8000);
+
     const fetchExisting = async () => {
-      if (effectiveEmpId && !isEmbedded) {
+      if (effectiveEmpId && !isEmbedded && !hasFetched.current) {
+        hasFetched.current = true;
         try {
           const [existing, emp] = await Promise.all([
-            dataService.getSalaryStructure(effectiveEmpId),
-            dataService.getEmployees().then(list => list.find(e => e.id === effectiveEmpId))
+            dataService.getSalaryStructure(effectiveEmpId).catch(() => null),
+            dataService.getEmployees().then(list => list.find(e => e.id === effectiveEmpId)).catch(() => null)
           ]);
           
-          if (existing) {
-            setForm(prev => ({ 
-              ...prev, 
-              ...existing,
-              empType: emp?.empType || prev.empType || 'Probation'
-            }));
-          } else if (emp) {
-            setForm(prev => ({
-              ...prev,
-              candidateName: emp.name,
-              roleApplied: emp.role,
-              empType: emp.empType || 'Probation'
-            }));
+          if (isMounted) {
+            if (existing) {
+              setForm(prev => ({ 
+                ...prev, 
+                ...existing,
+                empType: emp?.empType || prev.empType || 'Probation'
+              }));
+            } else if (emp) {
+              setForm(prev => ({
+                ...prev,
+                candidateName: emp.name,
+                roleApplied: emp.role,
+                empType: emp.empType || 'Probation'
+              }));
+            }
           }
         } catch (err) {
           console.error("Error fetching salary/employee details:", err);
+        } finally {
+          clearTimeout(safetyTimeout);
         }
       }
     };
-    fetchExisting();
+
+    if (!hasFetched.current) fetchExisting();
 
     if (!isEmbedded && location.state && location.state.isAppraisal) {
       setIsAppraisal(true);
@@ -61,16 +74,21 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
         candidateName: location.state.employeeName,
         roleApplied: location.state.employeeRole,
         empId: location.state.empId,
-        empType: location.state.empType || 'Permanent' // Appraisals usually mean they are permanent or moving to it
+        empType: location.state.empType || 'Permanent'
       }));
     } else if (passedState && Object.keys(passedState).length > 0) {
-      // Guard: Only update internal form if passedState is actually different to avoid cycles
+      // Synchronize from passed props but check for changes to avoid loops
       setForm(prev => {
         const isSame = JSON.stringify(prev) === JSON.stringify(passedState);
-        return isSame ? prev : passedState;
+        return isSame ? prev : { ...prev, ...passedState };
       });
     }
-  }, [location, passedState, isEmbedded, empId]);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(safetyTimeout);
+    };
+  }, [location, isEmbedded, empId, passedState]); // Keep passedState for prop updates, but the guard inside setForm handles it
 
   const handleInput = (field, val) => {
     setForm(prev => {

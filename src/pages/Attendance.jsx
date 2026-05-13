@@ -147,36 +147,49 @@ const Attendance = () => {
   const [loading,       setLoading]       = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+    const safetyTimeout = setTimeout(() => {
+      if (isMounted) setLoading(false);
+    }, 10000);
+
     const fetchData = async () => {
       setLoading(true);
       try {
         const [emps, att, hol, bConf] = await Promise.all([
-          dataService.getEmployees(),
-          dataService.getAttendance(),
-          dataService.getCustomHolidays(),
-          dataService.getBiometricConfig()
+          dataService.getEmployees().catch(() => []),
+          dataService.getAttendance().catch(() => ({})),
+          dataService.getCustomHolidays().catch(() => []),
+          dataService.getBiometricConfig().catch(() => null)
         ]);
-        console.log("Attendance: Data Load Success", { emps: emps.length, att: Object.keys(att || {}).length });
-        setEmployeesList(emps);
-        setRecords(att);
-        setHolidayList(hol);
-        if (bConf) setBioConfig(bConf);
+        
+        if (isMounted) {
+          console.log("Attendance: Data Load Success", { emps: emps.length, att: Object.keys(att || {}).length });
+          setEmployeesList(emps);
+          setRecords(att);
+          setHolidayList(hol);
+          if (bConf) setBioConfig(bConf);
 
-        if (isEmployee) {
-          if (emps.length > 0) {
-            const emp = emps.find(e => String(e.id) === String(currentUser?.id));
-            setSelectedEmp(emp || emps[0]);
+          if (isEmployee) {
+            if (emps.length > 0) {
+              const emp = emps.find(e => String(e.id) === String(currentUser?.id));
+              setSelectedEmp(emp || emps[0]);
+            }
+          } else if (emps.length > 0) {
+            setSelectedEmp(emps[0]);
           }
-        } else if (emps.length > 0) {
-          setSelectedEmp(emps[0]);
         }
       } catch (err) {
         console.error("Attendance: Critical Load Error:", err);
       } finally {
-        setLoading(false);
+        clearTimeout(safetyTimeout);
+        if (isMounted) setLoading(false);
       }
     };
     fetchData();
+    return () => {
+      isMounted = false;
+      clearTimeout(safetyTimeout);
+    };
   }, [currentUser?.id, isEmployee]);
 
   useEffect(() => {

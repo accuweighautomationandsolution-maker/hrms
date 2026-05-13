@@ -387,36 +387,56 @@ const Payroll = () => {
   const [holidayWorked, setHolidayWorked] = useState([]); // List of day numbers
 
   useEffect(() => {
+    let isMounted = true;
+    const safetyTimeout = setTimeout(() => {
+      if (isMounted) setLoading(false);
+    }, 15000); // Payroll has many requests, so we give it 15s
+
     const fetchData = async () => {
       setLoading(true);
       try {
         const [emps, hols] = await Promise.all([
-          dataService.getEmployees(),
-          dataService.getCustomHolidays()
+          dataService.getEmployees().catch(() => []),
+          dataService.getCustomHolidays().catch(() => [])
         ]);
         
         const attMap = {};
         const balMap = {};
+        
+        // Fetch attendance and balances in parallel with individual error handling
         await Promise.all(emps.map(async (emp) => {
-          const [count, balance] = await Promise.all([
-            dataService.getPresentDaysCount(emp.id, CUR_MO, CUR_YR),
-            dataService.getEmployeeBalance(emp.id)
-          ]);
-          attMap[emp.id] = count;
-          balMap[emp.id] = balance;
+          try {
+            const [count, balance] = await Promise.all([
+              dataService.getPresentDaysCount(emp.id, CUR_MO, CUR_YR).catch(() => 0),
+              dataService.getEmployeeBalance(emp.id).catch(() => 0)
+            ]);
+            if (isMounted) {
+              attMap[emp.id] = count;
+              balMap[emp.id] = balance;
+            }
+          } catch (e) {
+            console.warn(`Failed to fetch payroll data for employee ${emp.id}:`, e);
+          }
         }));
 
-        setEmployees(emps);
-        setHolidayList(hols);
-        setAttendanceMap(attMap);
-        setBalanceMap(balMap);
+        if (isMounted) {
+          setEmployees(emps);
+          setHolidayList(hols);
+          setAttendanceMap(attMap);
+          setBalanceMap(balMap);
+        }
       } catch (err) {
         console.error("Failed to load payroll data:", err);
       } finally {
-        setLoading(false);
+        clearTimeout(safetyTimeout);
+        if (isMounted) setLoading(false);
       }
     };
     fetchData();
+    return () => {
+      isMounted = false;
+      clearTimeout(safetyTimeout);
+    };
   }, []);
 
   const employeesWithPayroll = useMemo(() => {
