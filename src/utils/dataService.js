@@ -685,32 +685,26 @@ export const dataService = {
   getEmployeeDocs: async (empId = null) => {
     if (!supabase) return [];
     try {
-      // The schema confirmedly has 'id', 'emp_id', and 'file_data' (JSONB).
-      // It lacks top-level 'category' and 'data' columns.
-      let query = supabase.from('employee_documents').select('*');
-      if (empId) query = query.eq('emp_id', String(empId));
+      // We use the 'employees' table as the source of truth for documents
+      // because it has a guaranteed stable JSONB 'data' column.
+      const emps = await dataService.getEmployees();
       
-      const { data, error } = await query;
-      if (error) {
-        console.error("DataService: Error fetching employee docs:", error);
-        return [];
+      if (empId) {
+        const emp = emps.find(e => String(e.id) === String(empId));
+        return (emp?.documents || []).map(d => ({
+          ...d,
+          empName: emp.name
+        }));
       }
       
-      return (data || []).map(r => {
-        // We use 'file_data' as the primary JSONB source
-        const docData = r.file_data || r.data || {};
-        return {
-          ...docData,
-          id: r.id,
-          empId: r.emp_id,
-          category: docData.category || r.category || 'General',
-          docType: docData.docType || r.doc_type || 'Document',
-          status: docData.status || r.status || 'Active',
-          uploadedBy: docData.uploadedBy || r.uploaded_by || 'System',
-          version: docData.version || r.version || 1,
-          createdAt: docData.createdAt || r.created_at
-        };
-      });
+      // Return all documents across all employees
+      return emps.reduce((acc, e) => {
+        const docs = (e.documents || []).map(d => ({
+          ...d,
+          empName: e.name
+        }));
+        return [...acc, ...docs];
+      }, []);
     } catch (e) {
       console.error("DataService: Exception in getEmployeeDocs:", e);
       return [];
@@ -720,32 +714,35 @@ export const dataService = {
   addEmployeeDoc: async (doc) => {
     if (!supabase) return;
     try {
-      const id = `DOC_${Date.now()}`;
-      const file_data = {
-        id,
-        empId: String(doc.empId),
-        name: doc.name || doc.docType || 'Document', 
-        size: doc.size || 0, 
-        type: doc.type || 'text/html',
-        content: doc.content || '',
-        category: doc.category || 'General',
-        docType: doc.docType || 'Document',
-        status: doc.status || 'Active',
-        uploadedBy: doc.uploadedBy || 'System',
-        version: doc.version || 1,
+      // 1. Get the latest employee record
+      const employees = await dataService.getEmployees();
+      const emp = employees.find(e => String(e.id) === String(doc.empId));
+      if (!emp) throw new Error("Employee not found");
+
+      // 2. Append the new document
+      const newDoc = {
+        ...doc,
+        id: `DOC_${Date.now()}`,
         createdAt: new Date().toISOString()
       };
       
-      // Save using the confirmed {id, emp_id, file_data} pattern
-      const { error } = await supabase.from('employee_documents').upsert({ 
-        id, 
-        emp_id: String(doc.empId),
-        file_data: file_data
+      const updatedDocuments = [...(emp.documents || []), newDoc];
+      
+      // 3. Save back to employees table
+      await dataService.saveEmployee({
+        ...emp,
+        documents: updatedDocuments
       });
 
-      if (error) {
-        console.error("DataService: Error adding employee doc:", error);
-        throw error;
+      // Optional: Backup to employee_documents (silently ignore errors)
+      try {
+        await supabase.from('employee_documents').upsert({ 
+          id: newDoc.id, 
+          emp_id: String(doc.empId),
+          data: newDoc 
+        });
+      } catch (backupError) {
+        // Silently skip if the separate table is broken
       }
     } catch (e) {
       console.error("DataService: Exception in addEmployeeDoc:", e);
@@ -756,11 +753,22 @@ export const dataService = {
   deleteEmployeeDoc: async (id) => {
     if (!supabase) return;
     try {
-      const { error } = await supabase.from('employee_documents').delete().eq('id', id);
-      if (error) {
-        console.error("DataService: Error deleting employee doc:", error);
-        throw error;
+      // 1. Find which employee has this document
+      const employees = await dataService.getEmployees();
+      const emp = employees.find(e => (e.documents || []).some(d => String(d.id) === String(id)));
+      
+      if (emp) {
+        const updatedDocuments = (emp.documents || []).filter(d => String(d.id) === String(id));
+        await dataService.saveEmployee({
+          ...emp,
+          documents: updatedDocuments
+        });
       }
+
+      // Optional: Sync with backup table
+      try {
+        await supabase.from('employee_documents').delete().eq('id', id);
+      } catch (e) {}
     } catch (e) {
       console.error("DataService: Exception in deleteEmployeeDoc:", e);
       throw e;
