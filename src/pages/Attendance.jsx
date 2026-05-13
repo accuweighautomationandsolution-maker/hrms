@@ -6,12 +6,12 @@ import { dataService } from '../utils/dataService';
 import { authService } from '../utils/authService';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-const DAY_ABBR    = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const DAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-const pad2     = (n) => String(n).padStart(2, '0');
-const hhmm     = (h, m) => `${pad2(h)}:${pad2(m)}`;
-const toMins   = (t) => { if (!t) return null; const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+const pad2 = (n) => String(n).padStart(2, '0');
+const hhmm = (h, m) => `${pad2(h)}:${pad2(m)}`;
+const toMins = (t) => { if (!t) return null; const [h, m] = t.split(':').map(Number); return h * 60 + m; };
 const diffHHMM = (inT, outT) => {
   const a = toMins(inT), b = toMins(outT);
   if (a == null || b == null || b <= a) return null;
@@ -43,20 +43,20 @@ const buildCalendar = (year, month) => {
 // const EMPLOYEES_LIST = dataService.getEmployees(); // Moved into component for better reactivity
 
 const BADGE_COLOR = {
-  'Staff Employee':    'badge-primary',
-  'On role worker':    'badge-success',
-  'Contractual Worker':'badge-warning',
+  'Staff Employee': 'badge-primary',
+  'On role worker': 'badge-success',
+  'Contractual Worker': 'badge-warning',
 };
 
 // ── Punch-edit modal ────────────────────────────────────────────────────────
 const PunchModal = ({ entry, onSave, onClose }) => {
-  const [punchIn,  setPunchIn]  = useState(entry.punchIn  || '09:00');
+  const [punchIn, setPunchIn] = useState(entry.punchIn || '09:00');
   const [punchOut, setPunchOut] = useState(entry.punchOut || '');
-  const [remark,   setRemark]   = useState(entry.remark   || '');
+  const [remark, setRemark] = useState(entry.remark || '');
 
-  const res      = diffHHMM(punchIn, punchOut);
+  const res = diffHHMM(punchIn, punchOut);
   const duration = res?.text;
-  const netOT    = entry.isHoliday ? calcNetOT(punchIn, punchOut) : null;
+  const netOT = entry.isHoliday ? calcNetOT(punchIn, punchOut) : null;
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -68,7 +68,7 @@ const PunchModal = ({ entry, onSave, onClose }) => {
               {entry.name} — {pad2(entry.day)}/{pad2(entry.month + 1)}/{entry.year}
             </p>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.5rem', color: 'var(--color-text-muted)', cursor: 'pointer' }}><X size={20}/></button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.5rem', color: 'var(--color-text-muted)', cursor: 'pointer' }}><X size={20} /></button>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
@@ -114,7 +114,7 @@ const PunchModal = ({ entry, onSave, onClose }) => {
 
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
           <button className="btn btn-outline" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" 
+          <button className="btn btn-primary"
             disabled={!punchIn || !punchOut || !remark.trim()}
             onClick={() => onSave({ punchIn, punchOut, remark, source: 'Manual' })}>
             <Save size={16} /> Save Entry
@@ -128,24 +128,24 @@ const PunchModal = ({ entry, onSave, onClose }) => {
 // ── Main Attendance Component ───────────────────────────────────────────────
 const Attendance = () => {
   const currentUser = authService.getCurrentUser();
-  const userRole    = authService.getUserRole();
-  const isEmployee  = userRole === 'employee';
+  const userRole = authService.getUserRole();
+  const isEmployee = userRole === 'employee';
 
-  const now      = new Date();
-  const [year,  setYear]  = useState(now.getFullYear());
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
   const [employeesList, setEmployeesList] = useState([]);
   const [selectedEmp, setSelectedEmp] = useState(null);
-  const [searchQ,     setSearchQ]     = useState('');
-  const [punchModal,  setPunchModal]  = useState(null); // { day, ... }
-  const [devices,     setDevices]     = useState([]);
-  const [records,     setRecords]     = useState({});
-  const [syncLoading,   setSyncLoading]   = useState(false);
+  const [searchQ, setSearchQ] = useState('');
+  const [punchModal, setPunchModal] = useState(null); // { day, ... }
+  const [devices, setDevices] = useState([]);
+  const [records, setRecords] = useState({});
+  const [syncLoading, setSyncLoading] = useState(false);
   const [showBioConfig, setShowBioConfig] = useState(false);
-  const [bioConfig,     setBioConfig]     = useState({ ip: '192.168.1.201', port: '4370', isEnabled: true });
-  const [lastSync,      setLastSync]      = useState(null);
-  const [holidayList,   setHolidayList]   = useState([]);
-  const [loading,       setLoading]       = useState(true);
+  const [bioConfig, setBioConfig] = useState({ ip: '192.168.1.202', port: '4370', isEnabled: true });
+  const [lastSync, setLastSync] = useState(null);
+  const [holidayList, setHolidayList] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -163,7 +163,7 @@ const Attendance = () => {
           dataService.getBiometricConfig().catch(() => null),
           dataService.getConfig('biometric_last_sync', null).catch(() => null)
         ]);
-        
+
         if (isMounted) {
           console.log("Attendance: Data Load Success", { emps: emps.length, att: Object.keys(att || {}).length });
           setEmployeesList(emps);
@@ -202,16 +202,16 @@ const Attendance = () => {
     }
 
     BiometricService.getDeviceStatus(bioConfig.ip, bioConfig.port).then(d => setDevices(d));
-    
+
     // Subscribe to Push events for real-time reflection
     const unsubscribe = BiometricService.subscribeToPushEvents(async (punch) => {
       // Real-time Background Sync Logic
       const pDay = punch.day;
       const pMonth = punch.month;
       const pYear = punch.year;
-      
+
       const punchKey = `${punch.empId}_${pYear}_${pMonth}_${pDay}`;
-      
+
       let updatedRecord = null;
 
       setRecords(prev => {
@@ -240,7 +240,7 @@ const Attendance = () => {
     return () => unsubscribe();
   }, [bioConfig]);
 
-  const holidays   = useMemo(() => getHolidayDates(year, month, holidayList || []), [year, month, holidayList]);
+  const holidays = useMemo(() => getHolidayDates(year, month, holidayList || []), [year, month, holidayList]);
   const holidaySet = useMemo(() => new Set((holidays || []).map(h => h.day)), [holidays]);
   const holTypeMap = useMemo(() => Object.fromEntries((holidays || []).map(h => [h.day, h.type])), [holidays]);
 
@@ -271,7 +271,7 @@ const Attendance = () => {
 
       setRecords(newRecords);
       await dataService.saveAttendance(newRecords);
-      
+
       const timestamp = new Date().toLocaleString();
       setLastSync(timestamp);
       await dataService.saveConfig('biometric_last_sync', timestamp);
@@ -306,7 +306,7 @@ const Attendance = () => {
     if (holidaySet.has(day)) return rec ? 'holiday-worked' : 'holiday';
     if (dow === 0) return rec ? 'holiday-worked' : 'holiday'; // extra Sunday guard
     if (rec) return rec.punchOut ? 'present' : 'punch-in-only';
-    
+
     if (!year || !month || !day) return 'future';
 
     // Normalize comparison to midnight
@@ -318,12 +318,12 @@ const Attendance = () => {
   };
 
   const STATUS_STYLE = {
-    'present':       { bg: 'rgba(34,197,94,0.10)',  border: 'var(--color-success)', color: 'var(--color-success)' },
+    'present': { bg: 'rgba(34,197,94,0.10)', border: 'var(--color-success)', color: 'var(--color-success)' },
     'punch-in-only': { bg: 'rgba(245,158,11,0.10)', border: 'var(--color-warning)', color: 'var(--color-warning)' },
-    'holiday':       { bg: 'rgba(239,68,68,0.07)',  border: 'transparent',          color: 'var(--color-danger)' },
-    'holiday-worked':{ bg: 'rgba(245,158,11,0.15)', border: 'var(--color-warning)', color: '#b45309' },
-    'absent':        { bg: 'rgba(239,68,68,0.07)',  border: 'var(--color-danger)',   color: 'var(--color-danger)' },
-    'future':        { bg: 'transparent',            border: 'var(--color-border)',  color: 'var(--color-text-muted)' },
+    'holiday': { bg: 'rgba(239,68,68,0.07)', border: 'transparent', color: 'var(--color-danger)' },
+    'holiday-worked': { bg: 'rgba(245,158,11,0.15)', border: 'var(--color-warning)', color: '#b45309' },
+    'absent': { bg: 'rgba(239,68,68,0.07)', border: 'var(--color-danger)', color: 'var(--color-danger)' },
+    'future': { bg: 'transparent', border: 'var(--color-border)', color: 'var(--color-text-muted)' },
   };
 
   const filteredEmps = (employeesList || []).filter(e =>
@@ -331,9 +331,9 @@ const Attendance = () => {
   );
 
   // Summary stats for selected employee
-  const presentDays   = selectedEmp ? calDays.filter(({ day }) => ['present','punch-in-only','holiday-worked'].includes(dayStatus(selectedEmp.id, day, new Date(year, month, day).getDay()))).length : 0;
-  const absentDays    = selectedEmp ? calDays.filter(({ day, dow }) => dayStatus(selectedEmp.id, day, dow) === 'absent').length : 0;
-  const holidayDays   = selectedEmp ? calDays.filter(({ day }) => dayStatus(selectedEmp.id, day) === 'holiday').length : 0;
+  const presentDays = selectedEmp ? calDays.filter(({ day }) => ['present', 'punch-in-only', 'holiday-worked'].includes(dayStatus(selectedEmp.id, day, new Date(year, month, day).getDay()))).length : 0;
+  const absentDays = selectedEmp ? calDays.filter(({ day, dow }) => dayStatus(selectedEmp.id, day, dow) === 'absent').length : 0;
+  const holidayDays = selectedEmp ? calDays.filter(({ day }) => dayStatus(selectedEmp.id, day) === 'holiday').length : 0;
   const holidayWorked = selectedEmp ? calDays.filter(({ day }) => dayStatus(selectedEmp.id, day) === 'holiday-worked').length : 0;
 
   if (loading) {
@@ -357,35 +357,35 @@ const Attendance = () => {
         {/* Month navigator */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <button className="btn btn-outline" style={{ padding: '0.5rem 0.75rem' }}
-            onClick={() => { if (month === 0) { setMonth(11); setYear(y => y-1); } else setMonth(m => m-1); }}>‹</button>
+            onClick={() => { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); }}>‹</button>
           <span style={{ fontWeight: '700', fontSize: '1rem', minWidth: '140px', textAlign: 'center' }}>
             {MONTH_NAMES[month]} {year}
           </span>
           <button className="btn btn-outline" style={{ padding: '0.5rem 0.75rem' }}
-            onClick={() => { if (month === 11) { setMonth(0); setYear(y => y+1); } else setMonth(m => m+1); }}>›</button>
+            onClick={() => { if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1); }}>›</button>
         </div>
-        
+
         {/* Biometric Controls */}
         {!isEmployee && (
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             {bioConfig.isEnabled && devices[0] && (
-               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', padding: '0.4rem 0.6rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px' }}>
-                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: devices[0]?.status === 'Online' ? 'var(--color-success)' : 'var(--color-danger)' }}></div>
-                   <span style={{ fontWeight: '600' }}>X2008: {devices[0]?.status || 'Checking...'}</span>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: devices[0]?.status === 'Online' ? 'var(--color-success)' : 'var(--color-danger)' }}></div>
+                  <span style={{ fontWeight: '600' }}>X2008: {devices[0]?.status || 'Checking...'}</span>
                 </div>
                 {lastSync && <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>Last Sync: {lastSync}</span>}
-               </div>
+              </div>
             )}
-            <button 
-              className="btn btn-outline" 
+            <button
+              className="btn btn-outline"
               onClick={() => setShowBioConfig(true)}
               title="Biometric Setup"
             >
               <Settings size={18} />
             </button>
-            <button 
-              className={`btn ${syncLoading ? 'btn-ghost' : 'btn-primary'}`} 
+            <button
+              className={`btn ${syncLoading ? 'btn-ghost' : 'btn-primary'}`}
               onClick={handleBioSync}
               disabled={syncLoading || !bioConfig.isEnabled}
             >
@@ -410,9 +410,10 @@ const Attendance = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {filteredEmps.map(emp => (
                 <button key={emp.id} onClick={() => setSelectedEmp(emp)}
-                  style={{ textAlign: 'left', padding: '0.75rem', borderRadius: '8px', border: '1px solid', cursor: 'pointer', transition: 'all 0.15s',
-                    borderColor:       selectedEmp?.id === emp.id ? 'var(--color-primary)' : 'transparent',
-                    backgroundColor:   selectedEmp?.id === emp.id ? 'rgba(37,99,235,0.08)' : 'transparent',
+                  style={{
+                    textAlign: 'left', padding: '0.75rem', borderRadius: '8px', border: '1px solid', cursor: 'pointer', transition: 'all 0.15s',
+                    borderColor: selectedEmp?.id === emp.id ? 'var(--color-primary)' : 'transparent',
+                    backgroundColor: selectedEmp?.id === emp.id ? 'rgba(37,99,235,0.08)' : 'transparent',
                   }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <p style={{ margin: 0, fontWeight: '600', fontSize: '0.875rem', color: 'var(--color-text-main)' }}>{emp.name}</p>
@@ -433,10 +434,10 @@ const Attendance = () => {
           {/* Summary stats */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
             {[
-              { label: 'Days Present',      val: presentDays,   color: 'var(--color-success)' },
-              { label: 'Days Absent',        val: absentDays,    color: 'var(--color-danger)' },
-              { label: 'Holidays',           val: holidayDays,   color: 'var(--color-text-muted)' },
-              { label: 'Holiday OT Days',    val: holidayWorked, color: 'var(--color-warning)' },
+              { label: 'Days Present', val: presentDays, color: 'var(--color-success)' },
+              { label: 'Days Absent', val: absentDays, color: 'var(--color-danger)' },
+              { label: 'Holidays', val: holidayDays, color: 'var(--color-text-muted)' },
+              { label: 'Holiday OT Days', val: holidayWorked, color: 'var(--color-warning)' },
             ].map(({ label, val, color }) => (
               <div key={label} className="card" style={{ padding: '1rem', textAlign: 'center' }}>
                 <h3 style={{ fontSize: '1.75rem', fontWeight: '800', color, margin: 0 }}>{val}</h3>
@@ -457,10 +458,10 @@ const Attendance = () => {
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.75rem' }}>
                 {[
-                  ['🟢 Present',     '#16a34a'],
-                  ['🟡 Incomplete',  '#b45309'],
-                  ['🔴 Absent',      'var(--color-danger)'],
-                  ['⚫ Holiday',     'var(--color-text-muted)'],
+                  ['🟢 Present', '#16a34a'],
+                  ['🟡 Incomplete', '#b45309'],
+                  ['🔴 Absent', 'var(--color-danger)'],
+                  ['⚫ Holiday', 'var(--color-text-muted)'],
                   ['🟠 Holiday OT', '#b45309'],
                 ].map(([l, c]) => (
                   <span key={l} style={{ color: c, fontWeight: '500' }}>{l}</span>
@@ -490,9 +491,9 @@ const Attendance = () => {
                   {cells.map((cell, idx) => {
                     if (!cell) return <div key={`blank-${idx}`} />;
                     const { day, dow } = cell;
-                    const st    = (selectedEmp && selectedEmp.id) ? dayStatus(selectedEmp.id, day, dow) : 'future';
-                    const sty   = (STATUS_STYLE[st] || STATUS_STYLE['future']);
-                    const rec   = selectedEmp ? getRecord(selectedEmp.id, day) : null;
+                    const st = (selectedEmp && selectedEmp.id) ? dayStatus(selectedEmp.id, day, dow) : 'future';
+                    const sty = (STATUS_STYLE[st] || STATUS_STYLE['future']);
+                    const rec = selectedEmp ? getRecord(selectedEmp.id, day) : null;
                     const isHol = holidaySet.has(day);
                     const holType = holTypeMap[day];
                     const clickable = st !== 'future';
@@ -574,25 +575,25 @@ const Attendance = () => {
                 <tbody>
                   {calDays.map(({ day, dow }) => {
                     const rec = selectedEmp ? getRecord(selectedEmp.id, day) : null;
-                    const st  = selectedEmp ? dayStatus(selectedEmp.id, day, dow) : 'future';
+                    const st = selectedEmp ? dayStatus(selectedEmp.id, day, dow) : 'future';
                     const isHol = holidaySet.has(day);
                     const res = rec ? diffHHMM(rec.punchIn, rec.punchOut) : null;
                     const dur = isHol && res ? calcNetOT(rec.punchIn, rec.punchOut) : res?.text;
                     const STATUS_BADGE = {
-                      'present':       { label: 'Present',       cls: 'badge-success' },
-                      'punch-in-only': { label: 'Incomplete',    cls: 'badge-warning' },
-                      'holiday':       { label: isHol ? holTypeMap[day] : 'Sunday', cls: 'badge-default' },
-                      'holiday-worked':{ label: 'Holiday OT',    cls: 'badge-warning' },
-                      'absent':        { label: 'Absent',        cls: 'badge-danger' },
-                      'future':        { label: '—',             cls: '' },
+                      'present': { label: 'Present', cls: 'badge-success' },
+                      'punch-in-only': { label: 'Incomplete', cls: 'badge-warning' },
+                      'holiday': { label: isHol ? holTypeMap[day] : 'Sunday', cls: 'badge-default' },
+                      'holiday-worked': { label: 'Holiday OT', cls: 'badge-warning' },
+                      'absent': { label: 'Absent', cls: 'badge-danger' },
+                      'future': { label: '—', cls: '' },
                     };
                     const badge = STATUS_BADGE[st] || STATUS_BADGE['future'];
                     return (
                       <tr key={day} style={{ borderBottom: '1px solid var(--color-border)', opacity: st === 'future' ? 0.45 : 1 }}>
-                        <td style={{ padding: '0.75rem', fontWeight: '500' }}>{pad2(day)}/{pad2(month+1)}/{year}</td>
+                        <td style={{ padding: '0.75rem', fontWeight: '500' }}>{pad2(day)}/{pad2(month + 1)}/{year}</td>
                         <td style={{ padding: '0.75rem', color: 'var(--color-text-muted)' }}>{DAY_ABBR[dow]}</td>
-                        <td style={{ padding: '0.75rem', color: 'var(--color-success)', fontWeight: '600' }}>{rec?.punchIn  || '—'}</td>
-                        <td style={{ padding: '0.75rem', color: 'var(--color-danger)',  fontWeight: '600' }}>{rec?.punchOut || '—'}</td>
+                        <td style={{ padding: '0.75rem', color: 'var(--color-success)', fontWeight: '600' }}>{rec?.punchIn || '—'}</td>
+                        <td style={{ padding: '0.75rem', color: 'var(--color-danger)', fontWeight: '600' }}>{rec?.punchOut || '—'}</td>
                         <td style={{ padding: '0.75rem', fontWeight: '500' }}>{dur || '—'}</td>
                         <td style={{ padding: '0.75rem' }}><span className={`badge ${badge.cls}`} style={{ fontSize: '0.75rem' }}>{badge.label}</span></td>
                         <td style={{ padding: '0.75rem', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>{rec?.source || (isHol ? 'Holiday' : '—')}</td>
@@ -632,9 +633,9 @@ const Attendance = () => {
           <div className="card" style={{ width: '100%', maxWidth: '440px', padding: '2rem', animation: 'fadeIn 0.2s ease-out' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h3 style={{ margin: 0 }}>Biometric Integration</h3>
-              <button onClick={() => setShowBioConfig(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20}/></button>
+              <button onClick={() => setShowBioConfig(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
             </div>
-            
+
             <div style={{ backgroundColor: 'rgba(37,99,235,0.05)', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', borderLeft: '3px solid var(--color-primary)' }}>
               <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-text-muted)', lineHeight: '1.4' }}>
                 <strong>Identix X2008 Setup:</strong> This model supports push-mode. Ensure the device is connected to the same Ethernet segment and the "Push Protocol" is enabled in hardware settings.
@@ -647,9 +648,9 @@ const Attendance = () => {
                   <p style={{ margin: 0, fontWeight: '700', fontSize: '0.9rem' }}>Master Biometric Integration</p>
                   <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Toggle entire hardware sync on/off</p>
                 </div>
-                <div 
+                <div
                   onClick={() => setBioConfig({ ...bioConfig, isEnabled: !bioConfig.isEnabled })}
-                  style={{ 
+                  style={{
                     width: '48px', height: '26px', borderRadius: '13px', padding: '2px', cursor: 'pointer', transition: 'all 0.2s',
                     backgroundColor: bioConfig.isEnabled ? 'var(--color-success)' : '#cbd5e1',
                     display: 'flex', justifyContent: bioConfig.isEnabled ? 'flex-end' : 'flex-start'
@@ -661,24 +662,24 @@ const Attendance = () => {
               <div style={{ opacity: bioConfig.isEnabled ? 1 : 0.5, pointerEvents: bioConfig.isEnabled ? 'auto' : 'none', transition: 'all 0.3s' }}>
                 <div className="form-group">
                   <label className="form-label">Terminal IP Address *</label>
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    value={bioConfig.ip} 
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={bioConfig.ip}
                     placeholder="e.g. 192.168.1.201"
-                    onChange={(e) => setBioConfig({...bioConfig, ip: e.target.value})}
-                    style={{ width: '100%', marginTop: '0.4rem', borderColor: !bioConfig.ip ? 'var(--color-danger)' : 'var(--color-border)' }} 
+                    onChange={(e) => setBioConfig({ ...bioConfig, ip: e.target.value })}
+                    style={{ width: '100%', marginTop: '0.4rem', borderColor: !bioConfig.ip ? 'var(--color-danger)' : 'var(--color-border)' }}
                   />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Communication Port *</label>
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    value={bioConfig.port} 
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={bioConfig.port}
                     placeholder="e.g. 4370"
-                    onChange={(e) => setBioConfig({...bioConfig, port: e.target.value})}
-                    style={{ width: '100%', marginTop: '0.4rem', borderColor: !bioConfig.port ? 'var(--color-danger)' : 'var(--color-border)' }} 
+                    onChange={(e) => setBioConfig({ ...bioConfig, port: e.target.value })}
+                    style={{ width: '100%', marginTop: '0.4rem', borderColor: !bioConfig.port ? 'var(--color-danger)' : 'var(--color-border)' }}
                   />
                 </div>
               </div>
@@ -686,13 +687,13 @@ const Attendance = () => {
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid var(--color-border)' }}>
               <button className="btn btn-ghost" onClick={() => setShowBioConfig(false)}>Cancel</button>
-              <button className="btn btn-primary" 
+              <button className="btn btn-primary"
                 disabled={!bioConfig.ip || !bioConfig.port}
                 onClick={async () => {
-                await dataService.saveBiometricConfig(bioConfig);
-                setShowBioConfig(false);
-                alert("Biometric configuration saved permanently.");
-              }}>Save Configuration</button>
+                  await dataService.saveBiometricConfig(bioConfig);
+                  setShowBioConfig(false);
+                  alert("Biometric configuration saved permanently.");
+                }}>Save Configuration</button>
             </div>
           </div>
         </div>
