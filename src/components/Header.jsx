@@ -20,7 +20,7 @@ const Header = ({ onLogout, userRole, userName }) => {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>{userName || (userRole === 'management' ? 'HR Manager' : 'Employee Portal')}</span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{userRole === 'management' ? 'Admin Access' : 'Restricted Access'}</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{(userRole === 'management' || userRole === 'admin') ? 'Admin Access' : 'Restricted Access'}</span>
           </div>
         </div>
         <button onClick={onLogout} title="Log Out" style={{ marginLeft: '1rem', background: 'none', border: 'none', color: 'var(--color-danger)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>

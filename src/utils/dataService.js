@@ -155,7 +155,7 @@ export const dataService = {
       console.log(`dataService: Successfully fetched ${data.length} employees.`);
       
       const userRole = typeof authService !== 'undefined' ? authService.getUserRole() : 'employee';
-      const isEmployeeUser = userRole === 'employee';
+      const isEmployeeUser = userRole !== 'management' && userRole !== 'admin';
 
       return data.map(r => {
         let parsedData = {};
@@ -213,7 +213,7 @@ export const dataService = {
     if (!profile) return null;
 
     const userRole = typeof authService !== 'undefined' ? authService.getUserRole() : 'employee';
-    if (userRole === 'employee') {
+    if (userRole !== 'management' && userRole !== 'admin') {
       return {
         id: profile.id,
         name: profile.name,

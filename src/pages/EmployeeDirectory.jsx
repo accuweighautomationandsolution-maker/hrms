@@ -11,6 +11,7 @@ import { useNotification } from '../context/NotificationContext';
 const EmployeeDirectory = ({ userRole }) => {
   const { showNotification } = useNotification();
   const isEmployee = userRole !== 'management' && userRole !== 'admin';
+  const isAdmin = !isEmployee;
   
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -484,12 +485,12 @@ const EmployeeDirectory = ({ userRole }) => {
             <thead>
               <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Name</th>
-                {!isEmployee && <th style={{ padding: '1rem', fontWeight: '500' }}>Employee Code</th>}
+                {isAdmin && <th style={{ padding: '1rem', fontWeight: '500' }}>Employee Code</th>}
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Role</th>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Department</th>
-                {isEmployee && <th style={{ padding: '1rem', fontWeight: '500' }}>Contact Number</th>}
-                {!isEmployee && <th style={{ padding: '1rem', fontWeight: '500' }}>Grade</th>}
-                {!isEmployee && <th style={{ padding: '1rem', fontWeight: '500' }}>Status</th>}
+                <th style={{ padding: '1rem', fontWeight: '500' }}>Contact Number</th>
+                {isAdmin && <th style={{ padding: '1rem', fontWeight: '500' }}>Grade</th>}
+                {isAdmin && <th style={{ padding: '1rem', fontWeight: '500' }}>Status</th>}
                 <th style={{ padding: '1rem', fontWeight: '500', textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
@@ -517,11 +518,11 @@ const EmployeeDirectory = ({ userRole }) => {
                       </div>
                       <div>
                         <div style={{ fontWeight: '500', color: 'var(--color-text-main)' }}>{emp.name || ''}</div>
-                        {!isEmployee && <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{emp.email || ''}</div>}
+                        {isAdmin && <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{emp.email || ''}</div>}
                       </div>
                     </div>
                   </td>
-                  {!isEmployee && (
+                  {isAdmin && (
                     <td style={{ padding: '1rem' }}>
                       <div style={{ fontWeight: '600', color: 'var(--color-text-main)' }}>{emp.empCode || ''}</div>
                       <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Bio: {emp.biometricCode || ''}</div>
@@ -529,9 +530,9 @@ const EmployeeDirectory = ({ userRole }) => {
                   )}
                   <td style={{ padding: '1rem', color: 'var(--color-text-main)' }}>{emp.role || ''}</td>
                   <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{emp.department || ''}</td>
-                  {isEmployee && <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{emp.contact || ''}</td>}
-                  {!isEmployee && <td style={{ padding: '1rem' }}><span className="badge badge-blue">{emp.grade || 'N/A'}</span></td>}
-                  {!isEmployee && (
+                  <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{emp.contact || ''}</td>
+                  {isAdmin && <td style={{ padding: '1rem' }}><span className="badge badge-blue">{emp.grade || 'N/A'}</span></td>}
+                  {isAdmin && (
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
                         <span className={`badge ${emp.status === 'Active' ? 'badge-success' : emp.status === 'On Leave' ? 'badge-warning' : 'badge-danger'}`}>
@@ -547,7 +548,7 @@ const EmployeeDirectory = ({ userRole }) => {
                   )}
                   <td style={{ padding: '1rem', textAlign: 'right' }}>
                     <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                      {!isEmployee && (
+                      {isAdmin && (
                         <button 
                           className="btn btn-ghost" 
                           style={{ color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
@@ -559,7 +560,7 @@ const EmployeeDirectory = ({ userRole }) => {
                       <button className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', gap: '0.25rem' }} onClick={() => handleEditEmployee(emp)}>
                         <FileText size={12} /> {isEmployee ? 'View Profile' : 'Profile'}
                       </button>
-                      {!isEmployee && (
+                      {isAdmin && (
                         <button 
                           className="btn btn-ghost" 
                           style={{ padding: '0.5rem', color: 'var(--color-danger)', borderRadius: '50%', backgroundColor: 'rgba(239, 68, 68, 0.05)' }} 
@@ -656,7 +657,7 @@ const EmployeeDirectory = ({ userRole }) => {
                         <input type="text" className="form-input" style={{width:'100%', borderColor: !form.lastName ? 'var(--color-danger)' : 'var(--color-border)'}} 
                           value={form.lastName || ''} onChange={(e) => handleInput('lastName', e.target.value)} disabled={isEmployee} />
                       </div>
-                      {!isEmployee && (
+                      {isAdmin && (
                         <>
                           <div className="form-group"><label className="form-label">Date of Birth</label><input type="date" className="form-input" style={{width:'100%'}} value={form.dob || ''} onChange={e => handleInput('dob', e.target.value)} /></div>
                           <div className="form-group">
@@ -684,7 +685,7 @@ const EmployeeDirectory = ({ userRole }) => {
                         <input type="tel" className="form-input" style={{width:'100%', borderColor: !form.contact ? 'var(--color-danger)' : 'var(--color-border)'}} 
                           value={form.contact || ''} onChange={e => handleInput('contact', e.target.value)} disabled={isEmployee} />
                       </div>
-                      {!isEmployee && (
+                      {isAdmin && (
                         <>
                           <div className="form-group"><label className="form-label">Alternate Contact</label><input type="tel" className="form-input" style={{width:'100%'}} value={form.altContact || ''} onChange={e => handleInput('altContact', e.target.value)} /></div>
                           <div className="form-group">
@@ -697,7 +698,7 @@ const EmployeeDirectory = ({ userRole }) => {
                     </div>
                   </div>
 
-                  {!isEmployee && (
+                  {isAdmin && (
                     <div>
                       <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--color-primary)' }}>Government ID Details</h3>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
@@ -745,7 +746,8 @@ const EmployeeDirectory = ({ userRole }) => {
 
               {/* SECTION 2: Employment */}
               {activeTab === 2 && (
-                  {!isEmployee && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
+                  {isAdmin && (
                     <>
                       <div className="form-group">
                         <label className="form-label">Employee Code * (Company Identity)</label>
@@ -782,7 +784,7 @@ const EmployeeDirectory = ({ userRole }) => {
                     </select>
                   </div>
                   <div className="form-group"><label className="form-label">Designation</label><input type="text" className="form-input" style={{width:'100%'}} value={form.role || ''} onChange={e => handleInput('role', e.target.value)} disabled={isEmployee} /></div>
-                  {!isEmployee && (
+                  {isAdmin && (
                     <>
                       <div className="form-group"><label className="form-label">Employment Status</label><select className="form-input" style={{width:'100%'}} value={form.probType || ''} onChange={e => handleInput('probType', e.target.value)}><option>Select...</option><option>Temporary</option><option>Probation</option><option>Permanent</option></select></div>
                       <div className="form-group"><label className="form-label">Confirmation Date</label><input type="date" className="form-input" style={{width:'100%'}} value={form.exitDate || ''} onChange={e => handleInput('exitDate', e.target.value)} disabled={form.probType === 'Probation'} /></div>
@@ -797,6 +799,7 @@ const EmployeeDirectory = ({ userRole }) => {
                       </div>
                     </>
                   )}
+                </div>
               )}
 
               {/* SECTION 3: Address */}
