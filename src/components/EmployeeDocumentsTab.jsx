@@ -33,6 +33,7 @@ const EmployeeDocumentsTab = ({ empId, employeeName }) => {
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [statusMsg, setStatusMsg] = useState(null); // { type: 'success'|'error', text: string }
   const [uploadForm, setUploadForm] = useState({ category: Object.keys(CATEGORIES)[0], docType: CATEGORIES[Object.keys(CATEGORIES)[0]].types[0], file: null });
 
   useEffect(() => {
@@ -78,17 +79,19 @@ const EmployeeDocumentsTab = ({ empId, employeeName }) => {
   };
 
   const handleUploadSubmit = async () => {
-    if (!uploadForm.file) return alert('Please select a file.');
+    if (!uploadForm.file) { setStatusMsg({ type: 'error', text: 'Please select a file first.' }); return; }
+    if (!empId) { setStatusMsg({ type: 'error', text: 'Employee profile not saved yet. Save the profile before uploading.' }); return; }
     
     setUploading(true);
+    setStatusMsg(null);
     
-    // Safety Timeout: 45 seconds for large files or slow networks
+    // Safety Timeout: 30 seconds
     const timeout = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error("Network timeout: The upload is taking too long. Please check your connection or try a smaller file.")), 45000)
+      setTimeout(() => reject(new Error('Network timeout after 30s. Check your connection and try again.')), 30000)
     );
 
     try {
-      console.log(`Vault: Committing document for ${empId}...`);
+      console.log(`Vault: Committing document for empId=${empId}, category=${uploadForm.category}`);
       
       await Promise.race([
         dataService.addEmployeeDoc({
@@ -103,25 +106,26 @@ const EmployeeDocumentsTab = ({ empId, employeeName }) => {
         timeout
       ]);
 
-      alert('Document uploaded and synchronized successfully.');
+      setStatusMsg({ type: 'success', text: `✓ "${uploadForm.file.name}" uploaded successfully.` });
       setShowUpload(false);
       setUploadForm(prev => ({ ...prev, file: null }));
       await loadDocuments();
     } catch (e) {
-      console.error("Vault: Upload failure:", e);
-      alert(`Upload Failed: ${e.message || 'The server did not respond. Please try again.'}`);
+      console.error('Vault: Upload failure:', e);
+      setStatusMsg({ type: 'error', text: `Upload Failed: ${e.message || 'Server did not respond. Try again.'}` });
     } finally {
       setUploading(false);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this document permanently?")) {
+  const handleDelete = async (docId) => {
+    if (window.confirm('Are you sure you want to delete this document permanently?')) {
       try {
-        await dataService.deleteEmployeeDoc(id);
+        await dataService.deleteEmployeeDoc(docId, empId);
+        setStatusMsg({ type: 'success', text: 'Document deleted.' });
         await loadDocuments();
       } catch (e) {
-        alert("Failed to delete document.");
+        setStatusMsg({ type: 'error', text: 'Failed to delete document.' });
       }
     }
   };
@@ -169,6 +173,24 @@ const EmployeeDocumentsTab = ({ empId, employeeName }) => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      {/* Status Banner */}
+      {statusMsg && (
+        <div style={{
+          padding: '0.85rem 1.25rem',
+          borderRadius: '8px',
+          backgroundColor: statusMsg.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+          border: `1px solid ${statusMsg.type === 'success' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+          color: statusMsg.type === 'success' ? '#166534' : '#991b1b',
+          fontSize: '0.9rem',
+          fontWeight: '500',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <span>{statusMsg.text}</span>
+          <button onClick={() => setStatusMsg(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem', opacity: 0.6 }}>✕</button>
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h3 style={{ fontSize: '1.25rem', color: 'var(--color-text-main)', margin: 0 }}>Employee Profile Vault</h3>

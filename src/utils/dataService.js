@@ -674,99 +674,76 @@ export const dataService = {
   getLetterTemplates: async () => sbGetAll('letter_templates'),
   saveLetterTemplates: async (list) => sbSaveAll('letter_templates', list),
 
+  // ── Employee Vault Documents ───────────────────────────────────────────
+  // Storage Strategy: Uses the proven app_config table with key='vault_{empId}'.
+  // This is the same mechanism used for biometric_config, departments, etc.
+  // It is guaranteed schema-compatible and avoids row-size limits on the employees table.
+
   getEmployeeDocs: async (empId = null) => {
     if (!supabase) return [];
     try {
-      // We use the 'employees' table as the source of truth for documents
-      // because it has a guaranteed stable JSONB 'data' column.
-      const emps = await dataService.getEmployees();
-      
       if (empId) {
-        const emp = emps.find(e => String(e.id) === String(empId));
-        return (emp?.documents || []).map(d => ({
-          ...d,
-          empName: emp.name
-        }));
+        // Fetch docs for a specific employee
+        const docs = await getConfig(`vault_${empId}`, []);
+        return Array.isArray(docs) ? docs : [];
       }
-      
-      // Return all documents across all employees
-      return emps.reduce((acc, e) => {
-        const docs = (e.documents || []).map(d => ({
-          ...d,
-          empName: e.name
-        }));
+      // Fetch ALL vault entries (for the Document Hub global view)
+      const { data, error } = await supabase
+        .from('app_config')
+        .select('key, value')
+        .like('key', 'vault_%');
+      if (error) { console.error('getEmployeeDocs(all):', error); return []; }
+      return (data || []).reduce((acc, row) => {
+        const docs = Array.isArray(row.value) ? row.value : [];
         return [...acc, ...docs];
       }, []);
     } catch (e) {
-      console.error("DataService: Exception in getEmployeeDocs:", e);
+      console.error('DataService: Exception in getEmployeeDocs:', e);
       return [];
     }
   },
 
   addEmployeeDoc: async (doc) => {
-    if (!supabase) return;
+    if (!supabase) throw new Error('Database not connected');
     try {
-      // 1. Get the latest employee record
-      const employees = await dataService.getEmployees();
-      const emp = employees.find(e => String(e.id) === String(doc.empId));
-      if (!emp) throw new Error("Employee not found");
-
-      // 2. Append the new document
+      const vaultKey = `vault_${String(doc.empId)}`;
+      // 1. Read existing docs for this employee
+      const existing = await getConfig(vaultKey, []);
+      const docList = Array.isArray(existing) ? existing : [];
+      // 2. Build new document record (exclude raw file content from metadata, keep it for download)
       const newDoc = {
-        ...doc,
         id: `DOC_${Date.now()}`,
+        empId: String(doc.empId),
+        name: doc.name || 'Document',
+        size: doc.size || 0,
+        type: doc.type || 'application/octet-stream',
+        content: doc.content || '',   // base64 data URL for download
+        category: doc.category || 'General',
+        docType: doc.docType || 'Document',
+        status: doc.status || 'Active',
+        uploadedBy: doc.uploadedBy || 'HR Admin',
+        version: doc.version || 1,
         createdAt: new Date().toISOString()
       };
-      
-      const updatedDocuments = [...(emp.documents || []), newDoc];
-      
-      // 3. Save back to employees table via upsert (guaranteed persistence)
-      // Strip isNew so we always upsert, never insert-only
-      const { isNew: _ignored, ...empWithoutIsNew } = emp;
-      await dataService.saveEmployee({
-        ...empWithoutIsNew,
-        documents: updatedDocuments
-      });
-
-      // Optional: Backup to employee_documents (silently ignore errors)
-      try {
-        await supabase.from('employee_documents').upsert({ 
-          id: newDoc.id, 
-          emp_id: String(doc.empId),
-          data: newDoc 
-        });
-      } catch (backupError) {
-        // Silently skip if the separate table is broken
-      }
+      // 3. Append and save back
+      await saveConfig(vaultKey, [...docList, newDoc]);
+      console.log(`Vault: Document ${newDoc.id} committed for employee ${doc.empId}`);
     } catch (e) {
-      console.error("DataService: Exception in addEmployeeDoc:", e);
+      console.error('DataService: Exception in addEmployeeDoc:', e);
       throw e;
     }
   },
   
-  deleteEmployeeDoc: async (id) => {
+  deleteEmployeeDoc: async (docId, empId) => {
     if (!supabase) return;
     try {
-      // 1. Find which employee has this document
-      const employees = await dataService.getEmployees();
-      const emp = employees.find(e => (e.documents || []).some(d => String(d.id) === String(id)));
-      
-      if (emp) {
-        // FIX: Use !== to EXCLUDE the deleted document (was incorrectly using ===)
-        const updatedDocuments = (emp.documents || []).filter(d => String(d.id) !== String(id));
-        const { isNew: _ignored, ...empWithoutIsNew } = emp;
-        await dataService.saveEmployee({
-          ...empWithoutIsNew,
-          documents: updatedDocuments
-        });
-      }
-
-      // Optional: Sync with backup table
-      try {
-        await supabase.from('employee_documents').delete().eq('id', id);
-      } catch (e) {}
+      if (!empId) throw new Error('empId required to delete document');
+      const vaultKey = `vault_${String(empId)}`;
+      const existing = await getConfig(vaultKey, []);
+      const updated = (Array.isArray(existing) ? existing : []).filter(d => String(d.id) !== String(docId));
+      await saveConfig(vaultKey, updated);
     } catch (e) {
-      console.error("DataService: Exception in deleteEmployeeDoc:", e);
+      console.error('DataService: Exception in deleteEmployeeDoc:', e);
       throw e;
     }
   },
