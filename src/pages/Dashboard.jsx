@@ -187,20 +187,12 @@ const Dashboard = ({ userRole }) => {
       : [...existingNotices, noticeData];
     
     await dataService.saveNotices(newNotices);
-    setNotices(newNotices);
-    setNoticeModal(null);
-  };
-
-  const deleteNotice = async (id) => {
-    const existing = await dataService.getNotices();
-    const filtered = existing.filter(n => n.id !== id);
-    await dataService.saveNotices(filtered);
     
-    // Refresh local display
+    // Refresh notices + holidays
     const holidays = await dataService.getCustomHolidays();
-    const now = new Date();
-    const upcomingHolidays = holidays
-      .filter(h => new Date(h.fromDate) >= now)
+    const nowLocal = new Date();
+    const upcomingHolidays = (holidays || [])
+      .filter(h => new Date(h.fromDate) >= nowLocal)
       .map(h => ({
         id: `holiday-${h.id}`,
         title: `Holiday: ${h.name}`,
@@ -209,7 +201,30 @@ const Dashboard = ({ userRole }) => {
         type: 'Holiday',
         isSystem: true
       }));
+
+    setNotices([...upcomingHolidays, ...newNotices].sort((a, b) => new Date(b.date) - new Date(a.date)));
+    setNoticeModal(null);
+  };
+
+  const deleteNotice = async (id) => {
+    const existing = await dataService.getNotices();
+    const filtered = existing.filter(n => n.id !== id);
+    await dataService.saveNotices(filtered);
     
+    // Refresh notices + holidays
+    const holidays = await dataService.getCustomHolidays();
+    const nowLocal = new Date();
+    const upcomingHolidays = (holidays || [])
+      .filter(h => new Date(h.fromDate) >= nowLocal)
+      .map(h => ({
+        id: `holiday-${h.id}`,
+        title: `Holiday: ${h.name}`,
+        content: `Company-wide holiday observed for ${h.name}.`,
+        date: h.fromDate,
+        type: 'Holiday',
+        isSystem: true
+      }));
+
     setNotices([...upcomingHolidays, ...filtered].sort((a, b) => new Date(b.date) - new Date(a.date)));
   };
 
