@@ -358,57 +358,76 @@ const Dashboard = ({ userRole }) => {
               </div>
             </div>
 
-            <div className="notice-board-container">
-              <div className="notice-ticker" style={{ animationDuration: `${tickerSpeed}s` }}>
-                {/* Double the list for seamless infinite loop */}
-                {notices.filter(n => {
-                  if (userRole === 'management') return true;
-                  const now = new Date();
-                  if (n.is_permanent) return true;
-                  if (n.start_at && new Date(n.start_at) > now) return false;
-                  if (n.end_at && new Date(n.end_at) < now) return false;
-                  return true;
-                }).map((n, idx) => {
-                  const now = new Date();
-                  let status = 'Active';
-                  if (n.is_permanent) status = 'Permanent';
-                  else if (n.start_at && new Date(n.start_at) > now) status = 'Scheduled';
-                  else if (n.end_at && new Date(n.end_at) < now) status = 'Expired';
+            <div className="notice-board-container" style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {(() => {
+                  const filtered = notices.filter(n => {
+                    if (userRole === 'management') return true;
+                    const now = new Date();
+                    if (n.is_permanent) return true;
+                    // If no start_at is set, assume it's immediate
+                    if (n.start_at && new Date(n.start_at) > now) return false;
+                    // If no end_at is set, it hasn't expired
+                    if (n.end_at && new Date(n.end_at) < now) return false;
+                    return true;
+                  });
 
-                  return (
-                    <div key={`${n.id}-${idx}`} className="notice-item" onClick={() => setViewingNotice(n)} style={{ 
-                      cursor: 'pointer',
-                      borderLeft: status === 'Scheduled' ? '4px solid var(--color-warning)' : status === 'Expired' ? '4px solid var(--color-danger)' : '4px solid var(--color-primary)',
-                      opacity: status === 'Expired' ? 0.6 : 1
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <h4 style={{ margin: 0, color: 'var(--color-primary)' }}>{n.title}</h4>
-                          <span style={{ 
-                            backgroundColor: status === 'Active' || status === 'Permanent' ? 'var(--color-success)' : status === 'Scheduled' ? 'var(--color-warning)' : 'var(--color-danger)', 
-                            color: 'white', fontSize: '0.6rem', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 'bold'
-                          }}>{status}</span>
+                  if (filtered.length === 0) {
+                    return (
+                      <div style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>
+                        <BellRing size={40} style={{ margin: '0 auto 1rem', display: 'block', opacity: 0.3 }} />
+                        <p style={{ fontSize: '0.875rem' }}>No active announcements at the moment.</p>
+                      </div>
+                    );
+                  }
+
+                  return filtered.map((n, idx) => {
+                    const now = new Date();
+                    let status = 'Active';
+                    if (n.is_permanent) status = 'Permanent';
+                    else if (n.start_at && new Date(n.start_at) > now) status = 'Scheduled';
+                    else if (n.end_at && new Date(n.end_at) < now) status = 'Expired';
+
+                    return (
+                      <div key={`${n.id}-${idx}`} className="notice-item animation-fade-in" onClick={() => setViewingNotice(n)} style={{ 
+                        cursor: 'pointer',
+                        padding: '1.25rem',
+                        borderRadius: '12px',
+                        backgroundColor: 'var(--color-background)',
+                        borderLeft: status === 'Scheduled' ? '4px solid var(--color-warning)' : status === 'Expired' ? '4px solid var(--color-danger)' : '4px solid var(--color-primary)',
+                        opacity: status === 'Expired' ? 0.6 : 1,
+                        transition: 'transform 0.2s ease',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <h4 style={{ margin: 0, color: 'var(--color-primary)', fontWeight: '700' }}>{n.title}</h4>
+                            <span style={{ 
+                              backgroundColor: status === 'Active' || status === 'Permanent' ? 'var(--color-success)' : status === 'Scheduled' ? 'var(--color-warning)' : 'var(--color-danger)', 
+                              color: 'white', fontSize: '0.6rem', padding: '0.15rem 0.5rem', borderRadius: '4px', fontWeight: 'bold', textTransform: 'uppercase'
+                            }}>{status}</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{n.date}</span>
+                            {userRole === 'management' && (
+                              <div style={{ display: 'flex', gap: '0.4rem' }}>
+                                <button onClick={(e) => { e.stopPropagation(); setNoticeModal(n); }} className="btn-icon" style={{ padding: '0.2rem' }}><Edit size={14} /></button>
+                                <button onClick={(e) => { e.stopPropagation(); deleteNotice(n.id); }} className="btn-icon text-danger" style={{ padding: '0.2rem' }}><Trash2 size={14} /></button>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{n.date}</span>
-                          {userRole === 'management' && (
-                            <div style={{ display: 'flex', gap: '0.25rem' }}>
-                              <button onClick={(e) => { e.stopPropagation(); setNoticeModal(n); }} style={{ color: 'var(--color-text-muted)' }}><Edit size={14} /></button>
-                              <button onClick={(e) => { e.stopPropagation(); deleteNotice(n.id); }} style={{ color: 'var(--color-danger)' }}><Trash2 size={14} /></button>
-                            </div>
+                        <div style={{ fontSize: '0.875rem', color: 'var(--color-text-main)', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} dangerouslySetInnerHTML={{ __html: n.content }} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '0.5rem' }}>
+                          <p style={{ margin: 0, fontSize: '0.7rem', opacity: 0.6 }}>By {n.author}</p>
+                          {n.end_at && (
+                             <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--color-danger)', fontWeight: '600' }}>Expires: {new Date(n.end_at).toLocaleDateString()}</p>
                           )}
                         </div>
                       </div>
-                      <div style={{ fontSize: '0.875rem' }} dangerouslySetInnerHTML={{ __html: n.content }} />
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem' }}>
-                        <p style={{ margin: 0, fontSize: '0.7rem', opacity: 0.6 }}>Posted by: {n.author}</p>
-                        {n.end_at && (
-                           <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--color-danger)' }}>Expires: {new Date(n.end_at).toLocaleString()}</p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
               </div>
             </div>
           </div>
