@@ -147,6 +147,17 @@ const Attendance = () => {
   const [holidayList, setHolidayList] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // --- ID Mapping for Biometrics ---
+  const bioIdMap = useMemo(() => {
+    const map = {};
+    employeesList.forEach(e => {
+      if (e.biometric_code) map[String(e.biometric_code)] = e.id;
+    });
+    return map;
+  }, [employeesList]);
+
+  const [activeTab, setActiveTab] = useState('calendar');
+
   useEffect(() => {
     let isMounted = true;
     const safetyTimeout = setTimeout(() => {
@@ -240,14 +251,6 @@ const Attendance = () => {
   const holTypeMap = useMemo(() => Object.fromEntries((holidays || []).map(h => [h.day, h.type])), [holidays]);
 
   const calDays = useMemo(() => buildCalendar(year, month), [year, month]);
-
-  const bioIdMap = useMemo(() => {
-    const map = {};
-    employeesList.forEach(e => {
-      if (e.biometric_code) map[String(e.biometric_code)] = e.id;
-    });
-    return map;
-  }, [employeesList]);
 
   const key = (empId, day) => `${empId}_${year}_${month}_${day}`;
 
