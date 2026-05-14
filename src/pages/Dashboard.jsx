@@ -168,42 +168,36 @@ const Dashboard = ({ userRole }) => {
 
 
   const saveNotice = async (item) => {
-    const existingNotices = await dataService.getNotices();
-    
-    const now = new Date().toISOString();
-    const noticeData = {
-      ...item,
-      id: item.id || undefined,
-      date: item.date || now.slice(0, 10),
-      author: item.author || (currentUser.name || 'Admin'),
-      start_at: item.start_at || now,
-      end_at: item.is_permanent ? null : (item.end_at || null),
-      is_permanent: !!item.is_permanent,
-      status: item.status || 'Active'
-    };
+    try {
+      setLoading(true);
+      await dataService.saveNotice(item);
+      
+      // Full refresh from DB to ensure state is correct
+      const [noticesList, holidayList] = await Promise.all([
+        dataService.getNotices(),
+        dataService.getCustomHolidays()
+      ]);
+      
+      const nowLocal = new Date();
+      const upcomingHolidays = (holidayList || [])
+        .filter(h => new Date(h.fromDate) >= nowLocal)
+        .map(h => ({
+          id: `holiday-${h.id}`,
+          title: `Holiday: ${h.name}`,
+          content: `Company-wide holiday observed for ${h.name}.`,
+          date: h.fromDate,
+          type: 'Holiday',
+          isSystem: true
+        }));
 
-    const newNotices = item.id 
-      ? existingNotices.map(n => n.id === item.id ? noticeData : n)
-      : [...existingNotices, noticeData];
-    
-    await dataService.saveNotices(newNotices);
-    
-    // Refresh notices + holidays
-    const holidays = await dataService.getCustomHolidays();
-    const nowLocal = new Date();
-    const upcomingHolidays = (holidays || [])
-      .filter(h => new Date(h.fromDate) >= nowLocal)
-      .map(h => ({
-        id: `holiday-${h.id}`,
-        title: `Holiday: ${h.name}`,
-        content: `Company-wide holiday observed for ${h.name}.`,
-        date: h.fromDate,
-        type: 'Holiday',
-        isSystem: true
-      }));
-
-    setNotices([...upcomingHolidays, ...newNotices].sort((a, b) => new Date(b.date) - new Date(a.date)));
-    setNoticeModal(null);
+      setNotices([...upcomingHolidays, ...noticesList].sort((a, b) => new Date(b.date) - new Date(a.date)));
+      setNoticeModal(null);
+      alert("Notice successfully published and persisted.");
+    } catch (err) {
+      alert("Failed to save notice: " + (err.message || "Database connection error"));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const deleteNotice = async (id) => {
