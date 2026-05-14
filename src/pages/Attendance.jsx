@@ -206,21 +206,15 @@ const Attendance = () => {
 
     // Subscribe to Push events for real-time reflection
     const unsubscribe = BiometricService.subscribeToPushEvents(async (punch) => {
-      // Find the internal employee ID for this biometric code
-      const targetEmp = employeesList.find(e => String(e.biometric_code) === String(punch.empId));
-      if (!targetEmp) {
-         console.warn(`Push Event: No employee found with biometric code ${punch.empId}`);
-         return;
-      }
+      const internalId = bioIdMap[String(punch.empId)];
+      if (!internalId) return;
 
       const pDay = punch.day;
       const pMonth = punch.month;
       const pYear = punch.year;
-      
-      const punchKey = `${targetEmp.id}_${pYear}_${pMonth}_${pDay}`;
+      const punchKey = `${internalId}_${pYear}_${pMonth}_${pDay}`;
       
       let updatedRecord = null;
-
       setRecords(prev => {
         const existing = prev[punchKey] || {};
         updatedRecord = {
@@ -230,22 +224,16 @@ const Attendance = () => {
           remark: existing.remark || 'Real-time Push Sync',
           source: 'Biometric (Push)'
         };
-        return {
-          ...prev,
-          [punchKey]: updatedRecord
-        };
+        return { ...prev, [punchKey]: updatedRecord };
       });
 
-      // Automatically persist the punch to Supabase in background
       if (updatedRecord) {
-        dataService.saveAttendance({ [punchKey]: updatedRecord }).catch(err => {
-          console.error("Real-time sync background save failed:", err);
-        });
+        dataService.saveAttendance({ [punchKey]: updatedRecord }).catch(console.error);
       }
     });
 
     return () => unsubscribe();
-  }, [bioConfig]);
+  }, [bioConfig, bioIdMap]);
 
   const holidays = useMemo(() => getHolidayDates(year, month, holidayList || []), [year, month, holidayList]);
   const holidaySet = useMemo(() => new Set((holidays || []).map(h => h.day)), [holidays]);
@@ -253,38 +241,47 @@ const Attendance = () => {
 
   const calDays = useMemo(() => buildCalendar(year, month), [year, month]);
 
+  const bioIdMap = useMemo(() => {
+    const map = {};
+    employeesList.forEach(e => {
+      if (e.biometric_code) map[String(e.biometric_code)] = e.id;
+    });
+    return map;
+  }, [employeesList]);
+
   const key = (empId, day) => `${empId}_${year}_${month}_${day}`;
 
   const handleBioSync = async () => {
     setSyncLoading(true);
+    const startTime = Date.now();
     try {
       const logs = await BiometricService.fetchLogs(bioConfig.ip, bioConfig.port);
-      const newRecords = { ...records };
       const recordsToSave = {};
       let addedCount = 0;
 
-      logs.forEach(log => {
-        // Find internal ID
-        const targetEmp = employeesList.find(e => String(e.biometric_code) === String(log.empId));
-        if (!targetEmp) return; // Skip if machine ID doesn't match an employee
+      setRecords(prev => {
+        const next = { ...prev };
+        logs.forEach(log => {
+          const internalId = bioIdMap[String(log.empId)];
+          if (!internalId) return;
 
-        const logKey = `${targetEmp.id}_${log.year}_${log.month}_${log.day}`;
-        // Prevent overwriting existing manual entries or already synced logs
-        if (!newRecords[logKey] || newRecords[logKey].source === 'Biometric') {
-          const entry = {
-            punchIn: log.punchIn,
-            punchOut: log.punchOut,
-            remark: log.remark || 'Hardware Sync',
-            source: 'Biometric'
-          };
-          newRecords[logKey] = entry;
-          recordsToSave[logKey] = entry;
-          addedCount++;
-        }
+          const logKey = `${internalId}_${log.year}_${log.month}_${log.day}`;
+          if (!next[logKey] || next[logKey].source === 'Biometric') {
+            const entry = {
+              punchIn: log.punchIn,
+              punchOut: log.punchOut,
+              remark: log.remark || 'Hardware Sync',
+              source: 'Biometric'
+            };
+            next[logKey] = entry;
+            recordsToSave[logKey] = entry;
+            addedCount++;
+          }
+        });
+        return next;
       });
 
       if (addedCount > 0) {
-        setRecords(newRecords);
         await dataService.saveAttendance(recordsToSave);
       }
 
@@ -292,7 +289,8 @@ const Attendance = () => {
       setLastSync(timestamp);
       await dataService.saveConfig('biometric_last_sync', timestamp);
 
-      alert(`${addedCount} new logs successfully synchronized from hardware terminal.`);
+      console.log(`Sync completed in ${Date.now() - startTime}ms. Added ${addedCount} logs.`);
+      alert(`${addedCount} new logs successfully synchronized.`);
     } catch (err) {
       console.error("Sync Error Detailed:", err);
       // Surface the actual error message to the user for better debugging
