@@ -206,13 +206,19 @@ const Attendance = () => {
 
     // Subscribe to Push events for real-time reflection
     const unsubscribe = BiometricService.subscribeToPushEvents(async (punch) => {
-      // Real-time Background Sync Logic
+      // Find the internal employee ID for this biometric code
+      const targetEmp = employeesList.find(e => String(e.biometric_code) === String(punch.empId));
+      if (!targetEmp) {
+         console.warn(`Push Event: No employee found with biometric code ${punch.empId}`);
+         return;
+      }
+
       const pDay = punch.day;
       const pMonth = punch.month;
       const pYear = punch.year;
-
-      const punchKey = `${punch.empId}_${pYear}_${pMonth}_${pDay}`;
-
+      
+      const punchKey = `${targetEmp.id}_${pYear}_${pMonth}_${pDay}`;
+      
       let updatedRecord = null;
 
       setRecords(prev => {
@@ -257,7 +263,11 @@ const Attendance = () => {
       let addedCount = 0;
 
       logs.forEach(log => {
-        const logKey = `${log.empId}_${log.year}_${log.month}_${log.day}`;
+        // Find internal ID
+        const targetEmp = employeesList.find(e => String(e.biometric_code) === String(log.empId));
+        if (!targetEmp) return; // Skip if machine ID doesn't match an employee
+
+        const logKey = `${targetEmp.id}_${log.year}_${log.month}_${log.day}`;
         // Prevent overwriting existing manual entries or already synced logs
         if (!newRecords[logKey] || newRecords[logKey].source === 'Biometric') {
           newRecords[logKey] = {
