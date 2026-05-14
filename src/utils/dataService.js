@@ -500,8 +500,15 @@ export const dataService = {
   // ── Notices ─────────────────────────────────────────────────────────────
   getNotices: async () => {
     if (!supabase) return [];
-    const { data } = await supabase.from('notices').select('*').order('created_at', { ascending: false });
-    return (data || []).map(r => r.data);
+    const { data } = await supabase.from('notices').select('*').order('start_at', { ascending: false });
+    return (data || []).map(r => ({
+      ...r.data,
+      id: r.id,
+      start_at: r.start_at,
+      end_at: r.end_at,
+      is_permanent: r.is_permanent,
+      status: r.status
+    }));
   },
 
   getPersonalNotices: async (empId) => {
@@ -512,13 +519,17 @@ export const dataService = {
   saveNotices: async (notices) => {
     if (!supabase) return notices;
     const rows = notices.map(n => ({
-      id: n.id,
+      id: n.id && String(n.id).length > 10 ? undefined : n.id, // Handle temporary IDs vs BigInt
       title: n.title,
       content: n.content,
       type: n.type || 'General',
       priority: n.priority || 'Normal',
       author: n.author,
       date: n.date,
+      start_at: n.start_at || new Date().toISOString(),
+      end_at: n.is_permanent ? null : n.end_at,
+      is_permanent: !!n.is_permanent,
+      status: n.status || 'Active',
       data: n
     }));
     await supabase.from('notices').upsert(rows);

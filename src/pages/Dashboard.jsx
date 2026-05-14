@@ -169,27 +169,25 @@ const Dashboard = ({ userRole }) => {
 
   const saveNotice = async (item) => {
     const existingNotices = await dataService.getNotices();
+    
+    const now = new Date().toISOString();
+    const noticeData = {
+      ...item,
+      id: item.id || undefined,
+      date: item.date || now.slice(0, 10),
+      author: item.author || (currentUser.name || 'Admin'),
+      start_at: item.start_at || now,
+      end_at: item.is_permanent ? null : (item.end_at || null),
+      is_permanent: !!item.is_permanent,
+      status: item.status || 'Active'
+    };
+
     const newNotices = item.id 
-      ? existingNotices.map(n => n.id === item.id ? item : n)
-      : [...existingNotices, { ...item, id: Date.now(), date: new Date().toISOString().slice(0, 10), author: 'HR Admin' }];
+      ? existingNotices.map(n => n.id === item.id ? noticeData : n)
+      : [...existingNotices, noticeData];
     
     await dataService.saveNotices(newNotices);
-    
-    // Refresh local display (including holidays)
-    const holidays = await dataService.getCustomHolidays();
-    const now = new Date();
-    const upcomingHolidays = holidays
-      .filter(h => new Date(h.fromDate) >= now)
-      .map(h => ({
-        id: `holiday-${h.id}`,
-        title: `Holiday: ${h.name}`,
-        content: `Company-wide holiday observed for ${h.name}.`,
-        date: h.fromDate,
-        type: 'Holiday',
-        isSystem: true
-      }));
-    
-    setNotices([...upcomingHolidays, ...newNotices].sort((a, b) => new Date(b.date) - new Date(a.date)));
+    setNotices(newNotices);
     setNoticeModal(null);
   };
 
@@ -348,37 +346,54 @@ const Dashboard = ({ userRole }) => {
             <div className="notice-board-container">
               <div className="notice-ticker" style={{ animationDuration: `${tickerSpeed}s` }}>
                 {/* Double the list for seamless infinite loop */}
-                {[...notices, ...notices].map((n, idx) => (
-                  <div key={`${n.id}-${idx}`} className="notice-item" onClick={() => setViewingNotice(n)} style={{ cursor: 'pointer' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <h4 style={{ margin: 0, color: 'var(--color-primary)' }}>{n.title}</h4>
-                        {n.type === 'Holiday' && (
+                {notices.filter(n => {
+                  if (userRole === 'management') return true;
+                  const now = new Date();
+                  if (n.is_permanent) return true;
+                  if (n.start_at && new Date(n.start_at) > now) return false;
+                  if (n.end_at && new Date(n.end_at) < now) return false;
+                  return true;
+                }).map((n, idx) => {
+                  const now = new Date();
+                  let status = 'Active';
+                  if (n.is_permanent) status = 'Permanent';
+                  else if (n.start_at && new Date(n.start_at) > now) status = 'Scheduled';
+                  else if (n.end_at && new Date(n.end_at) < now) status = 'Expired';
+
+                  return (
+                    <div key={`${n.id}-${idx}`} className="notice-item" onClick={() => setViewingNotice(n)} style={{ 
+                      cursor: 'pointer',
+                      borderLeft: status === 'Scheduled' ? '4px solid var(--color-warning)' : status === 'Expired' ? '4px solid var(--color-danger)' : '4px solid var(--color-primary)',
+                      opacity: status === 'Expired' ? 0.6 : 1
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <h4 style={{ margin: 0, color: 'var(--color-primary)' }}>{n.title}</h4>
                           <span style={{ 
-                            backgroundColor: 'var(--color-success)', 
-                            color: 'white', 
-                            fontSize: '0.65rem', 
-                            padding: '0.15rem 0.5rem', 
-                            borderRadius: '10px', 
-                            fontWeight: 'bold',
-                            textTransform: 'uppercase'
-                          }}>Holiday</span>
-                        )}
+                            backgroundColor: status === 'Active' || status === 'Permanent' ? 'var(--color-success)' : status === 'Scheduled' ? 'var(--color-warning)' : 'var(--color-danger)', 
+                            color: 'white', fontSize: '0.6rem', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 'bold'
+                          }}>{status}</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{n.date}</span>
+                          {userRole === 'management' && (
+                            <div style={{ display: 'flex', gap: '0.25rem' }}>
+                              <button onClick={(e) => { e.stopPropagation(); setNoticeModal(n); }} style={{ color: 'var(--color-text-muted)' }}><Edit size={14} /></button>
+                              <button onClick={(e) => { e.stopPropagation(); deleteNotice(n.id); }} style={{ color: 'var(--color-danger)' }}><Trash2 size={14} /></button>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{n.date}</span>
-                        {userRole === 'management' && (
-                          <div style={{ display: 'flex', gap: '0.25rem' }}>
-                            <button onClick={() => setNoticeModal(n)} style={{ color: 'var(--color-text-muted)' }}><Edit size={14} /></button>
-                            <button onClick={() => deleteNotice(n.id)} style={{ color: 'var(--color-danger)' }}><Trash2 size={14} /></button>
-                          </div>
+                      <div style={{ fontSize: '0.875rem' }} dangerouslySetInnerHTML={{ __html: n.content }} />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem' }}>
+                        <p style={{ margin: 0, fontSize: '0.7rem', opacity: 0.6 }}>Posted by: {n.author}</p>
+                        {n.end_at && (
+                           <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--color-danger)' }}>Expires: {new Date(n.end_at).toLocaleString()}</p>
                         )}
                       </div>
                     </div>
-                    <div style={{ fontSize: '0.875rem' }} dangerouslySetInnerHTML={{ __html: n.content }} />
-                    <p style={{ margin: '0.5rem 0 0', fontSize: '0.7rem', opacity: 0.6 }}>Posted by: {n.author}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -496,7 +511,7 @@ const Dashboard = ({ userRole }) => {
 
       {noticeModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
-          <div className="card" style={{ width: '100%', maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '1.5rem', animation: 'fadeIn 0.3s ease-out' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '650px', display: 'flex', flexDirection: 'column', gap: '1rem', animation: 'fadeIn 0.3s ease-out' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h2 style={{ margin: 0 }}>{noticeModal.id ? 'Edit Notice' : 'Post New Announcement'}</h2>
               <button onClick={() => setNoticeModal(null)}>✕</button>
@@ -507,11 +522,45 @@ const Dashboard = ({ userRole }) => {
               <input 
                 type="text" 
                 className="form-input" 
-                style={{ borderColor: !noticeModal.title.trim() ? 'var(--color-danger)' : 'var(--color-border)' }}
                 value={noticeModal.title} 
                 onChange={(e) => setNoticeModal({ ...noticeModal, title: e.target.value })} 
                 placeholder="e.g. Health Insurance Update"
               />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="form-group">
+                <label className="form-label">Display Start (Date & Time)</label>
+                <input 
+                  type="datetime-local" 
+                  className="form-input"
+                  value={noticeModal.start_at ? noticeModal.start_at.slice(0, 16) : ''}
+                  onChange={(e) => setNoticeModal({ ...noticeModal, start_at: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Display End (Expiry)</label>
+                <input 
+                  type="datetime-local" 
+                  className="form-input"
+                  disabled={noticeModal.is_permanent}
+                  value={noticeModal.end_at ? noticeModal.end_at.slice(0, 16) : ''}
+                  onChange={(e) => setNoticeModal({ ...noticeModal, end_at: e.target.value })}
+                  style={{ opacity: noticeModal.is_permanent ? 0.5 : 1 }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', backgroundColor: 'var(--color-background)', borderRadius: '8px' }}>
+              <input 
+                type="checkbox" 
+                id="is_permanent"
+                checked={noticeModal.is_permanent || false}
+                onChange={(e) => setNoticeModal({ ...noticeModal, is_permanent: e.target.checked })}
+              />
+              <label htmlFor="is_permanent" style={{ fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer' }}>
+                Display Continuously / Unlimited Time (Never Expires)
+              </label>
             </div>
 
             <div className="form-group">
@@ -519,14 +568,14 @@ const Dashboard = ({ userRole }) => {
               <RichTextEditor 
                 value={noticeModal.content} 
                 onChange={(content) => setNoticeModal({ ...noticeModal, content })}
-                height="200px"
+                height="150px"
               />
             </div>
 
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', padding: '1.5rem', borderTop: '1px solid var(--color-border)' }}>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
               <button className="btn btn-ghost" onClick={() => setNoticeModal(null)}>Cancel</button>
               <button className="btn btn-primary" 
-                disabled={!noticeModal.title.trim() || !noticeModal.content || noticeModal.content === '<br>'}
+                disabled={!noticeModal.title?.trim() || !noticeModal.content || noticeModal.content === '<br>'}
                 onClick={() => saveNotice(noticeModal)}>
                 {noticeModal.id ? 'Update Notice' : 'Publish Announcement'}
               </button>
