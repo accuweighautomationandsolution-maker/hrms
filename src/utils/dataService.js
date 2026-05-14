@@ -161,7 +161,8 @@ export const dataService = {
       const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (error) {
-        console.error('Supabase Query Error (employees):', error.message, error.details, error.hint);
+        console.error('Supabase Query Error (employees):', error.message);
+        alert("📊 Database Access Error (Employees): " + error.message + "\n\nThis is likely why the employee list is blank. Please check your SQL Grants.");
         return [];
       }
       
@@ -422,8 +423,7 @@ export const dataService = {
         punch_in: punchInTs,
         punch_out: punchOutTs,
         status: rec.punchOut ? 'Present' : (rec.punchIn ? 'Incomplete' : 'Absent'),
-        data: { remark: rec.remark, source: rec.source },
-        updated_at: new Date().toISOString()
+        data: { remark: rec.remark, source: rec.source }
       };
     });
     // Upsert in chunks to avoid URL length limits
