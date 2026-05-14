@@ -116,9 +116,17 @@ const Dashboard = ({ userRole }) => {
         }
 
         const [noticesList, probationList, holidayList, bulletinConfig, statutoryData] = await Promise.all([
-          dataService.getNotices().catch(() => []),
+          dataService.getNotices().catch(err => {
+            console.error("Notice Fetch Error:", err);
+            alert("Diagnostic: Notice Fetch Failed - " + (err.message || "Unknown error"));
+            return [];
+          }),
           dataService.getUpcomingProbations().catch(() => []),
-          dataService.getCustomHolidays().catch(() => []),
+          dataService.getCustomHolidays().catch(err => {
+            console.error("Holiday Fetch Error:", err);
+            alert("Diagnostic: Holiday Fetch Failed - " + (err.message || "Unknown error"));
+            return [];
+          }),
           dataService.getBulletinConfig().catch(() => null),
           dataService.getStatutoryUpdates().catch(() => [])
         ]);
