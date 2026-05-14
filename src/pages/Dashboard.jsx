@@ -355,16 +355,8 @@ const Dashboard = ({ userRole }) => {
             <div className="notice-board-container" style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '0.5rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {(() => {
-                  const filtered = notices.filter(n => {
-                    if (userRole === 'management') return true;
-                    const now = new Date();
-                    if (n.is_permanent) return true;
-                    // If no start_at is set, assume it's immediate
-                    if (n.start_at && new Date(n.start_at) > now) return false;
-                    // If no end_at is set, it hasn't expired
-                    if (n.end_at && new Date(n.end_at) < now) return false;
-                    return true;
-                  });
+                  // EMERGENCY DEBUG: Disable filtering to see if data arrives at all
+                  const filtered = notices; 
 
                   if (filtered.length === 0) {
                     return (
