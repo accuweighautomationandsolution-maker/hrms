@@ -169,8 +169,10 @@ export const getHolidayDates = (year, month, customs = []) => {
       holidays.push({ day: d, date: dateStr, type: 'Sunday', name: 'Weekly Off' });
     } else if (dow === 6) {
       satCount++;
-      if (satCount === 1) holidays.push({ day: d, date: dateStr, type: '1st Saturday', name: 'Weekly Off' });
-      if (satCount === 3) holidays.push({ day: d, date: dateStr, type: '3rd Saturday', name: 'Weekly Off' });
+      if (satCount % 2 !== 0) {
+        const labels = ['1st', '2nd', '3rd', '4th', '5th'];
+        holidays.push({ day: d, date: dateStr, type: `${labels[satCount-1]} Saturday`, name: 'Weekly Off' });
+      }
     }
   }
 
