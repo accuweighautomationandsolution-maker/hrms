@@ -710,6 +710,9 @@ export const dataService = {
 
 
   // ── App Configs (Bulletin, Biometrics, etc) ──────────────────────────
+  getConfig: async (key, def) => getConfig(key, def),
+  saveConfig: async (key, val) => saveConfig(key, val),
+
   getBiometricConfig: async () => getConfig('biometric', { ip: '192.168.1.201', port: '4370', isEnabled: true }),
   saveBiometricConfig: async (conf) => saveConfig('biometric', conf),
 
