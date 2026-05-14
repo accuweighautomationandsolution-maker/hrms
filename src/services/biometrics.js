@@ -23,8 +23,9 @@ export const BiometricService = {
           // Skip Sundays
           if (logDate.getDay() === 0) continue;
           
-          // Generate 5 employee punches per day
-          for (let empId = 1; empId <= 5; empId++) {
+          // Generate punches for your ACTUAL employees (501, 881, 12)
+          const realIds = [501, 881, 12];
+          realIds.forEach(empId => {
             logs.push({
               empId,
               day: logDate.getDate(),
@@ -35,7 +36,7 @@ export const BiometricService = {
               remark: 'Hardware Sync',
               timestamp: logDate.toISOString()
             });
-          }
+          });
         }
         resolve(logs);
       }, 2000);
@@ -52,8 +53,9 @@ export const BiometricService = {
     // Simulate a random punch event every 15-30 seconds for demonstration
     const interval = setInterval(() => {
       const now = new Date();
-      // Pick a random employee from a larger pool
-      const empId = Math.floor(Math.random() * 10) + 1;
+      // Pick from your actual biometric IDs
+      const realIds = [501, 881, 12];
+      const empId = realIds[Math.floor(Math.random() * realIds.length)];
       const mockPunch = {
         empId,
         time: `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`,
