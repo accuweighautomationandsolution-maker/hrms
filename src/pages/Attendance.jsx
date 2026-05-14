@@ -260,6 +260,7 @@ const Attendance = () => {
     try {
       const logs = await BiometricService.fetchLogs(bioConfig.ip, bioConfig.port);
       const newRecords = { ...records };
+      const recordsToSave = {};
       let addedCount = 0;
 
       logs.forEach(log => {
@@ -270,18 +271,22 @@ const Attendance = () => {
         const logKey = `${targetEmp.id}_${log.year}_${log.month}_${log.day}`;
         // Prevent overwriting existing manual entries or already synced logs
         if (!newRecords[logKey] || newRecords[logKey].source === 'Biometric') {
-          newRecords[logKey] = {
+          const entry = {
             punchIn: log.punchIn,
             punchOut: log.punchOut,
             remark: log.remark || 'Hardware Sync',
             source: 'Biometric'
           };
+          newRecords[logKey] = entry;
+          recordsToSave[logKey] = entry;
           addedCount++;
         }
       });
 
-      setRecords(newRecords);
-      await dataService.saveAttendance(newRecords);
+      if (addedCount > 0) {
+        setRecords(newRecords);
+        await dataService.saveAttendance(recordsToSave);
+      }
 
       const timestamp = new Date().toLocaleString();
       setLastSync(timestamp);
