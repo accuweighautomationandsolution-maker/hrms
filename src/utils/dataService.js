@@ -516,23 +516,46 @@ export const dataService = {
     return dataService.getNotices();
   },
 
+  saveNotice: async (notice) => {
+    if (!supabase) return notice;
+    try {
+      const row = {
+        title: notice.title,
+        content: notice.content,
+        type: notice.type || 'General',
+        priority: notice.priority || 'Normal',
+        author: notice.author || 'Admin',
+        date: notice.date || new Date().toISOString().slice(0, 10),
+        start_at: notice.start_at || new Date().toISOString(),
+        end_at: notice.is_permanent ? null : (notice.end_at || null),
+        is_permanent: !!notice.is_permanent,
+        status: notice.status || 'Active',
+        data: notice
+      };
+
+      // Check if it's an existing BigInt ID (usually numeric and not a long timestamp)
+      if (notice.id && !isNaN(notice.id) && String(notice.id).length < 12) {
+        // Update existing
+        const { error } = await supabase.from('notices').update(row).eq('id', notice.id);
+        if (error) throw error;
+      } else {
+        // Insert new
+        const { error } = await supabase.from('notices').insert([row]);
+        if (error) throw error;
+      }
+      return true;
+    } catch (err) {
+      console.error("Notice Save Failure:", err);
+      throw err;
+    }
+  },
+
+  // Backward compatibility alias
   saveNotices: async (notices) => {
-    if (!supabase) return notices;
-    const rows = notices.map(n => ({
-      id: n.id && String(n.id).length > 10 ? undefined : n.id, // Handle temporary IDs vs BigInt
-      title: n.title,
-      content: n.content,
-      type: n.type || 'General',
-      priority: n.priority || 'Normal',
-      author: n.author,
-      date: n.date,
-      start_at: n.start_at || new Date().toISOString(),
-      end_at: n.is_permanent ? null : n.end_at,
-      is_permanent: !!n.is_permanent,
-      status: n.status || 'Active',
-      data: n
-    }));
-    await supabase.from('notices').upsert(rows);
+    // If passed a list, we'll just save the last one for now or loop
+    for (const n of notices) {
+      await dataService.saveNotice(n);
+    }
     return notices;
   },
 
