@@ -613,6 +613,7 @@ const Payroll = () => {
             )}
         </div>
       </div>
+    </div>
 
       {selectedIds.size > 0 && (
         <div style={{ 
@@ -844,7 +845,7 @@ const Payroll = () => {
                   </div>
                   <div className="form-group" style={{ marginBottom: '1.5rem' }}>
                       <label className="form-label" style={{ fontWeight: '500', display: 'block', marginBottom: '0.5rem' }}>Brief Message Text</label>
-                      <textarea className="form-input" style={{ width: '100%', resize: 'vertical', padding: '0.75rem' }} rows="4" defaultValue={`Please find attached the final Payroll Ledger for ${MONTH_NAMES[CUR_MO]} ${CUR_YR}.`}></textarea>
+                      <textarea className="form-input" style={{ width: '100%', resize: 'vertical', padding: '0.75rem' }} rows="4" defaultValue={`Please find attached the final Payroll Ledger for ${MONTH_NAMES[month]} ${year}.`}></textarea>
                   </div>
                   <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.75rem' }} onClick={() => { alert('Ledger successfully queued for email automation!'); setShowEmailModal(false); }}>
                       Dispatch Email
