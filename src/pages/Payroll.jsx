@@ -9,8 +9,8 @@ import { generatePDF } from '../utils/exportUtils';
 // const EMPLOYEES_DATA = dataService.getEmployees(); // Removed to ensure reactivity within the component
 
 const NOW = new Date();
-const CUR_YR = NOW.getFullYear();
-const CUR_MO = NOW.getMonth(); // 0-indexed
+const INITIAL_YR = NOW.getFullYear();
+const INITIAL_MO = NOW.getMonth(); // 0-indexed
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -130,7 +130,7 @@ const ContractualPayslipModal = ({ employee, onClose }) => {
                 textTransform: 'uppercase',
                 letterSpacing: '1px'
               }}>
-                Salary Slip for {MONTH_NAMES[CUR_MO]} {CUR_YR}
+                Salary Slip for {MONTH_NAMES[employee.payrollMonth ?? INITIAL_MO]} {employee.payrollYear ?? INITIAL_YR}
               </p>
             </div>
           </div>
@@ -148,7 +148,7 @@ const ContractualPayslipModal = ({ employee, onClose }) => {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <input type="number" className="form-input" placeholder="OT Hours" value={otHours} onChange={e => setOtHours(e.target.value)} />
-              <HolidayPanel year={CUR_YR} month={CUR_MO} workedDays={holidayWorked} onToggle={day => setHolidayWorked(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])} />
+              <HolidayPanel year={employee.payrollYear ?? INITIAL_YR} month={employee.payrollMonth ?? INITIAL_MO} workedDays={holidayWorked} onToggle={day => setHolidayWorked(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])} />
             </div>
           </div>
 
@@ -185,7 +185,7 @@ const PayslipModal = ({ employee, onClose }) => {
       setLoading(true);
       try {
         const [count, balance] = await Promise.all([
-          dataService.getPresentDaysCount(employee.id, CUR_MO, CUR_YR),
+          dataService.getPresentDaysCount(employee.id, employee.payrollMonth ?? INITIAL_MO, employee.payrollYear ?? INITIAL_YR),
           dataService.getEmployeeBalance(employee.id)
         ]);
         setDaysPresent(count || 0);
@@ -256,7 +256,7 @@ const PayslipModal = ({ employee, onClose }) => {
                 textTransform: 'uppercase', 
                 letterSpacing: '2px' 
               }}>
-                Salary Slip for {MONTH_NAMES[CUR_MO]} {CUR_YR}
+                Salary Slip for {MONTH_NAMES[employee.payrollMonth ?? INITIAL_MO]} {employee.payrollYear ?? INITIAL_YR}
               </p>
             </div>
           </div>
@@ -360,7 +360,7 @@ const PayslipModal = ({ employee, onClose }) => {
               <button 
                 className="btn btn-primary" 
                 style={{ padding: '1rem 2rem' }}
-                onClick={() => generatePDF('standard-payslip-capture', `Payslip_${employee.empCode}_${MONTH_NAMES[CUR_MO]}.pdf`)}
+                onClick={() => generatePDF('standard-payslip-capture', `Payslip_${employee.empCode}_${MONTH_NAMES[employee.payrollMonth ?? INITIAL_MO]}.pdf`)}
               >
                 <Download size={20} /> Generate PDF
               </button>
@@ -378,7 +378,8 @@ const Payroll = () => {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [year, setYear] = useState(INITIAL_YR);
+  const [month, setMonth] = useState(INITIAL_MO);
   const [employees, setEmployees] = useState([]);
   const [holidayList, setHolidayList] = useState([]);
   const [attendanceMap, setAttendanceMap] = useState({});
@@ -390,7 +391,7 @@ const Payroll = () => {
     let isMounted = true;
     const safetyTimeout = setTimeout(() => {
       if (isMounted) setLoading(false);
-    }, 15000); // Payroll has many requests, so we give it 15s
+    }, 15000); 
 
     const fetchData = async () => {
       setLoading(true);
@@ -403,11 +404,10 @@ const Payroll = () => {
         const attMap = {};
         const balMap = {};
         
-        // Fetch attendance and balances in parallel with individual error handling
         await Promise.all(emps.map(async (emp) => {
           try {
             const [count, balance] = await Promise.all([
-              dataService.getPresentDaysCount(emp.id, CUR_MO, CUR_YR).catch(() => 0),
+              dataService.getPresentDaysCount(emp.id, month, year).catch(() => 0),
               dataService.getEmployeeBalance(emp.id).catch(() => 0)
             ]);
             if (isMounted) {
@@ -437,7 +437,7 @@ const Payroll = () => {
       isMounted = false;
       clearTimeout(safetyTimeout);
     };
-  }, []);
+  }, [month, year]);
 
   const employeesWithPayroll = useMemo(() => {
     return employees.map(emp => {
@@ -446,6 +446,8 @@ const Payroll = () => {
         ...emp,
         daysPresent,
         balanceLeaves: balanceMap[emp.id],
+        payrollMonth: month,
+        payrollYear: year,
         payrollContext: emp.category !== 'Contractual Worker'
           ? calculateSalaryComponents(
               emp.grossSalary, 
@@ -462,7 +464,7 @@ const Payroll = () => {
           : null
       };
     });
-  }, [employees, attendanceMap, balanceMap]);
+  }, [employees, attendanceMap, balanceMap, month, year]);
 
   const isContractual = selectedEmployee?.category === 'Contractual Worker';
 
@@ -497,15 +499,14 @@ const Payroll = () => {
         const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
-        a.download = `Payroll_Ledger_${MONTH_NAMES[CUR_MO]}_${CUR_YR}.csv`;
+        a.download = `Payroll_Ledger_${MONTH_NAMES[month]}_${year}.csv`;
         a.click();
         window.URL.revokeObjectURL(url);
     } else if (format === 'xlsx') {
         const worksheet = XLSX.utils.json_to_sheet(rawData);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Payroll_Ledger");
-        XLSX.writeFile(workbook, `Payroll_Ledger_${MONTH_NAMES[CUR_MO]}_${CUR_YR}.xlsx`);
+        XLSX.writeFile(workbook, `Payroll_Ledger_${MONTH_NAMES[month]}_${year}.xlsx`);
     }
   };
 
@@ -527,7 +528,24 @@ const Payroll = () => {
           <h1 className="page-title">Payroll & Compliance</h1>
           <p className="page-subtitle">Monthly salary register · Contractor payouts · PF/ESIC compliance · Holiday OT tracking.</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem' }} className="hide-on-print">
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', backgroundColor: 'var(--color-surface)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+              <select 
+                value={month} 
+                onChange={(e) => setMonth(parseInt(e.target.value))}
+                style={{ border: 'none', background: 'none', fontWeight: '700', fontSize: '1rem', color: 'var(--color-primary)', cursor: 'pointer', outline: 'none' }}
+              >
+                {MONTH_NAMES.map((name, idx) => <option key={name} value={idx}>{name}</option>)}
+              </select>
+              <select 
+                value={year} 
+                onChange={(e) => setYear(parseInt(e.target.value))}
+                style={{ border: 'none', background: 'none', fontWeight: '700', fontSize: '1rem', color: 'var(--color-primary)', cursor: 'pointer', outline: 'none' }}
+              >
+                {[INITIAL_YR - 1, INITIAL_YR, INITIAL_YR + 1].map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: '1rem' }} className="hide-on-print">
             <button 
               className="btn btn-outline" 
               disabled={isProcessing}
@@ -572,8 +590,8 @@ const Payroll = () => {
       </div>
 
         <HolidayPanel 
-          year={CUR_YR} 
-          month={CUR_MO} 
+          year={year} 
+          month={month} 
           workedDays={holidayWorked} 
           holidayList={holidayList}
           onToggle={(day) => setHolidayWorked(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])} 
@@ -581,7 +599,7 @@ const Payroll = () => {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', alignItems: 'center' }}>
-          <h2>Salary Register — {MONTH_NAMES[CUR_MO]} {CUR_YR}</h2>
+          <h2>Salary Register — {MONTH_NAMES[month]} {year}</h2>
           <div style={{ display: 'flex', gap: '1rem' }}>
             <div className="header-search" style={{ width: '250px', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
               <Search size={18} color="var(--color-text-muted)" />
