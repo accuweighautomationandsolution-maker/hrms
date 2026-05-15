@@ -278,41 +278,37 @@ const Attendance = () => {
       console.log("Sync DEBUG: Mapping", bioIdMap);
       console.log("Sync DEBUG: Logs", logs);
 
-      setRecords(prev => {
-        const next = { ...prev };
-        logs.forEach(log => {
-          // STRICT TEMPORAL GUARD: Reject any log from the future
-          const logDate = new Date(log.year, log.month - 1, log.day);
-          if (logDate > today) {
-            futureRejectedCount++;
-            return;
-          }
+      const nextRecords = { ...records };
+      logs.forEach(log => {
+        const logDate = new Date(log.year, log.month - 1, log.day);
+        if (logDate > today) {
+          futureRejectedCount++;
+          return;
+        }
 
-          const internalId = bioIdMap[String(log.empId)];
-          if (!internalId) {
-            skippedMappingCount++;
-            return;
-          }
+        const internalId = bioIdMap[String(log.empId)];
+        if (!internalId) {
+          skippedMappingCount++;
+          return;
+        }
 
-          const dStr = `${log.year}-${String(log.month).padStart(2, '0')}-${String(log.day).padStart(2, '0')}`;
-          const logKey = `${internalId}_${dStr}`;
-          
-          console.log(`Mapping ${log.empId} -> ${internalId} | Key: ${logKey}`);
-
-          if (!next[logKey] || next[logKey].source === 'Biometric') {
-            const entry = {
-              punchIn: log.punchIn,
-              punchOut: log.punchOut,
-              remark: log.remark || 'Hardware Sync',
-              source: 'Biometric'
-            };
-            next[logKey] = entry;
-            recordsToSave[logKey] = entry;
-            addedCount++;
-          }
-        });
-        return next;
+        const dStr = `${log.year}-${String(log.month).padStart(2, '0')}-${String(log.day).padStart(2, '0')}`;
+        const logKey = `${internalId}_${dStr}`;
+        
+        if (!nextRecords[logKey] || nextRecords[logKey].source === 'Biometric') {
+          const entry = {
+            punchIn: log.punchIn,
+            punchOut: log.punchOut,
+            remark: log.remark || 'Hardware Sync',
+            source: 'Biometric'
+          };
+          nextRecords[logKey] = entry;
+          recordsToSave[logKey] = entry;
+          addedCount++;
+        }
       });
+
+      setRecords(nextRecords);
 
       if (Object.keys(recordsToSave).length > 0) {
         console.log("Sync DEBUG: Committing to database...", recordsToSave);
