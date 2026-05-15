@@ -594,36 +594,6 @@ const Payroll = () => {
               </div>
             )}
             <button 
-              className="btn btn-outline" 
-              disabled={isProcessing || selectedIds.size === 0}
-              onClick={async () => {
-                if (selectedIds.size === 0) {
-                  showNotification("Please select employees to finalize.", "warning");
-                  return;
-                }
-                setIsProcessing(true);
-                // Simulate processing delay
-                setTimeout(() => {
-                  const targetEmps = employeesWithPayroll.filter(e => selectedIds.has(String(e.id)));
-                  targetEmps.forEach(emp => {
-                    if (emp.payrollContext) {
-                        dataService.savePayrollSnapshot({
-                          empId: emp.id,
-                          month: month,
-                          year: year,
-                          ...emp.payrollContext
-                        });
-                    }
-                  });
-                  setIsProcessing(false);
-                  showNotification(`Payroll Cycle for ${selectedIds.size} selected employees finalized successfully.`, 'success');
-                }, 1500);
-              }}
-              style={{ gap: '0.5rem' }}
-            >
-              <Lock size={18} /> {isProcessing ? 'Finalizing...' : 'Finalize & Lock Cycle'}
-            </button>
-            <button 
               className="btn btn-primary" 
               onClick={() => setShowExportMenu(!showExportMenu)}
               style={{ padding: '0.75rem 1.5rem', fontSize: '1rem', gap: '0.75rem' }}
@@ -640,6 +610,73 @@ const Payroll = () => {
             )}
         </div>
       </div>
+
+      {selectedIds.size > 0 && (
+        <div style={{ 
+          position: 'fixed', 
+          bottom: '2rem', 
+          left: '50%', 
+          transform: 'translateX(-50%)', 
+          zIndex: 1000,
+          backgroundColor: 'var(--color-primary-dark)',
+          color: 'white',
+          padding: '1rem 2rem',
+          borderRadius: '50px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '2rem',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ backgroundColor: 'white', color: 'var(--color-primary-dark)', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800' }}>
+              {selectedIds.size}
+            </div>
+            <span style={{ fontWeight: '600', letterSpacing: '0.5px' }}>Employees Selected</span>
+          </div>
+
+          <div style={{ width: '1px', height: '30px', backgroundColor: 'rgba(255,255,255,0.2)' }}></div>
+
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <button 
+              className="btn" 
+              disabled={isProcessing}
+              onClick={async () => {
+                setIsProcessing(true);
+                console.log("STRICT PROCESSING: Targeting IDs", Array.from(selectedIds));
+                
+                // Simulate processing delay
+                setTimeout(() => {
+                  const targetEmps = employeesWithPayroll.filter(e => selectedIds.has(String(e.id)));
+                  targetEmps.forEach(emp => {
+                    if (emp.payrollContext) {
+                        dataService.savePayrollSnapshot({
+                          empId: emp.id,
+                          month: month,
+                          year: year,
+                          ...emp.payrollContext
+                        });
+                    }
+                  });
+                  setIsProcessing(false);
+                  showNotification(`Payroll Cycle for ${selectedIds.size} selected employees processed & saved successfully.`, 'success');
+                }, 1500);
+              }}
+              style={{ backgroundColor: 'var(--color-success)', color: 'white', border: 'none', padding: '0.6rem 1.5rem', borderRadius: '25px', fontWeight: '700' }}
+            >
+              <Lock size={18} style={{ marginRight: '0.5rem' }} /> {isProcessing ? 'Processing...' : 'Process & Finalize Selected'}
+            </button>
+            <button 
+              className="btn"
+              onClick={() => setSelectedIds(new Set())}
+              style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', padding: '0.6rem 1.5rem', borderRadius: '25px', fontWeight: '600' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
         <HolidayPanel 
           year={year} 
@@ -665,13 +702,18 @@ const Payroll = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
-                <th style={{ padding: '1rem' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={selectedIds.size > 0 && selectedIds.size === filteredEmployees.length} 
-                    onChange={toggleSelectAll}
-                    style={{ cursor: 'pointer', accentColor: 'var(--color-primary)' }}
-                  />
+                <th style={{ padding: '1rem', width: '120px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={selectedIds.size > 0 && selectedIds.size === filteredEmployees.length} 
+                      onChange={toggleSelectAll}
+                      style={{ cursor: 'pointer', width: '18px', height: '18px', accentColor: 'var(--color-primary)' }}
+                    />
+                    <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      {selectedIds.size === filteredEmployees.length ? 'Deselect' : 'Select All'}
+                    </span>
+                  </div>
                 </th>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Code</th>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Employee</th>
