@@ -275,6 +275,9 @@ const Attendance = () => {
         return;
       }
 
+      console.log("Sync DEBUG: Mapping", bioIdMap);
+      console.log("Sync DEBUG: Logs", logs);
+
       setRecords(prev => {
         const next = { ...prev };
         logs.forEach(log => {
@@ -294,6 +297,8 @@ const Attendance = () => {
           const dStr = `${log.year}-${String(log.month).padStart(2, '0')}-${String(log.day).padStart(2, '0')}`;
           const logKey = `${internalId}_${dStr}`;
           
+          console.log(`Mapping ${log.empId} -> ${internalId} | Key: ${logKey}`);
+
           if (!next[logKey] || next[logKey].source === 'Biometric') {
             const entry = {
               punchIn: log.punchIn,
@@ -310,6 +315,7 @@ const Attendance = () => {
       });
 
       if (Object.keys(recordsToSave).length > 0) {
+        console.log("Sync DEBUG: Saving", recordsToSave);
         await dataService.saveAttendance(recordsToSave);
       }
 
@@ -317,8 +323,8 @@ const Attendance = () => {
       setLastSync(timestamp);
       await dataService.saveConfig('biometric_last_sync', timestamp);
 
-      console.log(`Sync completed in ${Date.now() - startTime}ms. Added ${addedCount} logs.`);
-      alert(`${addedCount} new logs successfully synchronized.`);
+      console.log(`Sync completed. Added ${addedCount}, Skipped Mapping ${skippedMappingCount}, Future Rejected ${futureRejectedCount}`);
+      alert(`Sync completed.\nAdded: ${addedCount}\nSkipped (No ID match): ${skippedMappingCount}\nFuture Rejected: ${futureRejectedCount}`);
     } catch (err) {
       console.error("Sync Error Detailed:", err);
       // Surface the actual error message to the user for better debugging

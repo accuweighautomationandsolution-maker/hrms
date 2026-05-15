@@ -50,26 +50,21 @@ export const BiometricService = {
 
           if (dow === 0 || isOddSaturday) continue; // Skip Sundays and Odd Saturdays
 
-          // Return mock logs ONLY if IDs match the user's configuration
-          [501, 881, 12, 101, 202, 'E252699'].forEach(id => {
-            const logTime = d.getTime();
-            if (logTime > now.getTime()) return;
-
             let punchIn = '09:00';
             let punchOut = '18:30';
 
             // INJECT ACTUAL PUNCH DATA FOR E252699
-            if (id === 'E252699') {
+            if (String(id) === 'E252699') {
               const day = d.getDate();
               if (day === 11) { punchIn = '09:12'; punchOut = '18:31'; }
               else if (day === 12) { punchIn = '09:12'; punchOut = '18:38'; }
               else if (day === 14) { punchIn = '09:14'; punchOut = '18:45'; }
-              else if (day === 15) { punchIn = '09:51'; punchOut = null; } // Not yet punched out
-              else return; // Skip other dates for this specific employee
+              else if (day === 15) { punchIn = '09:51'; punchOut = null; } 
+              else return; 
             }
 
             logs.push({
-              empId: id,
+              empId: String(id), // Force string
               day: d.getDate(),
               month: d.getMonth() + 1, 
               year: d.getFullYear(),
