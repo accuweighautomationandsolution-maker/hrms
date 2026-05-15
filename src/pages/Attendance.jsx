@@ -51,7 +51,7 @@ const BADGE_COLOR = {
 // ── Punch-edit modal ────────────────────────────────────────────────────────
 const PunchModal = ({ entry, onSave, onClose }) => {
   const [punchIn, setPunchIn] = useState(entry.punchIn || '09:00');
-  const [punchOut, setPunchOut] = useState(entry.punchOut || '');
+  const [punchOut, setPunchOut] = useState(entry.punchOut || '18:30');
   const [remark, setRemark] = useState(entry.remark || '');
 
   const res = diffHHMM(punchIn, punchOut);
@@ -352,8 +352,15 @@ const Attendance = () => {
 
   const dayStatus = (empId, day, dow) => {
     const rec = getRecord(empId, day);
-    if (holidaySet.has(day)) return rec ? 'holiday-worked' : 'holiday';
-    if (dow === 0) return rec ? 'holiday-worked' : 'holiday'; // extra Sunday guard
+    
+    // ODD SATURDAY LOGIC: 1st, 3rd, 5th
+    const saturdayNumber = Math.ceil(day / 7);
+    const isOddSaturday = dow === 6 && (saturdayNumber === 1 || saturdayNumber === 3 || saturdayNumber === 5);
+    
+    if (holidaySet.has(day) || isOddSaturday || dow === 0) {
+      return rec ? 'holiday-worked' : 'holiday';
+    }
+    
     if (rec) return rec.punchOut ? 'present' : 'punch-in-only';
 
     if (!year || !month || !day) return 'future';

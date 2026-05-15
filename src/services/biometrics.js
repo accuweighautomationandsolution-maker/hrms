@@ -42,10 +42,15 @@ export const BiometricService = {
         for (let i = 0; i < 30; i++) {
           const d = new Date();
           d.setDate(now.getDate() - i);
-          if (d.getDay() === 0) continue; // Skip Sundays
+          
+          const dow = d.getDay();
+          const dayOfMonth = d.getDate();
+          const saturdayNumber = Math.ceil(dayOfMonth / 7);
+          const isOddSaturday = dow === 6 && (saturdayNumber === 1 || saturdayNumber === 3 || saturdayNumber === 5);
+
+          if (dow === 0 || isOddSaturday) continue; // Skip Sundays and Odd Saturdays
 
           // Return mock logs ONLY if IDs match the user's configuration
-          // This helps verify if the mapping logic is working
           [501, 881, 12, 101, 202, 'E252699'].forEach(id => {
             const logTime = d.getTime();
             if (logTime > now.getTime()) return;
@@ -57,7 +62,7 @@ export const BiometricService = {
               month: d.getMonth() + 1, 
               year: d.getFullYear(),
               punchIn: '09:00', 
-              punchOut: '18:00',
+              punchOut: '18:30',
               remark: 'Hardware Sync',
               timestamp: d.toISOString()
             });
