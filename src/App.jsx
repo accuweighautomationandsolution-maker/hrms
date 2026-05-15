@@ -41,7 +41,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { authService } from './utils/authService';
 import './App.css'; 
 
-const APP_VERSION = 'v3.4.1-SECURITY-FIX';
+const APP_VERSION = 'v3.4.2-STABILITY-FIX';
 
 const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
 

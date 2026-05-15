@@ -524,6 +524,10 @@ const Dashboard = ({ userRole }) => {
         reviewType={feedbackConfig.type}
         onClose={() => setFeedbackConfig(p => ({ ...p, isOpen: false }))}
       />
+      {/* Version Indicator */}
+      <div style={{ position: 'fixed', bottom: '10px', right: '10px', fontSize: '10px', opacity: 0.3, pointerEvents: 'none' }}>
+        HRMS Core 3.4.2
+      </div>
     </div>
   );
 };
