@@ -329,24 +329,36 @@ export const dataService = {
 
   // ── Attendance ─────────────────────────────────────────────────────────────
   getAttendance: async () => {
-    if (!supabase) return [];
-    const { data } = await supabase.from('attendance').select('*');
-    if (!data) return {};
-    
-    // Transform flat array into the map expected by the UI: { "empId_y_m_d": record }
-    const map = {};
-    data.forEach(r => {
-      const dateObj = new Date(r.date);
-      const k = `${r.emp_id}_${dateObj.getFullYear()}_${dateObj.getMonth()}_${dateObj.getDate()}`;
-      map[k] = {
-        punchIn: r.punch_in ? new Date(r.punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null,
-        punchOut: r.punch_out ? new Date(r.punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null,
-        status: r.status,
-        remark: r.data?.remark || '',
-        source: r.data?.source || 'Database'
-      };
-    });
-    return map;
+    if (!supabase) return {};
+    try {
+      const { data, error } = await supabase.from('attendance').select('*');
+      if (error) throw error;
+      if (!data) return {};
+      
+      const map = {};
+      data.forEach(r => {
+        // r.date is "YYYY-MM-DD"
+        const parts = r.date.split('-');
+        if (parts.length === 3) {
+          const y = parts[0];
+          const m = parseInt(parts[1], 10); // 1-indexed month
+          const d = parseInt(parts[2], 10);
+          
+          const k = `${r.emp_id}_${y}_${m}_${d}`;
+          map[k] = {
+            punchIn: r.punch_in ? new Date(r.punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null,
+            punchOut: r.punch_out ? new Date(r.punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null,
+            status: r.status,
+            remark: r.data?.remark || '',
+            source: r.data?.source || 'Database'
+          };
+        }
+      });
+      return map;
+    } catch (err) {
+      console.error("getAttendance Error:", err);
+      return {};
+    }
   },
 
   saveAttendance: async (recordsMap) => {

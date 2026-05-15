@@ -254,7 +254,7 @@ const Attendance = () => {
 
   const calDays = useMemo(() => buildCalendar(year, month), [year, month]);
 
-  const key = (empId, day) => `${empId}_${year}_${month}_${day}`;
+  const key = (empId, day) => `${empId}_${year}_${month + 1}_${day}`;
 
   const handleBioSync = async () => {
     setSyncLoading(true);
