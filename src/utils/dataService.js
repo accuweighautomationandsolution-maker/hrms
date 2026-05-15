@@ -338,8 +338,8 @@ export const dataService = {
       const map = {};
       data.forEach(r => {
         // r.date is "YYYY-MM-DD"
-        // NEW Standard: Key is "{empId}_{YYYY-MM-DD}"
-        const k = `${r.emp_id}_${r.date}`;
+        // Force emp_id to string for consistent key matching
+        const k = `${String(r.emp_id)}_${r.date}`;
         map[k] = {
           punchIn: r.punch_in ? new Date(r.punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null,
           punchOut: r.punch_out ? new Date(r.punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null,
@@ -348,6 +348,7 @@ export const dataService = {
           source: r.data?.source || 'Database'
         };
       });
+      console.log(`dataService: Attendance loaded (${Object.keys(map).length} records)`);
       return map;
     } catch (err) {
       console.error("getAttendance Error:", err);
@@ -381,7 +382,7 @@ export const dataService = {
 
       return {
         id: key, 
-        emp_id: empId,
+        emp_id: String(empId), // Ensure emp_id is string
         date: dateStr,
         punch_in: punchInTs,
         punch_out: punchOutTs,
@@ -392,7 +393,15 @@ export const dataService = {
     // Consistency Guard: Never save future records at the DB layer
     const today = new Date().toISOString().split('T')[0];
     const validRows = rows.filter(r => r.date <= today);
-    await supabase.from('attendance').upsert(validRows);
+    
+    if (validRows.length > 0) {
+      const { error } = await supabase.from('attendance').upsert(validRows);
+      if (error) {
+        console.error('saveAttendance DB Error:', error.message);
+        throw error;
+      }
+      console.log(`dataService: Saved ${validRows.length} attendance records.`);
+    }
   },
 
   /**
@@ -1095,6 +1104,7 @@ export const dataService = {
 
   saveFeedback: async (submission) => {
     if (!supabase) return;
+    // STABLE MOCK LOGS: Use deterministic times so they don't change on every pull
     const id = `FB_${Date.now()}`;
     await supabase.from('feedback_records').insert({
       id,
