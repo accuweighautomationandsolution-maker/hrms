@@ -458,6 +458,9 @@ const Payroll = () => {
       }
     };
     fetchData();
+    // Reset selection when month or year changes to prevent cross-period pollution
+    setSelectedIds(new Set());
+    
     return () => {
       isMounted = false;
       clearTimeout(safetyTimeout);
@@ -538,7 +541,7 @@ const Payroll = () => {
         const worksheet = XLSX.utils.json_to_sheet(rawData);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Payroll_Ledger");
-        XLSX.writeFile(workbook, `Payroll_Ledger_${MONTH_NAMES[month]}_${year}.xlsx`);
+        XLSX.writeFile(workbook, `Payroll_Ledger_${selectedIds.size}_Emps_${MONTH_NAMES[month]}_${year}.xlsx`);
     }
   };
 
@@ -702,16 +705,24 @@ const Payroll = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
-                <th style={{ padding: '1rem', width: '120px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <th style={{ 
+                  padding: '1rem', 
+                  width: '140px', 
+                  position: 'sticky', 
+                  left: 0, 
+                  backgroundColor: 'var(--color-surface)', 
+                  zIndex: 10,
+                  boxShadow: '2px 0 5px rgba(0,0,0,0.05)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <input 
                       type="checkbox" 
                       checked={selectedIds.size > 0 && selectedIds.size === filteredEmployees.length} 
                       onChange={toggleSelectAll}
-                      style={{ cursor: 'pointer', width: '18px', height: '18px', accentColor: 'var(--color-primary)' }}
+                      style={{ cursor: 'pointer', width: '20px', height: '20px', accentColor: 'var(--color-primary)' }}
                     />
-                    <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      {selectedIds.size === filteredEmployees.length ? 'Deselect' : 'Select All'}
+                    <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--color-primary)', textTransform: 'uppercase' }}>
+                      {selectedIds.size === filteredEmployees.length ? 'NONE' : 'ALL'}
                     </span>
                   </div>
                 </th>
@@ -736,16 +747,27 @@ const Payroll = () => {
                 return (
                   <tr key={emp.id} style={{ 
                     borderBottom: '1px solid var(--color-border)', 
-                    backgroundColor: isSelected ? 'rgba(37,99,235,0.06)' : 'transparent',
-                    transition: 'background-color 0.2s'
+                    backgroundColor: isSelected ? 'rgba(37,99,235,0.08)' : 'transparent',
+                    transition: 'all 0.2s ease'
                   }}>
-                    <td style={{ padding: '1rem', width: '40px' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={isSelected} 
-                        onChange={() => toggleSelect(emp.id)}
-                        style={{ cursor: 'pointer', width: '18px', height: '18px', accentColor: 'var(--color-primary)' }}
-                      />
+                    <td style={{ 
+                      padding: '1rem', 
+                      width: '40px', 
+                      position: 'sticky', 
+                      left: 0, 
+                      backgroundColor: isSelected ? '#eff6ff' : 'var(--color-surface)', 
+                      zIndex: 10,
+                      boxShadow: '2px 0 5px rgba(0,0,0,0.05)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <input 
+                          type="checkbox" 
+                          id={`emp-select-${emp.id}`}
+                          checked={isSelected} 
+                          onChange={() => toggleSelect(emp.id)}
+                          style={{ cursor: 'pointer', width: '22px', height: '22px', accentColor: 'var(--color-primary)' }}
+                        />
+                      </div>
                     </td>
                     <td style={{ padding: '1rem', fontWeight: '600', color: 'var(--color-primary)' }}>
                       {emp.empCode || emp.biometricCode || 'N/A'}
