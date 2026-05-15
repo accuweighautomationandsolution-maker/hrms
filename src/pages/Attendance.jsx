@@ -315,16 +315,20 @@ const Attendance = () => {
       });
 
       if (Object.keys(recordsToSave).length > 0) {
-        console.log("Sync DEBUG: Saving", recordsToSave);
+        console.log("Sync DEBUG: Committing to database...", recordsToSave);
         await dataService.saveAttendance(recordsToSave);
       }
+
+      // FORCE REFRESH: Re-fetch existing from DB to ensure state is perfectly synced
+      const freshAtt = await dataService.getAttendance().catch(() => ({}));
+      setRecords(freshAtt);
 
       const timestamp = new Date().toLocaleString();
       setLastSync(timestamp);
       await dataService.saveConfig('biometric_last_sync', timestamp);
 
       console.log(`Sync completed. Added ${addedCount}, Skipped Mapping ${skippedMappingCount}, Future Rejected ${futureRejectedCount}`);
-      alert(`Sync completed.\nAdded: ${addedCount}\nSkipped (No ID match): ${skippedMappingCount}\nFuture Rejected: ${futureRejectedCount}`);
+      alert(`✅ Biometric Sync Successful\n\n- Records Persisted: ${addedCount}\n- Skipped (No ID match): ${skippedMappingCount}\n- Future Logs Ignored: ${futureRejectedCount}\n\nData is now permanently saved in the database.`);
     } catch (err) {
       console.error("Sync Error Detailed:", err);
       // Surface the actual error message to the user for better debugging

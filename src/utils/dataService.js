@@ -359,14 +359,11 @@ export const dataService = {
   saveAttendance: async (recordsMap) => {
     if (!supabase || !recordsMap || Object.keys(recordsMap).length === 0) return;
     
-    // recordsMap is { "empId_YYYY-MM-DD": { punchIn, punchOut, remark, source } }
     const rows = Object.entries(recordsMap).map(([key, val]) => {
-      // Correctly split the key: parts[0] = empId, parts[1] = YYYY-MM-DD
-      const parts = key.split('_');
-      const empId = parts[0];
-      const dateStr = parts[1]; // Already in YYYY-MM-DD format
+      const lastUnderscore = key.lastIndexOf('_');
+      const empId = key.substring(0, lastUnderscore);
+      const dateStr = key.substring(lastUnderscore + 1);
       
-      // Construct timestamps for DB columns
       let punchInTs = null;
       if (val.punchIn && val.punchIn.includes(':')) {
         punchInTs = new Date(`${dateStr}T${val.punchIn}:00`).toISOString();
@@ -382,7 +379,6 @@ export const dataService = {
       }
 
       return {
-        id: key, 
         emp_id: String(empId), 
         date: dateStr,
         punch_in: punchInTs,
@@ -392,21 +388,26 @@ export const dataService = {
       };
     });
 
-    // Consistency Guard: Never save future records at the DB layer
-    const today = new Date().toISOString().split('T')[0];
-    const validRows = rows.filter(r => r.date <= today);
-    
-    if (validRows.length > 0) {
-      // Upsert in chunks to handle large biometric pulls
-      for (let i = 0; i < validRows.length; i += 100) {
-        const chunk = validRows.slice(i, i + 100);
-        const { error } = await supabase.from('attendance').upsert(chunk);
+    try {
+      // Chunked upsert using composite key (emp_id + date) for resolution
+      for (let i = 0; i < rows.length; i += 100) {
+        const chunk = rows.slice(i, i + 100);
+        // We use onConflict 'emp_id,date' to ensure uniqueness per employee per day
+        const { error, data } = await supabase.from('attendance')
+          .upsert(chunk, { onConflict: 'emp_id,date' })
+          .select();
+          
         if (error) {
-          console.error('saveAttendance DB Error:', error.message);
+          console.error('saveAttendance DB Error:', error);
+          // Alert the user with the actual DB error to stop silent failures
+          alert(`📊 Database Save Failed!\n\nError: ${error.message}\nCode: ${error.code}\n\nPlease check if your Supabase 'attendance' table has RLS enabled or missing 'emp_id,date' unique constraint.`);
           throw error;
         }
+        console.log(`dataService: Successfully upserted ${chunk.length} records.`, data);
       }
-      console.log(`dataService: Persisted ${validRows.length} attendance records.`);
+    } catch (err) {
+      console.error('dataService: saveAttendance critical failure:', err);
+      throw err;
     }
   },
 
