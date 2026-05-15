@@ -222,10 +222,8 @@ const Attendance = () => {
       const internalId = bioIdMap[String(punch.empId)];
       if (!internalId) return;
 
-      const pDay = punch.day;
-      const pMonth = punch.month;
-      const pYear = punch.year;
-      const punchKey = `${internalId}_${pYear}_${pMonth}_${pDay}`;
+      const dStr = `${punch.year}-${String(punch.month).padStart(2, '0')}-${String(punch.day).padStart(2, '0')}`;
+      const punchKey = `${internalId}_${dStr}`;
       
       let updatedRecord = null;
       setRecords(prev => {
@@ -254,7 +252,10 @@ const Attendance = () => {
 
   const calDays = useMemo(() => buildCalendar(year, month), [year, month]);
 
-  const key = (empId, day) => `${empId}_${year}_${month + 1}_${day}`;
+  const key = (empId, day) => {
+    const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return `${empId}_${dStr}`;
+  };
 
   const handleBioSync = async () => {
     setSyncLoading(true);
@@ -290,7 +291,9 @@ const Attendance = () => {
             return;
           }
 
-          const logKey = `${internalId}_${log.year}_${log.month}_${log.day}`;
+          const dStr = `${log.year}-${String(log.month).padStart(2, '0')}-${String(log.day).padStart(2, '0')}`;
+          const logKey = `${internalId}_${dStr}`;
+          
           if (!next[logKey] || next[logKey].source === 'Biometric') {
             const entry = {
               punchIn: log.punchIn,

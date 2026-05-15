@@ -338,21 +338,15 @@ export const dataService = {
       const map = {};
       data.forEach(r => {
         // r.date is "YYYY-MM-DD"
-        const parts = r.date.split('-');
-        if (parts.length === 3) {
-          const y = parts[0];
-          const m = parseInt(parts[1], 10); // 1-indexed month
-          const d = parseInt(parts[2], 10);
-          
-          const k = `${r.emp_id}_${y}_${m}_${d}`;
-          map[k] = {
-            punchIn: r.punch_in ? new Date(r.punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null,
-            punchOut: r.punch_out ? new Date(r.punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null,
-            status: r.status,
-            remark: r.data?.remark || '',
-            source: r.data?.source || 'Database'
-          };
-        }
+        // NEW Standard: Key is "{empId}_{YYYY-MM-DD}"
+        const k = `${r.emp_id}_${r.date}`;
+        map[k] = {
+          punchIn: r.punch_in ? new Date(r.punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null,
+          punchOut: r.punch_out ? new Date(r.punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null,
+          status: r.status,
+          remark: r.data?.remark || '',
+          source: r.data?.source || 'Database'
+        };
       });
       return map;
     } catch (err) {
@@ -395,7 +389,10 @@ export const dataService = {
         data: { remark: val.remark, source: val.source }
       };
     });
-    await supabase.from('attendance').upsert(rows);
+    // Consistency Guard: Never save future records at the DB layer
+    const today = new Date().toISOString().split('T')[0];
+    const validRows = rows.filter(r => r.date <= today);
+    await supabase.from('attendance').upsert(validRows);
   },
 
   /**
