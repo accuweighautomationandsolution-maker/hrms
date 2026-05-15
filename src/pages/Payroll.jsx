@@ -8,9 +8,9 @@ import { generatePDF } from '../utils/exportUtils';
 
 // const EMPLOYEES_DATA = dataService.getEmployees(); // Removed to ensure reactivity within the component
 
-const NOW = new Date();
-const INITIAL_YR = NOW.getFullYear();
-const INITIAL_MO = NOW.getMonth(); // 0-indexed
+const NOW_DATE = new Date();
+const INITIAL_YEAR = NOW_DATE.getFullYear();
+const INITIAL_MONTH = NOW_DATE.getMonth(); // 0-indexed
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -130,7 +130,7 @@ const ContractualPayslipModal = ({ employee, onClose }) => {
                 textTransform: 'uppercase',
                 letterSpacing: '1px'
               }}>
-                Salary Slip for {MONTH_NAMES[employee.payrollMonth ?? INITIAL_MO]} {employee.payrollYear ?? INITIAL_YR}
+                Salary Slip for {MONTH_NAMES[employee.payrollMonth ?? INITIAL_MONTH]} {employee.payrollYear ?? INITIAL_YEAR}
               </p>
             </div>
           </div>
@@ -148,7 +148,7 @@ const ContractualPayslipModal = ({ employee, onClose }) => {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <input type="number" className="form-input" placeholder="OT Hours" value={otHours} onChange={e => setOtHours(e.target.value)} />
-              <HolidayPanel year={employee.payrollYear ?? INITIAL_YR} month={employee.payrollMonth ?? INITIAL_MO} workedDays={holidayWorked} onToggle={day => setHolidayWorked(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])} />
+              <HolidayPanel year={employee.payrollYear ?? INITIAL_YEAR} month={employee.payrollMonth ?? INITIAL_MONTH} workedDays={holidayWorked} onToggle={day => setHolidayWorked(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])} />
             </div>
           </div>
 
@@ -185,7 +185,7 @@ const PayslipModal = ({ employee, onClose }) => {
       setLoading(true);
       try {
         const [count, balance] = await Promise.all([
-          dataService.getPresentDaysCount(employee.id, employee.payrollMonth ?? INITIAL_MO, employee.payrollYear ?? INITIAL_YR),
+          dataService.getPresentDaysCount(employee.id, employee.payrollMonth ?? INITIAL_MONTH, employee.payrollYear ?? INITIAL_YEAR),
           dataService.getEmployeeBalance(employee.id)
         ]);
         setDaysPresent(count || 0);
@@ -256,7 +256,7 @@ const PayslipModal = ({ employee, onClose }) => {
                 textTransform: 'uppercase', 
                 letterSpacing: '2px' 
               }}>
-                Salary Slip for {MONTH_NAMES[employee.payrollMonth ?? INITIAL_MO]} {employee.payrollYear ?? INITIAL_YR}
+                Salary Slip for {MONTH_NAMES[employee.payrollMonth ?? INITIAL_MONTH]} {employee.payrollYear ?? INITIAL_YEAR}
               </p>
             </div>
           </div>
@@ -378,8 +378,8 @@ const Payroll = () => {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [year, setYear] = useState(INITIAL_YR);
-  const [month, setMonth] = useState(INITIAL_MO);
+  const [year, setYear] = useState(INITIAL_YEAR);
+  const [month, setMonth] = useState(INITIAL_MONTH);
   const [employees, setEmployees] = useState([]);
   const [holidayList, setHolidayList] = useState([]);
   const [attendanceMap, setAttendanceMap] = useState({});
@@ -577,7 +577,7 @@ const Payroll = () => {
                 onChange={(e) => setYear(parseInt(e.target.value))}
                 style={{ border: 'none', background: 'none', fontWeight: '700', fontSize: '1rem', color: 'var(--color-primary)', cursor: 'pointer', outline: 'none' }}
               >
-                {[INITIAL_YR - 1, INITIAL_YR, INITIAL_YR + 1].map(y => <option key={y} value={y}>{y}</option>)}
+                {[INITIAL_YEAR - 1, INITIAL_YEAR, INITIAL_YEAR + 1].map(y => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>
             <div style={{ display: 'flex', gap: '1rem' }} className="hide-on-print">
