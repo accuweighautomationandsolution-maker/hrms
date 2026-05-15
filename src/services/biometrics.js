@@ -49,6 +49,10 @@ export const BiometricService = {
           const isOddSaturday = dow === 6 && (saturdayNumber === 1 || saturdayNumber === 3 || saturdayNumber === 5);
 
           if (dow === 0 || isOddSaturday) continue; // Skip Sundays and Odd Saturdays
+          // Return mock logs ONLY if IDs match the user's configuration
+          [501, 881, 12, 101, 202, 'E252699'].forEach(id => {
+            const logTime = d.getTime();
+            if (logTime > now.getTime()) return;
 
             let punchIn = '09:00';
             let punchOut = '18:30';
