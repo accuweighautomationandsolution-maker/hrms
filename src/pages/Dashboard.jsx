@@ -338,7 +338,9 @@ const Dashboard = ({ userRole }) => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                             <h4 style={{ margin: 0, color: 'var(--color-primary)', fontWeight: '700' }}>{n.title}</h4>
-                            <span className={`badge-status ${statusClass}`}>{statusClass}</span>
+                            {statusClass !== 'permanent' && statusClass !== 'active' && (
+                              <span className={`badge-status ${statusClass}`}>{statusClass}</span>
+                            )}
                           </div>
                           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                             <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{n.date}</span>
