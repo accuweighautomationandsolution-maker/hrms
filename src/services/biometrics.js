@@ -55,14 +55,26 @@ export const BiometricService = {
             const logTime = d.getTime();
             if (logTime > now.getTime()) return;
 
-            // STABLE DIAGNOSTIC LOGS: Use exact fixed times for testing mapping
+            let punchIn = '09:00';
+            let punchOut = '18:30';
+
+            // INJECT ACTUAL PUNCH DATA FOR E252699
+            if (id === 'E252699') {
+              const day = d.getDate();
+              if (day === 11) { punchIn = '09:12'; punchOut = '18:31'; }
+              else if (day === 12) { punchIn = '09:12'; punchOut = '18:38'; }
+              else if (day === 14) { punchIn = '09:14'; punchOut = '18:45'; }
+              else if (day === 15) { punchIn = '09:51'; punchOut = null; } // Not yet punched out
+              else return; // Skip other dates for this specific employee
+            }
+
             logs.push({
               empId: id,
               day: d.getDate(),
               month: d.getMonth() + 1, 
               year: d.getFullYear(),
-              punchIn: '09:00', 
-              punchOut: '18:30',
+              punchIn, 
+              punchOut,
               remark: 'Hardware Sync',
               timestamp: d.toISOString()
             });
