@@ -398,16 +398,17 @@ const Payroll = () => {
 
   const toggleSelect = (id) => {
     const next = new Set(selectedIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
+    const sid = String(id);
+    if (next.has(sid)) next.delete(sid);
+    else next.add(sid);
     setSelectedIds(next);
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === filteredEmployees.length) {
+    if (selectedIds.size === filteredEmployees.length && filteredEmployees.length > 0) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredEmployees.map(e => e.id)));
+      setSelectedIds(new Set(filteredEmployees.map(e => String(e.id))));
     }
   };
 
@@ -494,7 +495,7 @@ const Payroll = () => {
 
   const handleExport = (format) => {
     const rawData = [];
-    const targetEmps = employeesWithPayroll.filter(e => selectedIds.has(e.id));
+    const targetEmps = employeesWithPayroll.filter(e => selectedIds.has(String(e.id)));
     
     if (targetEmps.length === 0) {
       showNotification("Please select at least one employee to export.", "warning");
@@ -577,9 +578,24 @@ const Payroll = () => {
               </select>
             </div>
             <div style={{ display: 'flex', gap: '1rem' }} className="hide-on-print">
+            {selectedIds.size > 0 && (
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                backgroundColor: 'var(--color-primary)', 
+                color: 'white', 
+                padding: '0.25rem 0.75rem', 
+                borderRadius: '20px', 
+                fontSize: '0.75rem', 
+                fontWeight: '700',
+                boxShadow: '0 2px 4px rgba(37,99,235,0.2)'
+              }}>
+                {selectedIds.size} Selected
+              </div>
+            )}
             <button 
               className="btn btn-outline" 
-              disabled={isProcessing}
+              disabled={isProcessing || selectedIds.size === 0}
               onClick={async () => {
                 if (selectedIds.size === 0) {
                   showNotification("Please select employees to finalize.", "warning");
@@ -588,7 +604,7 @@ const Payroll = () => {
                 setIsProcessing(true);
                 // Simulate processing delay
                 setTimeout(() => {
-                  const targetEmps = employeesWithPayroll.filter(e => selectedIds.has(e.id));
+                  const targetEmps = employeesWithPayroll.filter(e => selectedIds.has(String(e.id)));
                   targetEmps.forEach(emp => {
                     if (emp.payrollContext) {
                         dataService.savePayrollSnapshot({
@@ -673,15 +689,20 @@ const Payroll = () => {
               {filteredEmployees.map((emp) => {
                 const isC = emp.category === 'Contractual Worker';
                 const ctx = emp.payrollContext;
-                const isSelected = selectedIds.has(emp.id);
+                const sid = String(emp.id);
+                const isSelected = selectedIds.has(sid);
                 return (
-                  <tr key={emp.id} style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: isSelected ? 'rgba(37,99,235,0.03)' : 'transparent' }}>
-                    <td style={{ padding: '1rem' }}>
+                  <tr key={emp.id} style={{ 
+                    borderBottom: '1px solid var(--color-border)', 
+                    backgroundColor: isSelected ? 'rgba(37,99,235,0.06)' : 'transparent',
+                    transition: 'background-color 0.2s'
+                  }}>
+                    <td style={{ padding: '1rem', width: '40px' }}>
                       <input 
                         type="checkbox" 
                         checked={isSelected} 
                         onChange={() => toggleSelect(emp.id)}
-                        style={{ cursor: 'pointer', accentColor: 'var(--color-primary)' }}
+                        style={{ cursor: 'pointer', width: '18px', height: '18px', accentColor: 'var(--color-primary)' }}
                       />
                     </td>
                     <td style={{ padding: '1rem', fontWeight: '600', color: 'var(--color-primary)' }}>
