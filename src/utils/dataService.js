@@ -500,15 +500,34 @@ export const dataService = {
   // ── Notices ─────────────────────────────────────────────────────────────
   getNotices: async () => {
     if (!supabase) return [];
-    const { data } = await supabase.from('notices').select('*').order('start_at', { ascending: false });
-    return (data || []).map(r => ({
-      ...r.data,
-      id: r.id,
-      start_at: r.start_at,
-      end_at: r.end_at,
-      is_permanent: r.is_permanent,
-      status: r.status
-    }));
+    try {
+      const { data, error } = await supabase.from('notices').select('*').order('start_at', { ascending: false });
+      if (error) throw error;
+      return (data || []).map(r => ({
+        ...r.data,
+        id: r.id,
+        start_at: r.start_at,
+        end_at: r.end_at,
+        is_permanent: r.is_permanent,
+        status: r.status,
+        created_at: r.created_at
+      }));
+    } catch (err) {
+      console.error("Critical error fetching notices:", err);
+      return [];
+    }
+  },
+
+  subscribeToNotices: (callback) => {
+    if (!supabase) return null;
+    return supabase
+      .channel('notices_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notices' }, async (payload) => {
+        console.log("Real-time notice update received:", payload);
+        const freshData = await dataService.getNotices();
+        callback(freshData);
+      })
+      .subscribe();
   },
 
   getPersonalNotices: async (empId) => {

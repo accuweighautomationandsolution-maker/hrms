@@ -9,6 +9,7 @@ import { Plus, Edit, Trash2, MessageSquareShare, ShieldCheck, Zap, ChevronRight,
 import { Link } from 'react-router-dom';
 import FeedbackPortal from '../components/FeedbackPortal';
 import RichTextEditor from '../components/RichTextEditor';
+import NoticeModal from '../components/NoticeModal';
 import { alertEngine } from '../utils/alertEngine';
 import { authService } from '../utils/authService';
 import { generateBoardReport } from '../utils/exportUtils';
@@ -85,60 +86,21 @@ const Dashboard = ({ userRole }) => {
   const [tempConfig, setTempConfig] = useState(bulletin);
 
   useEffect(() => {
-    let isMounted = true;
     const fetchData = async () => {
-      // Safety timeout: Ensure loader is cleared even if network hangs
-      const loaderTimeout = setTimeout(() => {
-        if (isMounted) setLoading(false);
-      }, 10000);
-
-      setLoading(true);
+      if (!currentUser) return;
+      
       try {
-        const stats = await dataService.getDashboardStats().catch(err => {
-          console.warn("Dashboard: Stats fetch failed:", err);
-          return { totalEmployees: 0, presentToday: 0, onLeave: 0 };
-        });
-        if (isMounted) setDashboardStats(stats);
-
-        if (isEmployee) {
-          const [attendance, status, trajectory, leaveBal] = await Promise.all([
-            dataService.getPersonalAttendanceSummary(currentUser.id, new Date().getMonth(), new Date().getFullYear()).catch(() => ({ present: 0 })),
-            dataService.getTodayAttendanceStatus(currentUser.id).catch(() => ({ punch_in: null, status: 'Not Marked' })),
-            dataService.getPersonalAttendanceTrajectory(currentUser.id).catch(() => []),
-            dataService.getEmployeeBalance(currentUser.id).catch(() => 0)
-          ]);
-          if (isMounted) {
-            setPersonalAttendance(attendance);
-            setTodayStatus(status);
-            setPersonalTrajectory(trajectory);
-            setPersonalLeaveBalance(leaveBal);
-          }
-        }
-
-        const [noticesList, probationList, holidayList, bulletinConfig, statutoryData] = await Promise.all([
-          dataService.getNotices().catch(err => {
-            console.error("Notice Fetch Error:", err);
-            alert("Diagnostic: Notice Fetch Failed - " + (err.message || "Unknown error"));
-            return [];
-          }),
-          dataService.getUpcomingProbations().catch(() => []),
-          dataService.getCustomHolidays().catch(err => {
-            console.error("Holiday Fetch Error:", err);
-            alert("Diagnostic: Holiday Fetch Failed - " + (err.message || "Unknown error"));
-            return [];
-          }),
-          dataService.getBulletinConfig().catch(() => null),
-          dataService.getStatutoryUpdates().catch(() => [])
+        setLoading(true);
+        
+        // Initial Fetch
+        const [holidays, noticesList] = await Promise.all([
+          dataService.getCustomHolidays().catch(() => []),
+          dataService.getNotices().catch(() => [])
         ]);
 
-        if (!isMounted) return;
-
-        if (bulletinConfig) setBulletinState(bulletinConfig);
-        setStatutoryUpdates(statutoryData || []);
-
-        const now = new Date();
-        const upcomingHolidays = (holidayList || [])
-          .filter(h => new Date(h.fromDate) >= now)
+        const nowLocal = new Date();
+        const upcomingHolidays = (holidays || [])
+          .filter(h => new Date(h.fromDate) >= nowLocal)
           .map(h => ({
             id: `holiday-${h.id}`,
             title: `Holiday: ${h.name}`,
@@ -148,16 +110,22 @@ const Dashboard = ({ userRole }) => {
             isSystem: true
           }));
 
-        setNotices([...upcomingHolidays, ...(noticesList || [])].sort((a, b) => new Date(b.date) - new Date(a.date)));
-        setProbations(probationList || []);
-        
-        const alerts = await alertEngine.getDashboardAlerts(currentUser).catch(err => {
-          console.error("Dashboard: Alerts engine failed:", err);
-          return [];
+        setNotices([...upcomingHolidays, ...noticesList].sort((a, b) => new Date(b.date) - new Date(a.date)));
+
+        // Setup Real-time Subscription
+        const subscription = dataService.subscribeToNotices((freshNotices) => {
+          setNotices(prev => {
+            const hols = prev.filter(n => n.isSystem);
+            return [...hols, ...freshNotices].sort((a, b) => new Date(b.date) - new Date(a.date));
+          });
         });
-        setSmartAlerts(alerts);
-      } catch (error) {
-        console.error("Failed to fetch dashboard data:", error);
+
+        return () => {
+          if (subscription) subscription.unsubscribe();
+        };
+
+      } catch (err) {
+        console.error("Dashboard Fetch Error:", err);
       } finally {
         clearTimeout(loaderTimeout);
         if (isMounted) setLoading(false);
@@ -175,36 +143,13 @@ const Dashboard = ({ userRole }) => {
   const [feedbackConfig, setFeedbackConfig] = useState({ isOpen: false, empId: null, type: 'Probation Completion' });
 
 
-  const saveNotice = async (item) => {
+  const saveNotice = async (noticeData) => {
     try {
-      setLoading(true);
-      await dataService.saveNotice(item);
-      
-      // Full refresh from DB to ensure state is correct
-      const [noticesList, holidayList] = await Promise.all([
-        dataService.getNotices(),
-        dataService.getCustomHolidays()
-      ]);
-      
-      const nowLocal = new Date();
-      const upcomingHolidays = (holidayList || [])
-        .filter(h => new Date(h.fromDate) >= nowLocal)
-        .map(h => ({
-          id: `holiday-${h.id}`,
-          title: `Holiday: ${h.name}`,
-          content: `Company-wide holiday observed for ${h.name}.`,
-          date: h.fromDate,
-          type: 'Holiday',
-          isSystem: true
-        }));
-
-      setNotices([...upcomingHolidays, ...noticesList].sort((a, b) => new Date(b.date) - new Date(a.date)));
+      await dataService.saveNotice(noticeData);
       setNoticeModal(null);
-      alert("Notice successfully published and persisted.");
+      // Data will refresh automatically via Real-time subscription
     } catch (err) {
-      alert("Failed to save notice: " + (err.message || "Database connection error"));
-    } finally {
-      setLoading(false);
+      alert("Failed to sync notice: " + err.message);
     }
   };
 
@@ -360,63 +305,62 @@ const Dashboard = ({ userRole }) => {
               </div>
             </div>
 
-            <div className="notice-board-container" style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '0.5rem' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="notice-scroll-container">
+              <div className="notice-scroll-content">
                 {(() => {
-                  // EMERGENCY DEBUG: Disable filtering to see if data arrives at all
-                  const filtered = notices; 
+                  const now = new Date();
+                  const visible = notices.filter(n => {
+                    if (userRole === 'management') return true;
+                    if (n.is_permanent) return true;
+                    if (n.start_at && new Date(n.start_at) > now) return false;
+                    if (n.end_at && new Date(n.end_at) < now) return false;
+                    return true;
+                  });
 
-                  if (filtered.length === 0) {
+                  if (visible.length === 0) {
                     return (
                       <div style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>
                         <BellRing size={40} style={{ margin: '0 auto 1rem', display: 'block', opacity: 0.3 }} />
-                        <p style={{ fontSize: '0.875rem' }}>No active announcements at the moment.</p>
+                        <p style={{ fontSize: '0.875rem' }}>No active announcements.</p>
                       </div>
                     );
                   }
 
-                  return filtered.map((n, idx) => {
-                    const now = new Date();
-                    let status = 'Active';
-                    if (n.is_permanent) status = 'Permanent';
-                    else if (n.start_at && new Date(n.start_at) > now) status = 'Scheduled';
-                    else if (n.end_at && new Date(n.end_at) < now) status = 'Expired';
+                  // Create a seamless loop for the scroll
+                  const displayItems = visible.length > 2 ? [...visible, ...visible] : visible;
+
+                  return displayItems.map((n, idx) => {
+                    let statusClass = 'active';
+                    if (n.is_permanent) statusClass = 'permanent';
+                    else if (n.start_at && new Date(n.start_at) > now) statusClass = 'scheduled';
+                    else if (n.end_at && new Date(n.end_at) < now) statusClass = 'expired';
 
                     return (
                       <div key={`${n.id}-${idx}`} className="notice-item animation-fade-in" onClick={() => setViewingNotice(n)} style={{ 
-                        cursor: 'pointer',
-                        padding: '1.25rem',
-                        borderRadius: '12px',
+                        cursor: 'pointer', padding: '1.25rem', borderRadius: '12px',
                         backgroundColor: 'var(--color-background)',
-                        borderLeft: status === 'Scheduled' ? '4px solid var(--color-warning)' : status === 'Expired' ? '4px solid var(--color-danger)' : '4px solid var(--color-primary)',
-                        opacity: status === 'Expired' ? 0.6 : 1,
-                        transition: 'transform 0.2s ease',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                        borderLeft: `4px solid ${statusClass === 'expired' ? '#94a3b8' : 'var(--color-primary)'}`,
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                             <h4 style={{ margin: 0, color: 'var(--color-primary)', fontWeight: '700' }}>{n.title}</h4>
-                            <span style={{ 
-                              backgroundColor: status === 'Active' || status === 'Permanent' ? 'var(--color-success)' : status === 'Scheduled' ? 'var(--color-warning)' : 'var(--color-danger)', 
-                              color: 'white', fontSize: '0.6rem', padding: '0.15rem 0.5rem', borderRadius: '4px', fontWeight: 'bold', textTransform: 'uppercase'
-                            }}>{status}</span>
+                            <span className={`badge-status ${statusClass}`}>{statusClass}</span>
                           </div>
                           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                             <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{n.date}</span>
                             {userRole === 'management' && (
                               <div style={{ display: 'flex', gap: '0.4rem' }}>
-                                <button onClick={(e) => { e.stopPropagation(); setNoticeModal(n); }} className="btn-icon" style={{ padding: '0.2rem' }}><Edit size={14} /></button>
-                                <button onClick={(e) => { e.stopPropagation(); deleteNotice(n.id); }} className="btn-icon text-danger" style={{ padding: '0.2rem' }}><Trash2 size={14} /></button>
+                                <button onClick={(e) => { e.stopPropagation(); setNoticeModal(n); }} className="btn-icon"><Edit size={14} /></button>
+                                <button onClick={(e) => { e.stopPropagation(); deleteNotice(n.id); }} className="btn-icon text-danger"><Trash2 size={14} /></button>
                               </div>
                             )}
                           </div>
                         </div>
-                        <div style={{ fontSize: '0.875rem', color: 'var(--color-text-main)', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} dangerouslySetInnerHTML={{ __html: n.content }} />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '0.5rem' }}>
-                          <p style={{ margin: 0, fontSize: '0.7rem', opacity: 0.6 }}>By {n.author}</p>
-                          {n.end_at && (
-                             <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--color-danger)', fontWeight: '600' }}>Expires: {new Date(n.end_at).toLocaleDateString()}</p>
-                          )}
+                        <div style={{ fontSize: '0.875rem', color: 'var(--color-text-main)' }} dangerouslySetInnerHTML={{ __html: n.content }} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', opacity: 0.6 }}>
+                          <p style={{ margin: 0, fontSize: '0.7rem' }}>Posted by: {n.author}</p>
+                          {n.end_at && <p style={{ margin: 0, fontSize: '0.7rem' }}>Exp: {new Date(n.end_at).toLocaleDateString()}</p>}
                         </div>
                       </div>
                     );
@@ -538,78 +482,12 @@ const Dashboard = ({ userRole }) => {
       </div>
 
       {noticeModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
-          <div className="card" style={{ width: '100%', maxWidth: '650px', display: 'flex', flexDirection: 'column', gap: '1rem', animation: 'fadeIn 0.3s ease-out' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0 }}>{noticeModal.id ? 'Edit Notice' : 'Post New Announcement'}</h2>
-              <button onClick={() => setNoticeModal(null)}>✕</button>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Announcement Title *</label>
-              <input 
-                type="text" 
-                className="form-input" 
-                value={noticeModal.title} 
-                onChange={(e) => setNoticeModal({ ...noticeModal, title: e.target.value })} 
-                placeholder="e.g. Health Insurance Update"
-              />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div className="form-group">
-                <label className="form-label">Display Start (Date & Time)</label>
-                <input 
-                  type="datetime-local" 
-                  className="form-input"
-                  value={noticeModal.start_at ? noticeModal.start_at.slice(0, 16) : ''}
-                  onChange={(e) => setNoticeModal({ ...noticeModal, start_at: e.target.value })}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Display End (Expiry)</label>
-                <input 
-                  type="datetime-local" 
-                  className="form-input"
-                  disabled={noticeModal.is_permanent}
-                  value={noticeModal.end_at ? noticeModal.end_at.slice(0, 16) : ''}
-                  onChange={(e) => setNoticeModal({ ...noticeModal, end_at: e.target.value })}
-                  style={{ opacity: noticeModal.is_permanent ? 0.5 : 1 }}
-                />
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', backgroundColor: 'var(--color-background)', borderRadius: '8px' }}>
-              <input 
-                type="checkbox" 
-                id="is_permanent"
-                checked={noticeModal.is_permanent || false}
-                onChange={(e) => setNoticeModal({ ...noticeModal, is_permanent: e.target.checked })}
-              />
-              <label htmlFor="is_permanent" style={{ fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer' }}>
-                Display Continuously / Unlimited Time (Never Expires)
-              </label>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Notice Content *</label>
-              <RichTextEditor 
-                value={noticeModal.content} 
-                onChange={(content) => setNoticeModal({ ...noticeModal, content })}
-                height="150px"
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
-              <button className="btn btn-ghost" onClick={() => setNoticeModal(null)}>Cancel</button>
-              <button className="btn btn-primary" 
-                disabled={!noticeModal.title?.trim() || !noticeModal.content || noticeModal.content === '<br>'}
-                onClick={() => saveNotice(noticeModal)}>
-                {noticeModal.id ? 'Update Notice' : 'Publish Announcement'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <NoticeModal 
+          notice={noticeModal.id ? noticeModal : null}
+          currentUser={currentUser}
+          onClose={() => setNoticeModal(null)}
+          onSave={saveNotice}
+        />
       )}
       {/* Notice Viewing Modal (Enlarged) */}
       {viewingNotice && (
