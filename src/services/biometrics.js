@@ -46,11 +46,14 @@ export const BiometricService = {
 
           // Return mock logs ONLY if IDs match the user's configuration
           // This helps verify if the mapping logic is working
-          [501, 881, 12, 101, 202].forEach(id => {
+          [501, 881, 12, 101, 202, 'E252699'].forEach(id => {
+            const logTime = d.getTime();
+            if (logTime > now.getTime()) return; // STRICT GUARD: No future dates allowed
+
             logs.push({
               empId: id,
               day: d.getDate(),
-              month: d.getMonth() + 1, // JS Months are 0-indexed, Supabase/Logic expects 1-indexed
+              month: d.getMonth() + 1, 
               year: d.getFullYear(),
               punchIn: '09:' + String(Math.floor(Math.random() * 15)).padStart(2, '0'),
               punchOut: '18:' + String(Math.floor(Math.random() * 15)).padStart(2, '0'),

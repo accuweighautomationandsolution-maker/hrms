@@ -354,20 +354,27 @@ export const dataService = {
     // recordsMap is { "empId_y_m_d": { punchIn, punchOut, remark, source } }
     const rows = Object.entries(recordsMap).map(([key, val]) => {
       const [empId, y, m, d] = key.split('_');
-      const dateStr = `${y}-${String(Number(m) + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      // FIX: The month 'm' coming from the key is already 1-indexed from biometrics sync
+      // or from UI month selection. No need to add 1.
+      const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       
       // Construct timestamps
       let punchInTs = null;
-      if (val.punchIn) {
+      if (val.punchIn && val.punchIn.includes(':')) {
         punchInTs = new Date(`${dateStr}T${val.punchIn}:00`).toISOString();
+      } else if (val.punchIn) {
+        punchInTs = val.punchIn;
       }
+
       let punchOutTs = null;
-      if (val.punchOut) {
+      if (val.punchOut && val.punchOut.includes(':')) {
         punchOutTs = new Date(`${dateStr}T${val.punchOut}:00`).toISOString();
+      } else if (val.punchOut) {
+        punchOutTs = val.punchOut;
       }
 
       return {
-        id: key, // Using the key as ID for easy upsert
+        id: key, 
         emp_id: empId,
         date: dateStr,
         punch_in: punchInTs,
@@ -377,6 +384,26 @@ export const dataService = {
       };
     });
     await supabase.from('attendance').upsert(rows);
+  },
+
+  /**
+   * PURGE TOOL: Deletes any attendance record with a date in the future.
+   */
+  deleteFutureAttendance: async () => {
+    if (!supabase) return 0;
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase.from('attendance')
+        .delete()
+        .gt('date', todayStr)
+        .select();
+      
+      if (error) throw error;
+      return data?.length || 0;
+    } catch (err) {
+      console.error('deleteFutureAttendance failed:', err);
+      throw err;
+    }
   },
 
   getTodayAttendanceStatus: async (userId) => {

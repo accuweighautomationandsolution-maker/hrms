@@ -264,6 +264,10 @@ const Attendance = () => {
       const recordsToSave = {};
       let addedCount = 0;
       let skippedMappingCount = 0;
+      let futureRejectedCount = 0;
+
+      const today = new Date();
+      today.setHours(23, 59, 59, 999); // End of today
 
       if (logs.length === 0) {
         alert("📊 Biometric Pull Complete: 0 new records found on device.\n\nPossible reasons:\n1. Device is empty.\n2. All logs already imported.\n3. Date range filter on device.");
@@ -273,6 +277,13 @@ const Attendance = () => {
       setRecords(prev => {
         const next = { ...prev };
         logs.forEach(log => {
+          // STRICT TEMPORAL GUARD: Reject any log from the future
+          const logDate = new Date(log.year, log.month - 1, log.day);
+          if (logDate > today) {
+            futureRejectedCount++;
+            return;
+          }
+
           const internalId = bioIdMap[String(log.empId)];
           if (!internalId) {
             skippedMappingCount++;
@@ -426,6 +437,24 @@ const Attendance = () => {
             >
               <Activity size={18} className={syncLoading ? 'animate-spin' : ''} />
               {syncLoading ? 'Connecting...' : 'Pull Hardware Data'}
+            </button>
+            <button 
+              className="btn btn-outline" 
+              style={{ padding: '0.75rem', color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}
+              title="Purge Future Attendance (May 16+)"
+              onClick={async () => {
+                if (window.confirm("⚠️ CRITICAL ACTION: This will PERMANENTLY delete all attendance records dated AFTER today (May 15). Proceed?")) {
+                  try {
+                    const count = await dataService.deleteFutureAttendance();
+                    alert(`Success: Purged ${count} invalid future records.`);
+                    window.location.reload();
+                  } catch (e) {
+                    alert("Purge failed: " + e.message);
+                  }
+                }
+              }}
+            >
+              <Trash2 size={18} />
             </button>
           </div>
         )}
