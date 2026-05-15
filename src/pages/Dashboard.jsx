@@ -307,13 +307,8 @@ const Dashboard = ({ userRole }) => {
               <div className="notice-scroll-content">
                 {(() => {
                   const now = new Date();
-                  const visible = notices.filter(n => {
-                    if (userRole === 'management') return true;
-                    if (n.is_permanent) return true;
-                    if (n.start_at && new Date(n.start_at) > now) return false;
-                    if (n.end_at && new Date(n.end_at) < now) return false;
-                    return true;
-                  });
+                  // FORCE VISIBILITY: Remove all filters to prove if data is arriving
+                  const visible = notices; 
 
                   if (visible.length === 0) {
                     return (
