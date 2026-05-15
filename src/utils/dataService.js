@@ -357,15 +357,16 @@ export const dataService = {
   },
 
   saveAttendance: async (recordsMap) => {
-    if (!supabase) return;
-    // recordsMap is { "empId_y_m_d": { punchIn, punchOut, remark, source } }
+    if (!supabase || !recordsMap || Object.keys(recordsMap).length === 0) return;
+    
+    // recordsMap is { "empId_YYYY-MM-DD": { punchIn, punchOut, remark, source } }
     const rows = Object.entries(recordsMap).map(([key, val]) => {
-      const [empId, y, m, d] = key.split('_');
-      // FIX: The month 'm' coming from the key is already 1-indexed from biometrics sync
-      // or from UI month selection. No need to add 1.
-      const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      // Correctly split the key: parts[0] = empId, parts[1] = YYYY-MM-DD
+      const parts = key.split('_');
+      const empId = parts[0];
+      const dateStr = parts[1]; // Already in YYYY-MM-DD format
       
-      // Construct timestamps
+      // Construct timestamps for DB columns
       let punchInTs = null;
       if (val.punchIn && val.punchIn.includes(':')) {
         punchInTs = new Date(`${dateStr}T${val.punchIn}:00`).toISOString();
@@ -382,7 +383,7 @@ export const dataService = {
 
       return {
         id: key, 
-        emp_id: String(empId), // Ensure emp_id is string
+        emp_id: String(empId), 
         date: dateStr,
         punch_in: punchInTs,
         punch_out: punchOutTs,
@@ -390,17 +391,22 @@ export const dataService = {
         data: { remark: val.remark, source: val.source }
       };
     });
+
     // Consistency Guard: Never save future records at the DB layer
     const today = new Date().toISOString().split('T')[0];
     const validRows = rows.filter(r => r.date <= today);
     
     if (validRows.length > 0) {
-      const { error } = await supabase.from('attendance').upsert(validRows);
-      if (error) {
-        console.error('saveAttendance DB Error:', error.message);
-        throw error;
+      // Upsert in chunks to handle large biometric pulls
+      for (let i = 0; i < validRows.length; i += 100) {
+        const chunk = validRows.slice(i, i + 100);
+        const { error } = await supabase.from('attendance').upsert(chunk);
+        if (error) {
+          console.error('saveAttendance DB Error:', error.message);
+          throw error;
+        }
       }
-      console.log(`dataService: Saved ${validRows.length} attendance records.`);
+      console.log(`dataService: Persisted ${validRows.length} attendance records.`);
     }
   },
 
@@ -440,45 +446,6 @@ export const dataService = {
     await supabase.from('attendance').upsert(record);
   },
 
-  saveAttendance: async (records) => {
-    if (!supabase) return;
-    // records is a map of { empId_y_m_d: { punchIn, punchOut, remark, source } }
-    const rows = Object.entries(records).map(([id, rec]) => {
-      const parts = id.split('_'); // empId_year_month_day
-      const emp_id = parts[0];
-      const date = `${parts[1]}-${String(Number(parts[2]) + 1).padStart(2, '0')}-${String(parts[3]).padStart(2, '0')}`;
-      
-      // Construct timestamps for DB columns if present
-      let punchInTs = null;
-      if (rec.punchIn && rec.punchIn.includes(':')) {
-        punchInTs = new Date(`${date}T${rec.punchIn}:00`).toISOString();
-      } else if (rec.punchIn) {
-        punchInTs = rec.punchIn; // assume already ISO or valid
-      }
-
-      let punchOutTs = null;
-      if (rec.punchOut && rec.punchOut.includes(':')) {
-        punchOutTs = new Date(`${date}T${rec.punchOut}:00`).toISOString();
-      } else if (rec.punchOut) {
-        punchOutTs = rec.punchOut; // assume already ISO or valid
-      }
-
-      return {
-        id,
-        emp_id,
-        date,
-        punch_in: punchInTs,
-        punch_out: punchOutTs,
-        status: rec.punchOut ? 'Present' : (rec.punchIn ? 'Incomplete' : 'Absent'),
-        data: { remark: rec.remark, source: rec.source }
-      };
-    });
-    // Upsert in chunks to avoid URL length limits
-    for (let i = 0; i < rows.length; i += 100) {
-      const { error } = await supabase.from('attendance').upsert(rows.slice(i, i + 100));
-      if (error) {
-        console.error("Supabase attendance upsert error:", error.message);
-        if (error.code === '42501') throw new Error("Permission Denied: Row Level Security (RLS) policy prevents saving attendance. Please contact the Database Admin.");
         throw new Error(`Database Error: ${error.message}`);
       }
     }
