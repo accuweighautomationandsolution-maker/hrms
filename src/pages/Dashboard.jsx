@@ -127,13 +127,11 @@ const Dashboard = ({ userRole }) => {
       } catch (err) {
         console.error("Dashboard Fetch Error:", err);
       } finally {
-        clearTimeout(loaderTimeout);
-        if (isMounted) setLoading(false);
+        setLoading(false);
       }
     };
     fetchData();
-    return () => { isMounted = false; };
-  }, [currentUser?.id, isEmployee]);
+  }, [currentUser?.id]);
 
   const [noticeModal, setNoticeModal] = useState(null); // { title, content } for editing
   const [viewingNotice, setViewingNotice] = useState(null);
