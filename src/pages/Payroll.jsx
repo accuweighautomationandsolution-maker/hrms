@@ -384,8 +384,32 @@ const Payroll = () => {
   const [holidayList, setHolidayList] = useState([]);
   const [attendanceMap, setAttendanceMap] = useState({});
   const [balanceMap, setBalanceMap] = useState({});
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [holidayWorked, setHolidayWorked] = useState([]); // List of day numbers
+
+  const filteredEmployees = useMemo(() => {
+    return employeesWithPayroll.filter(e => 
+      e.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (e.empCode && e.empCode.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  }, [employeesWithPayroll, searchTerm]);
+
+  const toggleSelect = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredEmployees.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredEmployees.map(e => e.id)));
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -470,7 +494,14 @@ const Payroll = () => {
 
   const handleExport = (format) => {
     const rawData = [];
-    employeesWithPayroll.forEach(emp => {
+    const targetEmps = employeesWithPayroll.filter(e => selectedIds.has(e.id));
+    
+    if (targetEmps.length === 0) {
+      showNotification("Please select at least one employee to export.", "warning");
+      return;
+    }
+
+    targetEmps.forEach(emp => {
       const isC = emp.category === 'Contractual Worker';
       const ctx = emp.payrollContext;
       
@@ -550,21 +581,26 @@ const Payroll = () => {
               className="btn btn-outline" 
               disabled={isProcessing}
               onClick={async () => {
+                if (selectedIds.size === 0) {
+                  showNotification("Please select employees to finalize.", "warning");
+                  return;
+                }
                 setIsProcessing(true);
                 // Simulate processing delay
                 setTimeout(() => {
-                  employeesWithPayroll.forEach(emp => {
+                  const targetEmps = employeesWithPayroll.filter(e => selectedIds.has(e.id));
+                  targetEmps.forEach(emp => {
                     if (emp.payrollContext) {
                         dataService.savePayrollSnapshot({
                           empId: emp.id,
-                          month: CUR_MO,
-                          year: CUR_YR,
+                          month: month,
+                          year: year,
                           ...emp.payrollContext
                         });
                     }
                   });
                   setIsProcessing(false);
-                  showNotification(`Payroll Cycle for ${MONTH_NAMES[CUR_MO]} finalized and locked successfully.`, 'success');
+                  showNotification(`Payroll Cycle for ${selectedIds.size} selected employees finalized successfully.`, 'success');
                 }, 1500);
               }}
               style={{ gap: '0.5rem' }}
@@ -613,6 +649,14 @@ const Payroll = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
+                <th style={{ padding: '1rem' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={selectedIds.size > 0 && selectedIds.size === filteredEmployees.length} 
+                    onChange={toggleSelectAll}
+                    style={{ cursor: 'pointer', accentColor: 'var(--color-primary)' }}
+                  />
+                </th>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Code</th>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Employee</th>
                 <th style={{ padding: '1rem', fontWeight: '500' }}>Status</th>
@@ -626,14 +670,20 @@ const Payroll = () => {
               </tr>
             </thead>
             <tbody>
-              {employeesWithPayroll.filter(e => 
-                e.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                (e.empCode && e.empCode.toLowerCase().includes(searchTerm.toLowerCase()))
-              ).map((emp) => {
+              {filteredEmployees.map((emp) => {
                 const isC = emp.category === 'Contractual Worker';
                 const ctx = emp.payrollContext;
+                const isSelected = selectedIds.has(emp.id);
                 return (
-                  <tr key={emp.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                  <tr key={emp.id} style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: isSelected ? 'rgba(37,99,235,0.03)' : 'transparent' }}>
+                    <td style={{ padding: '1rem' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={isSelected} 
+                        onChange={() => toggleSelect(emp.id)}
+                        style={{ cursor: 'pointer', accentColor: 'var(--color-primary)' }}
+                      />
+                    </td>
                     <td style={{ padding: '1rem', fontWeight: '600', color: 'var(--color-primary)' }}>
                       {emp.empCode || emp.biometricCode || 'N/A'}
                     </td>
