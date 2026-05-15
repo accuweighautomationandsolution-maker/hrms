@@ -151,7 +151,9 @@ const Attendance = () => {
   const bioIdMap = useMemo(() => {
     const map = {};
     employeesList.forEach(e => {
-      if (e.biometric_code) map[String(e.biometric_code)] = e.id;
+      // FIX: Use 'biometricCode' as defined in EmployeeDirectory and data column
+      const bCode = e.biometricCode || e.biometric_code; 
+      if (bCode) map[String(bCode)] = e.id;
     });
     return map;
   }, [employeesList]);
@@ -261,12 +263,21 @@ const Attendance = () => {
       const logs = await BiometricService.fetchLogs(bioConfig.ip, bioConfig.port);
       const recordsToSave = {};
       let addedCount = 0;
+      let skippedMappingCount = 0;
+
+      if (logs.length === 0) {
+        alert("📊 Biometric Pull Complete: 0 new records found on device.\n\nPossible reasons:\n1. Device is empty.\n2. All logs already imported.\n3. Date range filter on device.");
+        return;
+      }
 
       setRecords(prev => {
         const next = { ...prev };
         logs.forEach(log => {
           const internalId = bioIdMap[String(log.empId)];
-          if (!internalId) return;
+          if (!internalId) {
+            skippedMappingCount++;
+            return;
+          }
 
           const logKey = `${internalId}_${log.year}_${log.month}_${log.day}`;
           if (!next[logKey] || next[logKey].source === 'Biometric') {
@@ -284,7 +295,7 @@ const Attendance = () => {
         return next;
       });
 
-      if (addedCount > 0) {
+      if (Object.keys(recordsToSave).length > 0) {
         await dataService.saveAttendance(recordsToSave);
       }
 

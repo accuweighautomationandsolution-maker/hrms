@@ -188,7 +188,8 @@ export const dataService = {
           role: r.designation || parsedData.role || 'Associate',
           department: r.department || parsedData.department || 'Engineering',
           status: r.status || parsedData.status || 'Active',
-          empType: r.employment_type || parsedData.empType || 'Probation'
+          empType: r.employment_type || parsedData.empType || 'Probation',
+          biometricCode: r.biometric_code || parsedData.biometricCode || ''
         };
 
         // Strict Access Control: Scrub sensitive data for employee-level users
@@ -199,6 +200,7 @@ export const dataService = {
             role: fullProfile.role,
             department: fullProfile.department,
             contact: fullProfile.contact || '', // Allowed per requirements
+            biometricCode: fullProfile.biometricCode,
             // Scrub everything else
             email: '', 
             empCode: '', 
