@@ -230,8 +230,8 @@ const Attendance = () => {
         const existing = prev[punchKey] || {};
         updatedRecord = {
           ...existing,
-          punchIn: punch.type === 'Punch In' ? punch.time : (existing.punchIn || '09:00'),
-          punchOut: punch.type === 'Punch Out' ? punch.time : (existing.punchOut || ''),
+          punchIn: punch.type === 'Punch In' ? punch.time : (existing.punchIn || null),
+          punchOut: punch.type === 'Punch Out' ? punch.time : (existing.punchOut || null),
           remark: existing.remark || 'Real-time Push Sync',
           source: 'Biometric (Push)'
         };
