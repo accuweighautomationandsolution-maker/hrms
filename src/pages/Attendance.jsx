@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, Clock, Activity, CheckCircle, XCircle, Edit3, Save, X, CalendarDays, Settings } from 'lucide-react';
+import { Search, Filter, Clock, Activity, CheckCircle, XCircle, Edit3, Save, X, CalendarDays, Settings, Trash2 } from 'lucide-react';
 import { BiometricService } from '../services/biometrics';
 import { getHolidayDates } from '../utils/payrollCalculator';
 import { dataService } from '../utils/dataService';
