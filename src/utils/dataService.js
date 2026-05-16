@@ -331,14 +331,20 @@ export const dataService = {
   getAttendance: async () => {
     if (!supabase) return {};
     try {
-      const { data, error } = await supabase.from('attendance').select('*');
+      // Order by id descending so that the newest records for a day (if duplicates exist) win in the map loop
+      const { data, error } = await supabase.from('attendance')
+        .select('*')
+        .order('id', { ascending: false });
+        
       if (error) throw error;
       if (!data) return {};
       
       const map = {};
       data.forEach(r => {
         const k = `${String(r.emp_id)}_${r.date}`;
-        // Prioritize raw strings from JSONB 'data' to avoid timezone shifts
+        // Skip if we already have a newer record for this key (since we are iterating desc)
+        if (map[k]) return;
+
         const json = r.data || {};
         map[k] = {
           punchIn: json.punchIn || (r.punch_in ? new Date(r.punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null),
