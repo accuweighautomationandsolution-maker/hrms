@@ -57,14 +57,18 @@ export const BiometricService = {
             let punchIn = '09:00';
             let punchOut = '18:30';
 
-            // INJECT ACTUAL PUNCH DATA FOR E252699
-            if (String(id) === 'E252699') {
-              const day = d.getDate();
+            // INJECT ACTUAL PUNCH DATA AS REQUESTED BY USER
+            const day = d.getDate();
+            const month = d.getMonth() + 1; // 1-indexed
+
+            if (month === 5) { // May 2026
               if (day === 11) { punchIn = '09:12'; punchOut = '18:31'; }
               else if (day === 12) { punchIn = '09:12'; punchOut = '18:38'; }
               else if (day === 14) { punchIn = '09:14'; punchOut = '18:45'; }
               else if (day === 15) { punchIn = '09:51'; punchOut = null; } 
-              else return; 
+              else { punchIn = '09:00'; punchOut = '18:30'; }
+            } else {
+              punchIn = '09:00'; punchOut = '18:30';
             }
 
             logs.push({
