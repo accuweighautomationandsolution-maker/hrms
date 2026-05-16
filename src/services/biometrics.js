@@ -78,7 +78,8 @@ export const BiometricService = {
               year: d.getFullYear(),
               punchIn, 
               punchOut,
-              remark: 'Hardware Sync',
+              remark: 'Identix Hardware Pull',
+              source: 'Biometric Terminal',
               timestamp: d.toISOString()
             });
           });

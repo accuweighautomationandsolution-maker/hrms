@@ -293,14 +293,16 @@ const Attendance = () => {
         }
 
         const dStr = `${log.year}-${String(log.month).padStart(2, '0')}-${String(log.day).padStart(2, '0')}`;
-        const logKey = `${internalId}_${dStr}`;
-        
-        if (!nextRecords[logKey] || nextRecords[logKey].source === 'Biometric') {
+        // FORCE OVERWRITE: If the existing record is from DB or previous sync, allow update
+        const existing = nextRecords[logKey];
+        const canOverwrite = !existing || existing.source !== 'Manual';
+
+        if (canOverwrite) {
           const entry = {
             punchIn: log.punchIn,
             punchOut: log.punchOut,
-            remark: log.remark || 'Hardware Sync',
-            source: 'Biometric'
+            remark: log.remark || 'Identix Hardware Pull',
+            source: 'Biometric Terminal'
           };
           nextRecords[logKey] = entry;
           recordsToSave[logKey] = entry;
