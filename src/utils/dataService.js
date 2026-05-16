@@ -337,15 +337,15 @@ export const dataService = {
       
       const map = {};
       data.forEach(r => {
-        // r.date is "YYYY-MM-DD"
-        // Force emp_id to string for consistent key matching
         const k = `${String(r.emp_id)}_${r.date}`;
+        // Prioritize raw strings from JSONB 'data' to avoid timezone shifts
+        const json = r.data || {};
         map[k] = {
-          punchIn: r.punch_in ? new Date(r.punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null,
-          punchOut: r.punch_out ? new Date(r.punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null,
+          punchIn: json.punchIn || (r.punch_in ? new Date(r.punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null),
+          punchOut: json.punchOut || (r.punch_out ? new Date(r.punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null),
           status: r.status,
-          remark: r.data?.remark || '',
-          source: r.data?.source || 'Database'
+          remark: json.remark || '',
+          source: json.source || 'Database'
         };
       });
       console.log(`dataService: Attendance loaded (${Object.keys(map).length} records)`);
@@ -384,7 +384,13 @@ export const dataService = {
         punch_in: punchInTs,
         punch_out: punchOutTs,
         status: val.punchOut ? 'Present' : (val.punchIn ? 'Incomplete' : 'Absent'),
-        data: { remark: val.remark, source: val.source }
+        // STORE RAW STRINGS IN DATA TO PRESERVE LOCAL TIME
+        data: { 
+          remark: val.remark, 
+          source: val.source,
+          punchIn: val.punchIn,
+          punchOut: val.punchOut
+        }
       };
     });
 
