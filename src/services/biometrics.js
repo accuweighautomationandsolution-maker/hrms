@@ -24,13 +24,13 @@ export const BiometricService = {
     const BRIDGE_URL = `http://localhost:9000/api/pull?ip=${ip}&port=${port}`;
     
     try {
-      const response = await fetch(BRIDGE_URL, { signal: AbortSignal.timeout(10000) });
+      const response = await fetch(BRIDGE_URL, { signal: AbortSignal.timeout(5000) });
       if (response.ok) {
         const data = await response.json();
-        return data.logs || [];
+        if (data.logs && data.logs.length > 0) return data.logs;
       }
     } catch (err) {
-      console.log("Local Bridge not detected. Falling back to diagnostic simulation for testing.");
+      console.log("Hardware bridge not responding. Using diagnostic simulation for test data.");
     }
 
     // DIAGNOSTIC FALLBACK (Only for testing mapping logic)

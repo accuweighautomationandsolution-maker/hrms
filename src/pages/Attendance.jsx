@@ -275,8 +275,8 @@ const Attendance = () => {
         return;
       }
 
-      console.log("Sync DEBUG: Mapping", bioIdMap);
-      console.log("Sync DEBUG: Logs", logs);
+      console.log("Sync DEBUG: Raw logs received:", logs);
+      if (logs.length > 0) console.table(logs.slice(0, 10).map(l => ({ empId: l.empId, punchIn: l.punchIn, punchOut: l.punchOut })));
 
       const nextRecords = { ...records };
       logs.forEach(log => {
