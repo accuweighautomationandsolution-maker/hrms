@@ -151,6 +151,10 @@ const Attendance = () => {
   const [holidayList, setHolidayList] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // --- Sync Control States ---
+  const [syncSelection, setSyncSelection] = useState(new Set());
+  const [syncDateRange, setSyncDateRange] = useState({ from: '', to: '' });
+
   // --- ID Mapping for Biometrics ---
   // STRICT MAPPING: Only use biometricCode field (explicit mapping)
   // Employee Code and Fuzzy Name matching have been removed as per requirements
@@ -276,9 +280,23 @@ const Attendance = () => {
       today.setHours(23, 59, 59, 999); // End of today
 
       if (logs.length === 0) {
-        alert("📊 Biometric Pull Complete: 0 new records found on device.\n\nPossible reasons:\n1. Device is empty.\n2. All logs already imported.\n3. Date range filter on device.");
+        alert("📊 Biometric Pull Complete: 0 records found on device.");
         return;
       }
+
+      if (syncSelection.size === 0 && !window.confirm("No specific employees selected. Proceed to pull attendance for ALL employees?")) {
+        setSyncLoading(false);
+        return;
+      }
+
+      // Base minimum date (May 1st, 2026) per business requirements
+      const HARD_MIN_DATE = new Date("2026-05-01T00:00:00");
+      
+      const customFrom = syncDateRange.from ? new Date(`${syncDateRange.from}T00:00:00`) : null;
+      const customTo = syncDateRange.to ? new Date(`${syncDateRange.to}T23:59:59`) : null;
+
+      let legacyRejectedCount = 0;
+      let rangeRejectedCount = 0;
 
       console.log("Sync DEBUG: Raw logs received:", logs);
       if (logs.length > 0) console.table(logs.slice(0, 10).map(l => ({ empId: l.empId, punchIn: l.punchIn, punchOut: l.punchOut })));
@@ -286,8 +304,25 @@ const Attendance = () => {
       const nextRecords = { ...records };
       logs.forEach(log => {
         const logDate = new Date(log.year, log.month - 1, log.day);
+        
         if (logDate > today) {
           futureRejectedCount++;
+          return;
+        }
+
+        // 1. HARD CUTOFF: Ignore logs prior to May 1st 2026
+        if (logDate < HARD_MIN_DATE) {
+          legacyRejectedCount++;
+          return;
+        }
+
+        // 2. CUSTOM DATE RANGE
+        if (customFrom && logDate < customFrom) {
+          rangeRejectedCount++;
+          return;
+        }
+        if (customTo && logDate > customTo) {
+          rangeRejectedCount++;
           return;
         }
 
@@ -295,6 +330,12 @@ const Attendance = () => {
         const internalId = bioIdMap[String(log.empId)];
         if (!internalId) {
           skippedMappingCount++;
+          return;
+        }
+
+        // 3. EMPLOYEE SELECTION FILTER
+        if (syncSelection.size > 0 && !syncSelection.has(internalId)) {
+          // Exclude if specific employees are checked, but this employee isn't one of them
           return;
         }
 
@@ -332,8 +373,8 @@ const Attendance = () => {
       setLastSync(timestamp);
       await dataService.saveConfig('biometric_last_sync', timestamp);
 
-      console.log(`Sync completed. Added ${addedCount}, Skipped Mapping ${skippedMappingCount}, Future Rejected ${futureRejectedCount}`);
-      alert(`✅ Biometric Sync Successful\n\n- Records Persisted: ${addedCount}\n- Skipped (No ID match): ${skippedMappingCount}\n- Future Logs Ignored: ${futureRejectedCount}\n\nData is now permanently saved in the database.`);
+      console.log(`Sync completed. Added ${addedCount}, Skipped Mapping ${skippedMappingCount}, Future Rejected ${futureRejectedCount}, Legacy Rejected ${legacyRejectedCount}, Outside Range ${rangeRejectedCount}`);
+      alert(`✅ Biometric Sync Successful\n\n- Records Synced: ${addedCount}\n- Legacy Ignored (< May 2026): ${legacyRejectedCount}\n- Skipped (No ID match): ${skippedMappingCount}\n\nData is permanently stored in the database.`);
     } catch (err) {
       console.error("Sync Error Detailed:", err);
       // Surface the actual error message to the user for better debugging
@@ -512,6 +553,12 @@ const Attendance = () => {
                 {lastSync && <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>Last Sync: {lastSync}</span>}
               </div>
             )}
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', backgroundColor: 'var(--color-surface)', padding: '0.2rem 0.5rem', borderRadius: '6px', border: '1px solid var(--color-border)' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--color-text-muted)' }}>Sync Range:</span>
+              <input type="date" value={syncDateRange.from} onChange={e => setSyncDateRange(p => ({ ...p, from: e.target.value }))} style={{ fontSize: '0.75rem', padding: '0.2rem', border: 'none', background: 'transparent' }} title="From Date" />
+              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>to</span>
+              <input type="date" value={syncDateRange.to} onChange={e => setSyncDateRange(p => ({ ...p, to: e.target.value }))} style={{ fontSize: '0.75rem', padding: '0.2rem', border: 'none', background: 'transparent' }} title="To Date" />
+            </div>
             <button
               className="btn btn-outline"
               onClick={() => setShowBioConfig(true)}
@@ -523,9 +570,10 @@ const Attendance = () => {
               className={`btn ${syncLoading ? 'btn-ghost' : 'btn-primary'}`}
               onClick={handleBioSync}
               disabled={syncLoading || !bioConfig.isEnabled}
+              title={syncSelection.size > 0 ? `Pull data for ${syncSelection.size} selected employees` : "Pull data for ALL employees"}
             >
               <Activity size={18} className={syncLoading ? 'animate-spin' : ''} />
-              {syncLoading ? 'Connecting...' : 'Pull Hardware Data'}
+              {syncLoading ? 'Connecting...' : (syncSelection.size > 0 ? `Sync (${syncSelection.size})` : 'Sync All')}
             </button>
             <button
               className="btn btn-outline"
@@ -568,23 +616,49 @@ const Attendance = () => {
                 <Search size={16} color="var(--color-text-muted)" />
                 <input type="text" placeholder="Search..." value={searchQ} onChange={e => setSearchQ(e.target.value)} style={{ fontSize: '0.875rem' }} />
               </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {filteredEmps.map(emp => (
-                <button key={emp.id} onClick={() => setSelectedEmp(emp)}
-                  style={{
-                    textAlign: 'left', padding: '0.75rem', borderRadius: '8px', border: '1px solid', cursor: 'pointer', transition: 'all 0.15s',
-                    borderColor: selectedEmp?.id === emp.id ? 'var(--color-primary)' : 'transparent',
-                    backgroundColor: selectedEmp?.id === emp.id ? 'rgba(37,99,235,0.08)' : 'transparent',
-                  }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <p style={{ margin: 0, fontWeight: '600', fontSize: '0.875rem', color: 'var(--color-text-main)' }}>{emp.name}</p>
-                    <span style={{ fontSize: '0.65rem', fontWeight: '700', color: 'var(--color-primary)', backgroundColor: 'rgba(37,99,235,0.06)', padding: '2px 4px', borderRadius: '4px' }}>
-                      {emp.empCode || emp.biometricCode || `B:${emp.biometricId}`}
-                    </span>
-                  </div>
-                  <span className={`badge ${BADGE_COLOR[emp.category]}`} style={{ fontSize: '0.7rem', marginTop: '0.25rem' }}>{emp.category}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--color-text-muted)' }}>{syncSelection.size} selected for sync</span>
+                <button 
+                  onClick={() => {
+                    if (syncSelection.size === filteredEmps.length) setSyncSelection(new Set());
+                    else setSyncSelection(new Set(filteredEmps.map(e => e.id)));
+                  }}
+                  style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                >
+                  {syncSelection.size === filteredEmps.length ? 'Deselect All' : 'Select All'}
                 </button>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '600px', overflowY: 'auto', paddingRight: '4px' }}>
+              {filteredEmps.map(emp => (
+                <div key={emp.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={syncSelection.has(emp.id)}
+                    onChange={(e) => {
+                      const next = new Set(syncSelection);
+                      if (e.target.checked) next.add(emp.id);
+                      else next.delete(emp.id);
+                      setSyncSelection(next);
+                    }}
+                    style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--color-primary)' }}
+                    title="Select for Biometric Sync"
+                  />
+                  <button onClick={() => setSelectedEmp(emp)}
+                    style={{
+                      flex: 1, textAlign: 'left', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid', cursor: 'pointer', transition: 'all 0.15s',
+                      borderColor: selectedEmp?.id === emp.id ? 'var(--color-primary)' : 'transparent',
+                      backgroundColor: selectedEmp?.id === emp.id ? 'rgba(37,99,235,0.08)' : 'var(--color-surface)',
+                    }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <p style={{ margin: 0, fontWeight: '600', fontSize: '0.875rem', color: 'var(--color-text-main)' }}>{emp.name}</p>
+                      <span style={{ fontSize: '0.65rem', fontWeight: '700', color: 'var(--color-primary)', backgroundColor: 'rgba(37,99,235,0.06)', padding: '2px 4px', borderRadius: '4px' }}>
+                        {emp.biometricCode || `No Bio ID`}
+                      </span>
+                    </div>
+                    <span className={`badge ${BADGE_COLOR[emp.category]}`} style={{ fontSize: '0.7rem', marginTop: '0.25rem' }}>{emp.category}</span>
+                  </button>
+                </div>
               ))}
             </div>
           </div>

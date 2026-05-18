@@ -331,30 +331,44 @@ export const dataService = {
   getAttendance: async () => {
     if (!supabase) return {};
     try {
-      // Order by id descending so that the newest records for a day (if duplicates exist) win in the map loop
-      const { data, error } = await supabase.from('attendance')
-        .select('*')
-        .order('id', { ascending: false });
-        
-      if (error) throw error;
-      if (!data) return {};
-      
       const map = {};
-      data.forEach(r => {
-        const k = `${String(r.emp_id)}_${r.date}`;
-        // Skip if we already have a newer record for this key (since we are iterating desc)
-        if (map[k]) return;
+      let start = 0;
+      const CHUNK_SIZE = 1000;
+      let hasMore = true;
 
-        const json = r.data || {};
-        map[k] = {
-          punchIn: json.punchIn || (r.punch_in ? new Date(r.punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null),
-          punchOut: json.punchOut || (r.punch_out ? new Date(r.punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null),
-          status: r.status,
-          remark: json.remark || '',
-          source: json.source || 'Database'
-        };
-      });
-      console.log(`dataService: Attendance loaded (${Object.keys(map).length} records)`);
+      // Supabase has a default 1000 row limit. We must paginate to fetch all 45,000+ biometric logs.
+      while (hasMore) {
+        const { data, error } = await supabase.from('attendance')
+          .select('*')
+          .order('id', { ascending: false })
+          .range(start, start + CHUNK_SIZE - 1);
+          
+        if (error) throw error;
+        
+        if (!data || data.length === 0) {
+          hasMore = false;
+        } else {
+          data.forEach(r => {
+            const k = `${String(r.emp_id)}_${r.date}`;
+            // Skip if we already have a newer record for this key (since we are iterating desc)
+            if (map[k]) return;
+
+            const json = r.data || {};
+            map[k] = {
+              punchIn: json.punchIn || (r.punch_in ? new Date(r.punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null),
+              punchOut: json.punchOut || (r.punch_out ? new Date(r.punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null),
+              status: r.status,
+              remark: json.remark || '',
+              source: json.source || 'Database'
+            };
+          });
+
+          start += CHUNK_SIZE;
+          if (data.length < CHUNK_SIZE) hasMore = false;
+        }
+      }
+
+      console.log(`dataService: Attendance loaded (${Object.keys(map).length} records from DB)`);
       return map;
     } catch (err) {
       console.error("getAttendance Error:", err);
