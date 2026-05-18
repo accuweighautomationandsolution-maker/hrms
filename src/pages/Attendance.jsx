@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, Clock, Activity, CheckCircle, XCircle, Edit3, Save, X, CalendarDays, Settings, Trash2 } from 'lucide-react';
+import { Search, Filter, Clock, Activity, CheckCircle, XCircle, Edit3, Save, X, CalendarDays, Settings, Trash2, Upload, FileSpreadsheet, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { BiometricService } from '../services/biometrics';
 import { getHolidayDates } from '../utils/payrollCalculator';
 import { dataService } from '../utils/dataService';
@@ -144,6 +144,10 @@ const Attendance = () => {
   const [showBioConfig, setShowBioConfig] = useState(false);
   const [bioConfig, setBioConfig] = useState({ ip: '192.168.1.202', port: '4370', isEnabled: true });
   const [lastSync, setLastSync] = useState(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importPreview, setImportPreview] = useState(null); // { logs, filename }
+  const [importLoading, setImportLoading] = useState(false);
   const [holidayList, setHolidayList] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -342,6 +346,70 @@ const Attendance = () => {
     }
   };
 
+  // ── Handle Excel/CSV Import ────────────────────────────────────────────────
+  const handleFileSelect = async (file) => {
+    if (!file) return;
+    setImportFile(file);
+    setImportLoading(true);
+    try {
+      const logs = await BiometricService.parseMonthlyPunchesReport(file);
+      setImportPreview({ logs, filename: file.name });
+    } catch (err) {
+      alert(`❌ Failed to parse file: ${err.message}`);
+      setImportFile(null);
+      setImportPreview(null);
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!importPreview?.logs?.length) return;
+    setImportLoading(true);
+    try {
+      // Map empId (EmpCode from file) → internal ID via employees list
+      const empCodeMap = {};
+      employeesList.forEach(e => {
+        if (e.empCode) empCodeMap[String(e.empCode).trim()] = e.id;
+        if (e.biometricCode) empCodeMap[String(e.biometricCode).trim()] = e.id;
+      });
+
+      const recordsToSave = {};
+      let matched = 0, skipped = 0;
+
+      importPreview.logs.forEach(log => {
+        const internalId = empCodeMap[String(log.empId).trim()];
+        if (!internalId) { skipped++; return; }
+        const dStr = `${log.year}-${String(log.month).padStart(2, '0')}-${String(log.day).padStart(2, '0')}`;
+        const key = `${internalId}_${dStr}`;
+        recordsToSave[key] = {
+          punchIn: log.punchIn,
+          punchOut: log.punchOut,
+          remark: log.remark,
+          source: 'Excel Import'
+        };
+        matched++;
+      });
+
+      if (Object.keys(recordsToSave).length > 0) {
+        await dataService.saveAttendance(recordsToSave);
+        const fresh = await dataService.getAttendance().catch(() => ({}));
+        setRecords(fresh);
+      }
+
+      const timestamp = new Date().toLocaleString();
+      setLastSync(`Import: ${timestamp}`);
+      alert(`✅ Import Successful!\n\n• Records Imported: ${matched}\n• Skipped (no EmpCode match): ${skipped}\n\nData saved to database.`);
+      setShowImportModal(false);
+      setImportFile(null);
+      setImportPreview(null);
+    } catch (err) {
+      alert(`❌ Import Failed: ${err.message}`);
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
   const getRecord = (empId, day) => {
     if (!records) return null;
     return records[key(empId, day)] || null;
@@ -455,6 +523,15 @@ const Attendance = () => {
             >
               <Activity size={18} className={syncLoading ? 'animate-spin' : ''} />
               {syncLoading ? 'Connecting...' : 'Pull Hardware Data'}
+            </button>
+            <button
+              className="btn btn-outline"
+              onClick={() => setShowImportModal(true)}
+              title="Import Monthly Punches Report (Excel/CSV)"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              <Upload size={18} />
+              Import Excel
             </button>
             <button 
               className="btn btn-outline" 
@@ -777,6 +854,111 @@ const Attendance = () => {
                   alert("Biometric configuration saved permanently.");
                 }}>Save Configuration</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Excel Import Modal */}
+      {showImportModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '720px', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}>
+            
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div>
+                <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <FileSpreadsheet size={22} color="var(--color-success)" /> Import Monthly Punches Report
+                </h3>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+                  Upload the Excel/CSV exported from ZKTeco / eSSL / BioTime software
+                </p>
+              </div>
+              <button onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={22} /></button>
+            </div>
+
+            {/* File Drop Zone */}
+            {!importPreview && (
+              <label style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                border: '2px dashed var(--color-border)', borderRadius: '12px', padding: '3rem',
+                cursor: 'pointer', transition: 'all 0.2s', backgroundColor: 'var(--color-surface)',
+                marginBottom: '1.5rem'
+              }}
+              onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--color-primary)'; }}
+              onDragLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
+              onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--color-border)'; handleFileSelect(e.dataTransfer.files[0]); }}
+              >
+                <input type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={e => handleFileSelect(e.target.files[0])} />
+                {importLoading ? (
+                  <p style={{ color: 'var(--color-primary)', fontWeight: '600' }}>⏳ Parsing file...</p>
+                ) : (
+                  <>
+                    <Upload size={40} color="var(--color-text-muted)" style={{ marginBottom: '1rem' }} />
+                    <p style={{ fontWeight: '700', margin: 0 }}>Drop file here or click to browse</p>
+                    <p style={{ margin: '0.5rem 0 0', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
+                      Accepts: .xlsx, .xls, .csv — Monthly Punches Report format
+                    </p>
+                  </>
+                )}
+              </label>
+            )}
+
+            {/* Preview Table */}
+            {importPreview && (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', padding: '0.75rem 1rem', backgroundColor: 'rgba(34,197,94,0.08)', border: '1px solid var(--color-success)', borderRadius: '8px' }}>
+                  <CheckCircle2 size={18} color="var(--color-success)" />
+                  <span style={{ fontWeight: '600', color: 'var(--color-success)' }}>
+                    {importPreview.logs.length} records parsed from {importPreview.filename}
+                  </span>
+                </div>
+
+                <p style={{ margin: '0 0 0.75rem', fontSize: '0.85rem', color: 'var(--color-text-muted)', fontWeight: '600' }}>Preview (first 10 records):</p>
+                <div style={{ overflowX: 'auto', marginBottom: '1.5rem' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
+                        <th style={{ padding: '0.6rem', textAlign: 'left' }}>EmpCode</th>
+                        <th style={{ padding: '0.6rem', textAlign: 'left' }}>Date</th>
+                        <th style={{ padding: '0.6rem', textAlign: 'left', color: 'var(--color-success)' }}>Punch In</th>
+                        <th style={{ padding: '0.6rem', textAlign: 'left', color: 'var(--color-danger)' }}>Punch Out</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importPreview.logs.slice(0, 10).map((log, idx) => (
+                        <tr key={idx} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                          <td style={{ padding: '0.6rem', fontWeight: '600' }}>{log.empId}</td>
+                          <td style={{ padding: '0.6rem' }}>{String(log.day).padStart(2,'0')}/{String(log.month).padStart(2,'0')}/{log.year}</td>
+                          <td style={{ padding: '0.6rem', color: 'var(--color-success)', fontWeight: '600' }}>{log.punchIn || '—'}</td>
+                          <td style={{ padding: '0.6rem', color: 'var(--color-danger)', fontWeight: '600' }}>{log.punchOut || 'Not punched'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {importPreview.logs.length > 10 && (
+                  <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', textAlign: 'center', marginBottom: '1rem' }}>
+                    ... and {importPreview.logs.length - 10} more records
+                  </p>
+                )}
+
+                <div style={{ padding: '0.75rem 1rem', backgroundColor: 'rgba(245,158,11,0.08)', border: '1px solid var(--color-warning)', borderRadius: '8px', marginBottom: '1.5rem', display: 'flex', gap: '0.5rem' }}>
+                  <AlertTriangle size={16} color="var(--color-warning)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--color-warning)' }}>
+                    <strong>EmpCode Matching:</strong> Records will be matched to employees using the EmpCode column. Ensure your employee records have matching EmpCodes configured in their profiles.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                  <button className="btn btn-outline" onClick={() => { setImportFile(null); setImportPreview(null); }}>
+                    Choose Different File
+                  </button>
+                  <button className="btn btn-primary" onClick={handleConfirmImport} disabled={importLoading} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {importLoading ? '⏳ Saving...' : <><CheckCircle2 size={16} /> Confirm Import ({importPreview.logs.length} records)</>}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

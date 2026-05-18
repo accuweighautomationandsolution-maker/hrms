@@ -1,0 +1,15 @@
+{
+  "name": "hrms-biometric-bridge",
+  "version": "1.0.0",
+  "description": "Local bridge server to connect Identix X2008 / ZKTeco biometric terminal to Accuweigh HRMS",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "node-zklib": "^1.0.8"
+  }
+}
