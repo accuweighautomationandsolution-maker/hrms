@@ -11,52 +11,26 @@ export const BiometricService = {
     const BRIDGE_URL = `http://localhost:9000/api/pull?ip=${ip}&port=${port}`;
     
     try {
-      const response = await fetch(BRIDGE_URL, { signal: AbortSignal.timeout(5000) });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.logs && data.logs.length > 0) {
-          console.log(`Bridge returned ${data.logs.length} records.`);
-          return data.logs;
-        }
+      // Removed the 5-second timeout. Hardware with many logs can take 20-30 seconds to respond.
+      const response = await fetch(BRIDGE_URL);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}: Failed to fetch logs from bridge.`);
       }
+      
+      const data = await response.json();
+      if (data.logs) {
+        console.log(`Bridge returned ${data.logs.length} records.`);
+        return data.logs;
+      }
+      return [];
     } catch (err) {
-      console.log("Hardware bridge not responding. Start biometric-bridge/server.js to enable live pull.");
+      console.error("Biometric fetch Error:", err);
+      if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
+        throw new Error("Cannot connect to the Biometric Bridge server. Ensure 'node server.js' is running in the biometric-bridge folder on port 9000.");
+      }
+      throw err;
     }
-
-    // Simulation fallback for development/testing
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const logs = [];
-        const now = new Date();
-        for (let i = 0; i < 30; i++) {
-          const d = new Date();
-          d.setDate(now.getDate() - i);
-          
-          const dow = d.getDay();
-          const dayOfMonth = d.getDate();
-          const saturdayNumber = Math.ceil(dayOfMonth / 7);
-          const isOddSaturday = dow === 6 && (saturdayNumber === 1 || saturdayNumber === 3 || saturdayNumber === 5);
-
-          if (dow === 0 || isOddSaturday) continue;
-
-          [501, 881, 12, 101, 202].forEach(id => {
-            if (d.getTime() > now.getTime()) return;
-            logs.push({
-              empId: String(id),
-              day: d.getDate(),
-              month: d.getMonth() + 1, 
-              year: d.getFullYear(),
-              punchIn: '09:00',
-              punchOut: '18:30',
-              remark: 'Simulation',
-              source: 'Simulation',
-              timestamp: d.toISOString()
-            });
-          });
-        }
-        resolve(logs);
-      }, 1000);
-    });
   },
 
   /**

@@ -402,8 +402,8 @@ export const dataService = {
 
     try {
       // Chunked upsert using composite key (emp_id + date) for resolution
-      for (let i = 0; i < rows.length; i += 100) {
-        const chunk = rows.slice(i, i + 100);
+      for (let i = 0; i < rows.length; i += 1000) {
+        const chunk = rows.slice(i, i + 1000);
         // We use onConflict 'emp_id,date' to ensure uniqueness per employee per day
         const { error, data } = await supabase.from('attendance')
           .upsert(chunk, { onConflict: 'emp_id,date' })
@@ -456,11 +456,14 @@ export const dataService = {
 
   saveAttendanceRecord: async (record) => {
     if (!supabase) return;
-    await supabase.from('attendance').upsert(record);
-  },
-
+    try {
+      const { error } = await supabase.from('attendance').upsert(record);
+      if (error) {
         throw new Error(`Database Error: ${error.message}`);
       }
+    } catch (err) {
+      console.error('saveAttendanceRecord failed:', err);
+      throw err;
     }
   },
 

@@ -55,6 +55,33 @@ app.get('/api/status', async (req, res) => {
   }
 });
 
+// ── Get Users Registered on Device ───────────────────────────────────────────
+app.get('/api/users', async (req, res) => {
+  const { ip = '192.168.1.202', port = '4370' } = req.query;
+  
+  const zk = new ZKLib(ip, parseInt(port), 10000, 4000);
+  
+  try {
+    await zk.createSocket();
+    const { data: users } = await zk.getUsers();
+    await zk.disconnect();
+    
+    // Return clean user list: deviceUserId → name
+    const userList = (users || []).map(u => ({
+      deviceId: String(u.userId),
+      name: u.name || '',
+      cardNo: u.cardNo || '',
+      role: u.role || 0
+    }));
+    
+    console.log(`[Users] Retrieved ${userList.length} registered users from device.`);
+    console.log('Sample:', userList.slice(0, 5));
+    res.json({ users: userList, total: userList.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message, users: [] });
+  }
+});
+
 // ── Pull Attendance Logs ──────────────────────────────────────────────────────
 app.get('/api/pull', async (req, res) => {
   const { ip = '192.168.1.202', port = '4370' } = req.query;
@@ -65,6 +92,18 @@ app.get('/api/pull', async (req, res) => {
   
   try {
     await zk.createSocket();
+    
+    // Get user registry for name-based matching
+    let userRegistry = {};
+    try {
+      const { data: users } = await zk.getUsers();
+      (users || []).forEach(u => {
+        userRegistry[String(u.userId)] = u.name || '';
+      });
+      console.log(`Loaded ${Object.keys(userRegistry).length} users from device registry.`);
+    } catch (e) {
+      console.warn('Could not load user registry:', e.message);
+    }
     
     // Read raw attendance logs from device
     const { data: rawLogs } = await zk.getAttendances();
@@ -115,6 +154,7 @@ app.get('/api/pull', async (req, res) => {
       
       return {
         empId: entry.empId,
+        empName: userRegistry[entry.empId] || '',
         year: entry.year,
         month: entry.month,
         day: entry.day,

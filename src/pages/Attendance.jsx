@@ -152,15 +152,68 @@ const Attendance = () => {
   const [loading, setLoading] = useState(true);
 
   // --- ID Mapping for Biometrics ---
+  // Strategy 1: biometricCode field (explicit mapping - most reliable)
+  // Strategy 2: empCode numeric match (e.g. empCode "12" matches device "12")
+  // Strategy 3: name-based fuzzy match (last resort)
   const bioIdMap = useMemo(() => {
     const map = {};
     employeesList.forEach(e => {
-      // FIX: Use 'biometricCode' as defined in EmployeeDirectory and data column
+      // Strategy 1: explicit biometricCode
       const bCode = e.biometricCode || e.biometric_code; 
-      if (bCode) map[String(bCode)] = e.id;
+      if (bCode) map[String(bCode).trim()] = e.id;
+      
+      // Strategy 2: numeric empCode
+      const numericCode = parseInt(e.empCode);
+      if (!isNaN(numericCode) && String(numericCode) === String(e.empCode)) {
+        map[String(numericCode)] = e.id;
+      }
+      
+      // Strategy 3: name match (strip spaces, lowercase)
+      if (e.name) {
+        const normalized = e.name.replace(/\s+/g, '').toLowerCase();
+        map[`name:${normalized}`] = e.id;
+      }
     });
     return map;
   }, [employeesList]);
+
+  // Name-based lookup helper for bridge data that includes names
+  const findEmpIdByDeviceName = (deviceName) => {
+    if (!deviceName) return null;
+    const normalizedDevice = deviceName.replace(/\s+/g, '').toLowerCase();
+    
+    // Strategy 3a: Exact normalized match
+    if (bioIdMap[`name:${normalizedDevice}`]) {
+      return bioIdMap[`name:${normalizedDevice}`];
+    }
+    
+    // Strategy 3b: Smart substring / split word matching
+    let matchedId = null;
+    employeesList.forEach(e => {
+      if (!e.name || matchedId) return;
+      const normalizedEmp = e.name.replace(/\s+/g, '').toLowerCase();
+      
+      // Check if normalized device name is inside the normalized employee name, or vice versa
+      if (normalizedEmp.includes(normalizedDevice) || normalizedDevice.includes(normalizedEmp)) {
+        matchedId = e.id;
+        return;
+      }
+      
+      // Split employee full name into parts (e.g., ["pooja", "govind", "masalage"])
+      const empParts = e.name.toLowerCase().split(/\s+/).filter(p => p.length > 2);
+      
+      // Split device name by CamelCase or spaces
+      const devParts = deviceName.replace(/([A-Z])/g, ' $1').trim().toLowerCase().split(/\s+/).filter(p => p.length > 2);
+      
+      // Match if parts intersect significantly
+      const matches = empParts.filter(part => normalizedDevice.includes(part) || devParts.some(dp => dp.includes(part) || part.includes(dp)));
+      if (matches.length >= 2 || (matches.length >= 1 && empParts[0] === devParts[0])) {
+        matchedId = e.id;
+      }
+    });
+    
+    return matchedId;
+  };
 
   const [activeTab, setActiveTab] = useState('calendar');
 
@@ -290,13 +343,15 @@ const Attendance = () => {
           return;
         }
 
-        const internalId = bioIdMap[String(log.empId)];
+        // Multi-strategy matching: deviceId → biometricCode → numeric empCode → name
+        const internalId = bioIdMap[String(log.empId)] || findEmpIdByDeviceName(log.empName);
         if (!internalId) {
           skippedMappingCount++;
           return;
         }
 
         const dStr = `${log.year}-${String(log.month).padStart(2, '0')}-${String(log.day).padStart(2, '0')}`;
+        const logKey = `${internalId}_${dStr}`;
         // FORCE OVERWRITE: If the existing record is from DB or previous sync, allow update
         const existing = nextRecords[logKey];
         const canOverwrite = !existing || existing.source !== 'Manual';
