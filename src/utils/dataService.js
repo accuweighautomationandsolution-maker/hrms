@@ -48,7 +48,15 @@ const getConfig = async (key, defaultVal) => {
       .eq('key', key)
       .limit(1);
     
-    if (!error && data && data.length > 0) return data[0].value;
+    if (!error && data && data.length > 0) {
+      const val = data[0].value;
+      try {
+        // Auto-parse JSON if the value was stringified (e.g. Arrays/Objects)
+        return typeof val === 'string' && (val.startsWith('[') || val.startsWith('{')) ? JSON.parse(val) : val;
+      } catch {
+        return val;
+      }
+    }
 
     // Strategy 2: Fallback to letter_templates table (using shadow ID)
     // The letter_templates table uses a TEXT primary key and JSONB data column,
@@ -60,7 +68,9 @@ const getConfig = async (key, defaultVal) => {
       .eq('id', shadowId)
       .maybeSingle();
     
-    if (!shadowErr && shadow && shadow.data && shadow.data.value !== undefined) return shadow.data.value;
+    if (!shadowErr && shadow && shadow.data && shadow.data.value !== undefined) {
+      return shadow.data.value;
+    }
 
     return defaultVal;
   } catch (e) { 
@@ -73,10 +83,13 @@ const getConfig = async (key, defaultVal) => {
 const saveConfig = async (key, value) => {
   if (!supabase) return false;
   try {
+    // Serialize arrays/objects to strings so they don't crash PostgreSQL TEXT columns
+    const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
+
     // Strategy 1: Try app_config
     const { error: e1 } = await supabase
       .from('app_config')
-      .upsert({ key, value }, { onConflict: 'key' });
+      .upsert({ key, value: stringValue }, { onConflict: 'key' });
     if (!e1) return true;
 
     // Strategy 2: Fallback to letter_templates table (shadow record)
