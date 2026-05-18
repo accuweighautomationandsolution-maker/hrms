@@ -169,14 +169,14 @@ const HolidayList = ({ userRole }) => {
   const handleAdd = async (data) => {
     const newList = [...customs, { ...data, id: Date.now() }];
     setCustoms(newList);
-    await dataService.saveCustomHolidays(newList);
+    await dataService.saveHolidays(newList);
     setModal(null);
   };
 
   const handleEdit = async (data) => {
     const newList = customs.map(h => h.id === modal.id ? { ...h, ...data } : h);
     setCustoms(newList);
-    await dataService.saveCustomHolidays(newList);
+    await dataService.saveHolidays(newList);
     setModal(null);
   };
 
@@ -184,7 +184,7 @@ const HolidayList = ({ userRole }) => {
     if (window.confirm('Remove this holiday from the list?')) {
       const newList = customs.filter(h => h.id !== id);
       setCustoms(newList);
-      await dataService.saveCustomHolidays(newList);
+      await dataService.saveHolidays(newList);
     }
   };
 
