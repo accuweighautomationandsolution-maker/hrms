@@ -370,6 +370,13 @@ export const dataService = {
       const empId = key.substring(0, lastUnderscore);
       const dateStr = key.substring(lastUnderscore + 1);
       
+      // GENERATE EXACT PRIMARY KEY ID to bypass missing 'emp_id,date' unique constraint
+      const dateParts = dateStr.split('-');
+      const y = dateParts[0];
+      const m = parseInt(dateParts[1], 10) - 1; // Match legacy JS month (0-11)
+      const d = parseInt(dateParts[2], 10);
+      const generatedId = parseInt(`${empId}${y}${m}${d}`);
+
       let punchInTs = null;
       if (val.punchIn && val.punchIn.includes(':')) {
         punchInTs = new Date(`${dateStr}T${val.punchIn}:00`).toISOString();
@@ -385,6 +392,7 @@ export const dataService = {
       }
 
       return {
+        id: generatedId,
         emp_id: String(empId), 
         date: dateStr,
         punch_in: punchInTs,
@@ -401,12 +409,11 @@ export const dataService = {
     });
 
     try {
-      // Chunked upsert using composite key (emp_id + date) for resolution
+      // Chunked upsert using generated primary key to bypass missing constraint
       for (let i = 0; i < rows.length; i += 1000) {
         const chunk = rows.slice(i, i + 1000);
-        // We use onConflict 'emp_id,date' to ensure uniqueness per employee per day
         const { error, data } = await supabase.from('attendance')
-          .upsert(chunk, { onConflict: 'emp_id,date' })
+          .upsert(chunk, { onConflict: 'id' })
           .select();
           
         if (error) {
