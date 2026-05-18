@@ -50,15 +50,17 @@ const getConfig = async (key, defaultVal) => {
     
     if (!error && data && data.length > 0) return data[0].value;
 
-    // Strategy 2: Fallback to employees table (using shadow ID)
+    // Strategy 2: Fallback to letter_templates table (using shadow ID)
+    // The letter_templates table uses a TEXT primary key and JSONB data column,
+    // making it a perfect schema-less key-value store fallback.
     const shadowId = `sys_config_${key}`;
     const { data: shadow, error: shadowErr } = await supabase
-      .from('employees')
+      .from('letter_templates')
       .select('data')
       .eq('id', shadowId)
       .maybeSingle();
     
-    if (!shadowErr && shadow && shadow.data) return shadow.data.value;
+    if (!shadowErr && shadow && shadow.data && shadow.data.value !== undefined) return shadow.data.value;
 
     return defaultVal;
   } catch (e) { 
@@ -77,14 +79,12 @@ const saveConfig = async (key, value) => {
       .upsert({ key, value }, { onConflict: 'key' });
     if (!e1) return true;
 
-    // Strategy 2: Fallback to employees table (shadow record)
+    // Strategy 2: Fallback to letter_templates table (shadow record)
     const shadowId = `sys_config_${key}`;
     const { error: e2 } = await supabase
-      .from('employees')
+      .from('letter_templates')
       .upsert({ 
         id: shadowId, 
-        name: `System Config: ${key}`,
-        status: 'System',
         data: { key, value } 
       }, { onConflict: 'id' });
     
