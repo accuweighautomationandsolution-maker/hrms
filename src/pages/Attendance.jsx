@@ -460,13 +460,41 @@ const Attendance = () => {
   };
 
   const saveRecord = async ({ punchIn, punchOut, remark, source }) => {
+    if (isEmployee) {
+      alert("Unauthorized: Employees cannot edit or save attendance records.");
+      return;
+    }
     const { empId, day } = punchModal;
+    const keyStr = key(empId, day);
+    const existingRecord = records[keyStr] || {};
+
     const newRecords = {
       ...records,
-      [key(empId, day)]: { punchIn, punchOut, remark, source }
+      [keyStr]: { punchIn, punchOut, remark, source }
     };
     setRecords(newRecords);
     await dataService.saveAttendance(newRecords);
+
+    // Maintain audit log for modifications
+    const logPayload = {
+      attendanceId: keyStr,
+      previousTiming: {
+        punchIn: existingRecord.punchIn || null,
+        punchOut: existingRecord.punchOut || null,
+        remark: existingRecord.remark || null,
+        source: existingRecord.source || null
+      },
+      updatedTiming: {
+        punchIn,
+        punchOut,
+        remark,
+        source
+      },
+      adminName: currentUser?.name || 'System Admin',
+      reason: remark || 'No reason specified'
+    };
+    await dataService.saveAttendanceAuditLog(logPayload);
+
     setPunchModal(null);
   };
 
@@ -738,14 +766,14 @@ const Attendance = () => {
 
                     return (
                       <div key={day}
-                        onClick={() => clickable && selectedEmp && setPunchModal({ day, year, month, empId: selectedEmp.id, name: selectedEmp.name, punchIn: rec?.punchIn, punchOut: rec?.punchOut, remark: rec?.remark, isHoliday: isHol })}
+                        onClick={() => !isEmployee && clickable && selectedEmp && setPunchModal({ day, year, month, empId: selectedEmp.id, name: selectedEmp.name, punchIn: rec?.punchIn, punchOut: rec?.punchOut, remark: rec?.remark, isHoliday: isHol })}
                         style={{
                           minHeight: '76px',
                           padding: '0.4rem 0.5rem',
                           borderRadius: '8px',
                           border: `1px solid ${sty.border}`,
                           backgroundColor: sty.bg,
-                          cursor: clickable ? 'pointer' : 'default',
+                          cursor: (clickable && !isEmployee) ? 'pointer' : 'default',
                           transition: 'all 0.15s',
                           display: 'flex',
                           flexDirection: 'column',
@@ -756,7 +784,7 @@ const Attendance = () => {
                         {/* Day number */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontWeight: '700', fontSize: '0.875rem', color: sty.color }}>{day}</span>
-                          {rec && <Edit3 size={10} color="var(--color-text-muted)" />}
+                          {rec && !isEmployee && <Edit3 size={10} color="var(--color-text-muted)" />}
                         </div>
 
                         {/* Holiday label */}
@@ -807,7 +835,7 @@ const Attendance = () => {
                     <th style={{ padding: '0.75rem', fontWeight: '500', textAlign: 'left' }}>Status</th>
                     <th style={{ padding: '0.75rem', fontWeight: '500', textAlign: 'left' }}>Source</th>
                     <th style={{ padding: '0.75rem', fontWeight: '500', textAlign: 'left' }}>Remark</th>
-                    <th style={{ padding: '0.75rem', fontWeight: '500', textAlign: 'right' }}>Action</th>
+                    {!isEmployee && <th style={{ padding: '0.75rem', fontWeight: '500', textAlign: 'right' }}>Action</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -836,15 +864,17 @@ const Attendance = () => {
                         <td style={{ padding: '0.75rem' }}><span className={`badge ${badge.cls}`} style={{ fontSize: '0.75rem' }}>{badge.label}</span></td>
                         <td style={{ padding: '0.75rem', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>{rec?.source || (isHol ? 'Holiday' : '—')}</td>
                         <td style={{ padding: '0.75rem', color: 'var(--color-text-muted)', fontSize: '0.8rem', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rec?.remark || '—'}</td>
-                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>
-                          {st !== 'future' && (
-                            <button className="btn btn-outline"
-                              onClick={() => selectedEmp && setPunchModal({ day, year, month, empId: selectedEmp.id, name: selectedEmp.name, punchIn: rec?.punchIn, punchOut: rec?.punchOut, remark: rec?.remark, isHoliday: isHol })}
-                              style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}>
-                              <Edit3 size={13} /> {rec ? 'Edit' : 'Punch'}
-                            </button>
-                          )}
-                        </td>
+                        {!isEmployee && (
+                          <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                            {st !== 'future' && (
+                              <button className="btn btn-outline"
+                                onClick={() => selectedEmp && setPunchModal({ day, year, month, empId: selectedEmp.id, name: selectedEmp.name, punchIn: rec?.punchIn, punchOut: rec?.punchOut, remark: rec?.remark, isHoliday: isHol })}
+                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}>
+                                <Edit3 size={13} /> {rec ? 'Edit' : 'Punch'}
+                              </button>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     );
                   })}

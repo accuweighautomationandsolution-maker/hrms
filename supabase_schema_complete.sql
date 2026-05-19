@@ -389,5 +389,16 @@ DO $$ BEGIN
   CREATE POLICY "allow_all_app_config" ON app_config USING (true) WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+-- ── 31. Attendance Audit Logs ─────────────────────────────────
+CREATE TABLE IF NOT EXISTS attendance_audit_logs (
+  id          TEXT         PRIMARY KEY,
+  data        JSONB        NOT NULL,
+  created_at  TIMESTAMPTZ  DEFAULT NOW()
+);
+ALTER TABLE attendance_audit_logs ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  CREATE POLICY "allow_all_attendance_audit_logs" ON attendance_audit_logs USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 -- ── Done ──────────────────────────────────────────────────────
--- 30 tables. All data is Supabase-only. No localStorage fallbacks.
+-- 31 tables. All data is Supabase-only. No localStorage fallbacks.

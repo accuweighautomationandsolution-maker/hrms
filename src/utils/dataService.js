@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { authService } from './authService';
 
 // ── Generic Supabase Helpers (Pure Supabase, No localStorage) ───────────
 
@@ -400,6 +401,11 @@ export const dataService = {
   saveAttendance: async (recordsMap) => {
     if (!supabase || !recordsMap || Object.keys(recordsMap).length === 0) return;
     
+    const userRole = (typeof authService !== 'undefined' && authService.getUserRole) ? authService.getUserRole() : null;
+    if (userRole === 'employee') {
+      throw new Error("RBAC Deny: Employees are not allowed to modify attendance data.");
+    }
+    
     try {
       const entries = Object.entries(recordsMap);
       
@@ -532,6 +538,10 @@ export const dataService = {
 
   saveAttendanceRecord: async (record) => {
     if (!supabase) return;
+    const userRole = (typeof authService !== 'undefined' && authService.getUserRole) ? authService.getUserRole() : null;
+    if (userRole === 'employee') {
+      throw new Error("RBAC Deny: Employees are not allowed to modify attendance data.");
+    }
     try {
       const { error } = await supabase.from('attendance').upsert(record);
       if (error) {
@@ -540,6 +550,28 @@ export const dataService = {
     } catch (err) {
       console.error('saveAttendanceRecord failed:', err);
       throw err;
+    }
+  },
+
+  saveAttendanceAuditLog: async (logPayload) => {
+    if (!supabase) return;
+    const logId = `AUDIT_ATT_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    const logData = {
+      id: logId,
+      timestamp: new Date().toISOString(),
+      ...logPayload
+    };
+    try {
+      const { error } = await supabase.from('attendance_audit_logs').insert({ id: logId, data: logData });
+      if (error && error.message.includes('Could not find the table')) {
+        await supabase.from('auth_logs').insert({ id: logId, data: logData });
+      }
+    } catch (e) {
+      try {
+        await supabase.from('auth_logs').insert({ id: logId, data: logData });
+      } catch (err) {
+        console.error('Failed to save attendance audit log:', err);
+      }
     }
   },
 
