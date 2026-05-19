@@ -1,13 +1,26 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { IndianRupee, Download, Search, Filter, Eye, AlertCircle, Info, FileText, FileSpreadsheet, Printer, Mail, X, Lock } from 'lucide-react';
+import { IndianRupee, Download, Search, Filter, Eye, AlertCircle, Info, FileText, FileSpreadsheet, Printer, Mail, X, Lock, History, Check } from 'lucide-react';
 import { calculateSalaryComponents, formatCurrency, getHolidayDates, numberToWords } from '../utils/payrollCalculator';
 import { dataService } from '../utils/dataService';
+import { authService } from '../utils/authService';
 import { useNotification } from '../context/NotificationContext';
 import { generatePDF } from '../utils/exportUtils';
 
 const Payroll = () => {
   const { showNotification } = useNotification();
+  const userRole = authService.getUserRole();
+  const isAdmin = userRole === 'admin' || userRole === 'hr' || userRole === 'hr_admin';
+
+  const [dbRecords, setDbRecords] = useState({});
+  const [paymentModalData, setPaymentModalData] = useState(null);
+  const [historyModalRecord, setHistoryModalRecord] = useState(null);
+
+  // Payment Details Form fields
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentMode, setPaymentMode] = useState('Bank transfer');
+  const [txnRef, setTxnRef] = useState('');
+  const [paymentNotes, setPaymentNotes] = useState('');
   
   // Internal Constants (Moved inside to avoid initialization issues)
   const MONTH_NAMES = useMemo(() => [
@@ -124,7 +137,12 @@ const Payroll = () => {
             </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
-            <button className="btn btn-primary" onClick={() => generatePDF('payslip-capture', `Payslip_${employee.empCode}_${MONTH_NAMES[month]}.pdf`)}>Download PDF</button>
+            <button className="btn btn-primary" onClick={() => {
+              if (employee.payrollGenerated && !employee.payslipGenerated) {
+                handleUpdateStatus(employee.id, { payslipGenerated: true });
+              }
+              generatePDF('payslip-capture', `Payslip_${employee.empCode}_${MONTH_NAMES[month]}.pdf`);
+            }}>Download PDF</button>
             <button className="btn btn-outline" onClick={onClose}>Close</button>
           </div>
         </div>
@@ -155,9 +173,10 @@ const Payroll = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [emps, hols] = await Promise.all([
+        const [emps, hols, dbRecs] = await Promise.all([
           dataService.getEmployees().catch(() => []),
-          dataService.getCustomHolidays().catch(() => [])
+          dataService.getCustomHolidays().catch(() => []),
+          dataService.getPayrollRecordsByMonth(month, year).catch(() => [])
         ]);
         
         const attMap = {};
@@ -172,11 +191,19 @@ const Payroll = () => {
           balMap[emp.id] = balance;
         }));
 
+        const dbRecsMap = {};
+        dbRecs.forEach(r => {
+          if (r && r.empId) {
+            dbRecsMap[String(r.empId)] = r;
+          }
+        });
+
         if (isMounted) {
           setEmployees(emps);
           setHolidayList(hols);
           setAttendanceMap(attMap);
           setBalanceMap(balMap);
+          setDbRecords(dbRecsMap);
         }
       } catch (err) {
         console.error("Failed to load payroll:", err);
@@ -192,16 +219,28 @@ const Payroll = () => {
   const employeesWithPayroll = useMemo(() => {
     return employees.map(emp => {
       const daysPresent = attendanceMap[emp.id] || 0;
+      const dbRec = dbRecords[String(emp.id)] || {};
+      const calculatedContext = emp.category !== 'Contractual Worker'
+        ? calculateSalaryComponents(emp.grossSalary, true, emp.advanceLoanEMI || 0, emp.category, daysPresent, 30, { hasPF: !!emp.uanNumber, hasESIC: !!emp.esicNumber })
+        : null;
+
       return {
         ...emp,
         daysPresent,
         balanceLeaves: balanceMap[emp.id],
-        payrollContext: emp.category !== 'Contractual Worker'
-          ? calculateSalaryComponents(emp.grossSalary, true, emp.advanceLoanEMI || 0, emp.category, daysPresent, 30, { hasPF: !!emp.uanNumber, hasESIC: !!emp.esicNumber })
-          : null
+        payrollGenerated: !!dbRec.payrollGenerated,
+        payslipGenerated: !!dbRec.payslipGenerated,
+        paymentDone: !!dbRec.paymentDone,
+        paymentDate: dbRec.paymentDate || '',
+        paymentMode: dbRec.paymentMode || '',
+        txnRef: dbRec.txnRef || '',
+        statusHistory: dbRec.statusHistory || [],
+        payrollContext: dbRec.payrollGenerated && dbRec.payrollContext 
+          ? dbRec.payrollContext 
+          : calculatedContext
       };
     });
-  }, [employees, attendanceMap, balanceMap, month, year]);
+  }, [employees, attendanceMap, balanceMap, dbRecords, month, year]);
 
   const filteredEmployees = useMemo(() => {
     return employeesWithPayroll.filter(e => 
@@ -209,6 +248,133 @@ const Payroll = () => {
       (e.empCode && e.empCode.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [employeesWithPayroll, searchTerm]);
+
+  const handleUpdateStatus = async (empId, updates) => {
+    const isAuthorized = userRole === 'admin' || userRole === 'hr' || userRole === 'hr_admin';
+    if (!isAuthorized) {
+      showNotification("Access Denied: Only Admin/HR can update payroll status", "error");
+      return;
+    }
+    
+    const emp = employeesWithPayroll.find(e => String(e.id) === String(empId));
+    if (!emp) return;
+
+    // Check workflow dependencies
+    if (updates.payslipGenerated && !emp.payrollGenerated && !updates.payrollGenerated) {
+      showNotification("Cannot generate payslip: Payroll must be generated first", "warning");
+      return;
+    }
+    if (updates.paymentDone && !emp.payslipGenerated && !updates.payslipGenerated) {
+      showNotification("Cannot mark payment done: Payslip must be generated first", "warning");
+      return;
+    }
+    if (updates.payrollGenerated === false && emp.payslipGenerated) {
+      showNotification("Cannot revert payroll: Payslip is already generated. Revert payslip first.", "warning");
+      return;
+    }
+    if (updates.payslipGenerated === false && emp.paymentDone) {
+      showNotification("Cannot revert payslip: Payment has already been completed. Revert payment first.", "warning");
+      return;
+    }
+
+    if (updates.payrollGenerated && !emp.payrollGenerated) {
+      updates.payrollContext = emp.payrollContext;
+    }
+
+    try {
+      const updatedRecord = await dataService.updatePayrollRecord(
+        month, 
+        year, 
+        empId, 
+        updates, 
+        authService.getCurrentUser()?.name || 'Admin'
+      );
+      if (updatedRecord) {
+        setDbRecords(prev => ({
+          ...prev,
+          [String(empId)]: updatedRecord
+        }));
+        showNotification("Payroll status updated", "success");
+      } else {
+        showNotification("Failed to save status", "error");
+      }
+    } catch (e) {
+      console.error(e);
+      showNotification("Failed to update payroll status", "error");
+    }
+  };
+
+  const handleSavePaymentDetails = async () => {
+    if (!paymentModalData) return;
+    const empId = paymentModalData.id;
+    const updates = {
+      paymentDone: true,
+      paymentDate,
+      paymentMode,
+      txnRef,
+      notes: `Marked Paid — Date: ${paymentDate}, Mode: ${paymentMode}, Ref: ${txnRef || 'N/A'}` + (paymentNotes ? ` (${paymentNotes})` : '')
+    };
+
+    await handleUpdateStatus(empId, updates);
+    setPaymentModalData(null);
+    setTxnRef('');
+    setPaymentNotes('');
+  };
+
+  const handleBulkFinalize = async () => {
+    const isAuthorized = userRole === 'admin' || userRole === 'hr' || userRole === 'hr_admin';
+    if (!isAuthorized) {
+      showNotification("Access Denied: Only Admin/HR can process payroll", "error");
+      return;
+    }
+
+    const targetEmps = employeesWithPayroll.filter(e => selectedIds.has(String(e.id)));
+    if (targetEmps.length === 0) {
+      showNotification("Select employees first", "warning");
+      return;
+    }
+
+    setIsProcessing(true);
+    let successCount = 0;
+    try {
+      const adminName = authService.getCurrentUser()?.name || 'Admin';
+      for (const emp of targetEmps) {
+        if (emp.payrollGenerated) {
+          successCount++;
+          continue;
+        }
+
+        const updates = {
+          payrollGenerated: true,
+          payrollContext: emp.payrollContext,
+          createdAt: new Date().toISOString()
+        };
+
+        const updated = await dataService.updatePayrollRecord(
+          month,
+          year,
+          emp.id,
+          updates,
+          adminName
+        );
+
+        if (updated) {
+          successCount++;
+          setDbRecords(prev => ({
+            ...prev,
+            [String(emp.id)]: updated
+          }));
+        }
+      }
+      showNotification(`Successfully processed payroll for ${successCount} employees`, "success");
+      setSelectedIds(new Set());
+    } catch (e) {
+      console.error(e);
+      showNotification("An error occurred during bulk processing", "error");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleExport = (format) => {
     const targetEmps = employeesWithPayroll.filter(e => selectedIds.has(String(e.id)));
@@ -250,7 +416,7 @@ const Payroll = () => {
       {selectedIds.size > 0 && (
         <div style={{ position: 'fixed', bottom: '2rem', left: '50%', transform: 'translateX(-50%)', zIndex: 1000, backgroundColor: '#1e293b', color: 'white', padding: '1rem 2rem', borderRadius: '50px', display: 'flex', gap: '2rem', alignItems: 'center', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
           <span style={{ fontWeight: '700' }}>{selectedIds.size} Selected</span>
-          <button className="btn btn-success" style={{ backgroundColor: 'var(--color-success)', border: 'none', padding: '0.5rem 1.5rem', borderRadius: '20px' }} onClick={() => { setIsProcessing(true); setTimeout(() => { setIsProcessing(false); setSelectedIds(new Set()); showNotification("Processed successfully", "success"); }, 1500); }}>
+          <button className="btn btn-success" style={{ backgroundColor: 'var(--color-success)', border: 'none', padding: '0.5rem 1.5rem', borderRadius: '20px' }} onClick={handleBulkFinalize}>
             {isProcessing ? 'Processing...' : 'Process & Finalize'}
           </button>
           <button className="btn" style={{ color: 'white' }} onClick={() => setSelectedIds(new Set())}>Cancel</button>
@@ -271,6 +437,9 @@ const Payroll = () => {
                 <th style={{ padding: '1rem' }}>Code</th>
                 <th style={{ padding: '1rem' }}>Name</th>
                 <th style={{ padding: '1rem' }}>Net Pay</th>
+                <th style={{ padding: '1rem' }}>Payroll Generated</th>
+                <th style={{ padding: '1rem' }}>Payslip Generated</th>
+                <th style={{ padding: '1rem' }}>Payment Done</th>
                 <th style={{ padding: '1rem' }}>Actions</th>
               </tr>
             </thead>
@@ -281,10 +450,135 @@ const Payroll = () => {
                   <tr key={emp.id} style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: isSelected ? 'rgba(37,99,235,0.05)' : 'transparent' }}>
                     <td style={{ padding: '1rem' }}><input type="checkbox" checked={isSelected} onChange={() => toggleSelect(emp.id)} /></td>
                     <td style={{ padding: '1rem' }}>{emp.empCode}</td>
-                    <td style={{ padding: '1rem' }}>{emp.name}</td>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span>{emp.name}</span>
+                        <button 
+                          className="btn btn-ghost" 
+                          style={{ padding: '0.2rem', height: 'auto', display: 'inline-flex', alignItems: 'center' }} 
+                          title="View status history log"
+                          onClick={() => setHistoryModalRecord(emp)}
+                        >
+                          <History size={14} color="var(--color-text-muted)" />
+                        </button>
+                      </div>
+                    </td>
                     <td style={{ padding: '1rem', fontWeight: '700' }}>{emp.payrollContext ? formatCurrency(emp.payrollContext.netPay) : 'N/A'}</td>
                     <td style={{ padding: '1rem' }}>
-                      <button className="btn btn-ghost" onClick={() => setSelectedEmployee(emp)}>View</button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {emp.payrollGenerated ? (
+                          <>
+                            <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><Check size={12} /> Yes</span>
+                            {isAdmin && !emp.payslipGenerated && (
+                              <button 
+                                className="btn btn-ghost" 
+                                style={{ padding: '0.2rem 0.4rem', fontSize: '0.75rem', height: 'auto', color: 'var(--color-danger)' }} 
+                                onClick={() => handleUpdateStatus(emp.id, { payrollGenerated: false })}
+                              >
+                                Revert
+                              </button>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <span className="badge badge-default">No</span>
+                            {isAdmin && (
+                              <button 
+                                className="btn btn-primary" 
+                                style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', height: 'auto' }} 
+                                onClick={() => handleUpdateStatus(emp.id, { payrollGenerated: true })}
+                              >
+                                Generate
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </td>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {emp.payslipGenerated ? (
+                          <>
+                            <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><Check size={12} /> Yes</span>
+                            {isAdmin && !emp.paymentDone && (
+                              <button 
+                                className="btn btn-ghost" 
+                                style={{ padding: '0.2rem 0.4rem', fontSize: '0.75rem', height: 'auto', color: 'var(--color-danger)' }} 
+                                onClick={() => handleUpdateStatus(emp.id, { payslipGenerated: false })}
+                              >
+                                Revert
+                              </button>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <span className="badge badge-default">No</span>
+                            {isAdmin && (
+                              <button 
+                                className="btn btn-primary" 
+                                style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', height: 'auto' }} 
+                                disabled={!emp.payrollGenerated}
+                                onClick={() => handleUpdateStatus(emp.id, { payslipGenerated: true })}
+                              >
+                                Mark Generated
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </td>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {emp.paymentDone ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><Check size={12} /> Paid</span>
+                              {isAdmin && (
+                                <button 
+                                  className="btn btn-ghost" 
+                                  style={{ padding: '0.2rem 0.4rem', fontSize: '0.75rem', height: 'auto', color: 'var(--color-danger)' }} 
+                                  onClick={() => handleUpdateStatus(emp.id, { paymentDone: false })}
+                                >
+                                  Revert
+                                </button>
+                              )}
+                            </div>
+                            {emp.paymentMode && (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                                {emp.paymentMode} {emp.txnRef ? `(${emp.txnRef})` : ''}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <span className="badge badge-default">Unpaid</span>
+                            {isAdmin && (
+                              <button 
+                                className="btn btn-primary" 
+                                style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', height: 'auto' }} 
+                                disabled={!emp.payslipGenerated}
+                                onClick={() => {
+                                  setPaymentDate(new Date().toISOString().split('T')[0]);
+                                  setPaymentMode('Bank transfer');
+                                  setTxnRef('');
+                                  setPaymentNotes('');
+                                  setPaymentModalData(emp);
+                                }}
+                              >
+                                Mark Paid
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </td>
+                    <td style={{ padding: '1rem' }}>
+                      <button className="btn btn-ghost" onClick={() => {
+                        if (emp.payrollGenerated && !emp.payslipGenerated) {
+                          handleUpdateStatus(emp.id, { payslipGenerated: true });
+                        }
+                        setSelectedEmployee(emp);
+                      }}>View</button>
                     </td>
                   </tr>
                 );
@@ -297,6 +591,107 @@ const Payroll = () => {
       {selectedEmployee && (selectedEmployee.category === 'Contractual Worker' ? 
         <ContractualPayslipModal employee={selectedEmployee} onClose={() => setSelectedEmployee(null)} /> : 
         <PayslipModal employee={selectedEmployee} onClose={() => setSelectedEmployee(null)} />
+      )}
+
+      {/* Payment Details Entry Modal */}
+      {paymentModalData && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '450px', padding: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem' }}>
+              <h3 style={{ margin: 0 }}>💰 Payment Details — {paymentModalData.name}</h3>
+              <button className="btn btn-ghost" onClick={() => setPaymentModalData(null)} style={{ padding: '0.25rem' }}><X size={20} /></button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div className="form-group">
+                <label className="form-label">Payment Date *</label>
+                <input 
+                  type="date" 
+                  className="form-input" 
+                  style={{ width: '100%' }} 
+                  value={paymentDate} 
+                  onChange={e => setPaymentDate(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Payment Mode *</label>
+                <select 
+                  className="form-input" 
+                  style={{ width: '100%' }} 
+                  value={paymentMode} 
+                  onChange={e => setPaymentMode(e.target.value)}
+                >
+                  <option value="Bank transfer">Bank transfer</option>
+                  <option value="Cash">Cash</option>
+                  <option value="UPI">UPI</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Transaction Reference Number</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  style={{ width: '100%' }} 
+                  placeholder="e.g. TXN123456789" 
+                  value={txnRef} 
+                  onChange={e => setTxnRef(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Notes / Remarks</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  style={{ width: '100%' }} 
+                  placeholder="Additional payout details..." 
+                  value={paymentNotes} 
+                  onChange={e => setPaymentNotes(e.target.value)} 
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.75rem', borderTop: '1px solid var(--color-border)', paddingTop: '1.25rem' }}>
+              <button className="btn btn-outline" onClick={() => setPaymentModalData(null)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleSavePaymentDetails}>Save Payment</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Status History Audit Timeline Modal */}
+      {historyModalRecord && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '500px', padding: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem' }}>
+              <h3 style={{ margin: 0 }}>📜 Status History — {historyModalRecord.name}</h3>
+              <button className="btn btn-ghost" onClick={() => setHistoryModalRecord(null)} style={{ padding: '0.25rem' }}><X size={20} /></button>
+            </div>
+            
+            <div style={{ maxHeight: '350px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem', paddingRight: '0.5rem' }}>
+              {(!historyModalRecord.statusHistory || historyModalRecord.statusHistory.length === 0) ? (
+                <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '1.5rem' }}>No status changes recorded yet.</p>
+              ) : (
+                historyModalRecord.statusHistory.map((h, i) => (
+                  <div key={i} style={{ borderLeft: '3px solid var(--color-primary)', paddingLeft: '1rem', position: 'relative' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+                      <span>👤 {h.updatedBy}</span>
+                      <span>📅 {new Date(h.timestamp).toLocaleString()}</span>
+                    </div>
+                    <p style={{ margin: '0.25rem 0', fontWeight: '600', fontSize: '0.9rem', color: 'var(--color-text-main)' }}>{h.notes}</p>
+                  </div>
+                ))
+              )}
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem', borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
+              <button className="btn btn-primary" onClick={() => setHistoryModalRecord(null)}>Close</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

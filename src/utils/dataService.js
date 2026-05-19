@@ -814,6 +814,107 @@ export const dataService = {
     return history;
   },
 
+  getPayrollRecordsByMonth: async (month, year) => {
+    if (!supabase) return [];
+    const prefix = `PAY_${year}_${month}_`;
+    try {
+      const { data, error } = await supabase
+        .from('payroll_history')
+        .select('*')
+        .like('id', `${prefix}%`);
+      
+      if (error) {
+        console.error('getPayrollRecordsByMonth failed:', error.message);
+        return [];
+      }
+      return (data || []).map(r => r.data);
+    } catch (e) {
+      console.error('getPayrollRecordsByMonth exception:', e);
+      return [];
+    }
+  },
+
+  updatePayrollRecord: async (month, year, empId, updates, updatedBy = 'Admin') => {
+    if (!supabase) return null;
+    const id = `PAY_${year}_${month}_${empId}`;
+    try {
+      const { data: existing, error: fetchErr } = await supabase
+        .from('payroll_history')
+        .select('data')
+        .eq('id', id)
+        .maybeSingle();
+      
+      let recordData = {};
+      if (!fetchErr && existing && existing.data) {
+        recordData = { ...existing.data };
+      } else {
+        recordData = {
+          empId: String(empId),
+          month,
+          year,
+          payrollGenerated: false,
+          payslipGenerated: false,
+          paymentDone: false,
+          statusHistory: [],
+          createdAt: new Date().toISOString()
+        };
+      }
+
+      // Check and log status changes for audit timeline
+      const auditTrail = [];
+      const checkAndLogStatus = (field, label) => {
+        if (updates[field] !== undefined && updates[field] !== recordData[field]) {
+          let noteStr = `Status '${label}' set to ${updates[field] ? 'Yes' : 'No'}`;
+          if (field === 'paymentDone' && updates[field]) {
+            noteStr += ` (Mode: ${updates.paymentMode || 'N/A'}, Ref: ${updates.txnRef || 'N/A'}, Date: ${updates.paymentDate || 'N/A'})`;
+          }
+          auditTrail.push({
+            status: field,
+            value: updates[field],
+            timestamp: new Date().toISOString(),
+            updatedBy,
+            notes: updates.notes || noteStr
+          });
+        }
+      };
+
+      checkAndLogStatus('payrollGenerated', 'Payroll Generated');
+      checkAndLogStatus('payslipGenerated', 'Payslip Generated');
+      checkAndLogStatus('paymentDone', 'Payment Done');
+
+      if (auditTrail.length > 0) {
+        recordData.statusHistory = [
+          ...(recordData.statusHistory || []),
+          ...auditTrail
+        ];
+      }
+
+      // Merge remaining fields
+      recordData = {
+        ...recordData,
+        ...updates,
+        updatedAt: new Date().toISOString()
+      };
+
+      const { error } = await supabase
+        .from('payroll_history')
+        .upsert({
+          id,
+          data: recordData,
+          created_at: recordData.createdAt || new Date().toISOString()
+        }, { onConflict: 'id' });
+
+      if (error) {
+        console.error('updatePayrollRecord upsert failed:', error.message);
+        return null;
+      }
+      return recordData;
+    } catch (e) {
+      console.error('updatePayrollRecord exception:', e);
+      return null;
+    }
+  },
+
   getManpowerRequests: async () => sbGetAll('manpower_requests'),
   saveManpowerRequests: async (list) => sbSaveAll('manpower_requests', list),
 

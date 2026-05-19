@@ -183,9 +183,8 @@ CREATE TABLE IF NOT EXISTS payroll_history (
   created_at  TIMESTAMPTZ  DEFAULT NOW()
 );
 ALTER TABLE payroll_history ENABLE ROW LEVEL SECURITY;
-DO $$ BEGIN
-  CREATE POLICY "allow_all_payroll" ON payroll_history USING (true) WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DROP POLICY IF EXISTS "allow_all_payroll" ON payroll_history;
+CREATE POLICY "allow_all_payroll" ON payroll_history USING (true) WITH CHECK (true);
 
 -- ── 13. Salary Structures (full JSONB snapshot) ──────────────
 CREATE TABLE IF NOT EXISTS salary_structures_ext (
