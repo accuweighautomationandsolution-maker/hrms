@@ -351,9 +351,8 @@ CREATE TABLE IF NOT EXISTS letter_templates (
   created_at  TIMESTAMPTZ  DEFAULT NOW()
 );
 ALTER TABLE letter_templates ENABLE ROW LEVEL SECURITY;
-DO $$ BEGIN
-  CREATE POLICY "allow_all_letter_templates" ON letter_templates USING (true) WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DROP POLICY IF EXISTS "allow_all_letter_templates" ON letter_templates;
+CREATE POLICY "allow_all_letter_templates" ON letter_templates USING (true) WITH CHECK (true);
 
 -- ── 28. Employee Documents ───────────────────────────────────
 CREATE TABLE IF NOT EXISTS employee_docs (
@@ -363,9 +362,8 @@ CREATE TABLE IF NOT EXISTS employee_docs (
   created_at  TIMESTAMPTZ  DEFAULT NOW()
 );
 ALTER TABLE employee_docs ENABLE ROW LEVEL SECURITY;
-DO $$ BEGIN
-  CREATE POLICY "allow_all_employee_docs" ON employee_docs USING (true) WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DROP POLICY IF EXISTS "allow_all_employee_docs" ON employee_docs;
+CREATE POLICY "allow_all_employee_docs" ON employee_docs USING (true) WITH CHECK (true);
 
 -- ── 29. Auth Logs ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS auth_logs (
@@ -374,9 +372,8 @@ CREATE TABLE IF NOT EXISTS auth_logs (
   created_at  TIMESTAMPTZ  DEFAULT NOW()
 );
 ALTER TABLE auth_logs ENABLE ROW LEVEL SECURITY;
-DO $$ BEGIN
-  CREATE POLICY "allow_all_auth_logs" ON auth_logs USING (true) WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DROP POLICY IF EXISTS "allow_all_auth_logs" ON auth_logs;
+CREATE POLICY "allow_all_auth_logs" ON auth_logs USING (true) WITH CHECK (true);
 
 -- ── 30. App Config (bulletin, biometric, gratuity, etc.) ─────
 CREATE TABLE IF NOT EXISTS app_config (
@@ -385,9 +382,8 @@ CREATE TABLE IF NOT EXISTS app_config (
   updated_at  TIMESTAMPTZ  DEFAULT NOW()
 );
 ALTER TABLE app_config ENABLE ROW LEVEL SECURITY;
-DO $$ BEGIN
-  CREATE POLICY "allow_all_app_config" ON app_config USING (true) WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DROP POLICY IF EXISTS "allow_all_app_config" ON app_config;
+CREATE POLICY "allow_all_app_config" ON app_config USING (true) WITH CHECK (true);
 
 -- ── 31. Attendance Audit Logs ─────────────────────────────────
 CREATE TABLE IF NOT EXISTS attendance_audit_logs (
@@ -396,9 +392,8 @@ CREATE TABLE IF NOT EXISTS attendance_audit_logs (
   created_at  TIMESTAMPTZ  DEFAULT NOW()
 );
 ALTER TABLE attendance_audit_logs ENABLE ROW LEVEL SECURITY;
-DO $$ BEGIN
-  CREATE POLICY "allow_all_attendance_audit_logs" ON attendance_audit_logs USING (true) WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DROP POLICY IF EXISTS "allow_all_attendance_audit_logs" ON attendance_audit_logs;
+CREATE POLICY "allow_all_attendance_audit_logs" ON attendance_audit_logs USING (true) WITH CHECK (true);
 
 -- ── Done ──────────────────────────────────────────────────────
 -- 31 tables. All data is Supabase-only. No localStorage fallbacks.

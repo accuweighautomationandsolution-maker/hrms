@@ -1058,18 +1058,61 @@ export const dataService = {
 
     if (empId) {
       const localKey = `vault_${empId}`;
+      
+      // 1. Try dedicated employee_docs table first
       try {
-        // 1. Read from Supabase (source of truth, cross-device)
-        const remoteDocs = await getConfig(localKey, null);
-        if (Array.isArray(remoteDocs) && remoteDocs.length > 0) {
-          localWrite(localKey, remoteDocs); // Update local cache
-          return remoteDocs;
+        if (supabase) {
+          const { data: dbDocs, error: dbErr } = await supabase
+            .from('employee_docs')
+            .select('data')
+            .eq('emp_id', Number(empId));
+          
+          if (!dbErr && Array.isArray(dbDocs)) {
+            const remoteDocs = dbDocs.map(row => row.data);
+            localWrite(localKey, remoteDocs);
+            console.log(`Vault: Loaded ${remoteDocs.length} documents from employee_docs table for ${empId}`);
+            return remoteDocs;
+          }
         }
-      } catch (e) { console.warn('getEmployeeDocs Supabase read failed, using localStorage'); }
-      // 2. Fallback: localStorage cache
+      } catch (err) {
+        console.warn('getEmployeeDocs: employee_docs table read failed, trying app_config fallback...', err);
+      }
+
+      // 2. Try App Config table (fallback)
+      try {
+        if (supabase) {
+          const remoteDocs = await getConfig(localKey, null);
+          if (Array.isArray(remoteDocs)) {
+            localWrite(localKey, remoteDocs); // Update local cache
+            console.log(`Vault: Loaded ${remoteDocs.length} documents from app_config fallback for ${empId}`);
+            return remoteDocs;
+          }
+        }
+      } catch (e) {
+        console.warn('getEmployeeDocs app_config read failed, using localStorage cache.');
+      }
+      
+      // 3. Fallback: localStorage cache
       return localRead(localKey);
     }
-    // All employees: scan localStorage
+
+    // All employees: scan employee_docs table first
+    try {
+      if (supabase) {
+        const { data: dbDocs, error: dbErr } = await supabase
+          .from('employee_docs')
+          .select('data');
+        if (!dbErr && Array.isArray(dbDocs)) {
+          const allRemote = dbDocs.map(row => row.data);
+          console.log(`Vault: Loaded ${allRemote.length} documents from employee_docs table for all profiles.`);
+          return allRemote;
+        }
+      }
+    } catch (e) {
+      console.warn('getEmployeeDocs all employee_docs scan failed, using localStorage fallback.');
+    }
+
+    // Scan localStorage as legacy all-employees fallback
     const allDocs = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -1106,7 +1149,7 @@ export const dataService = {
     localStorage.setItem(localKey, JSON.stringify(updated));
     console.log(`Vault: ${newDoc.id} cached in localStorage for emp ${doc.empId}`);
 
-    // Step 3: AWAIT Supabase Storage & Config save
+    // Step 3: AWAIT Supabase Storage & DB sync
     if (supabase) {
       try {
         let finalDoc = { ...newDoc };
@@ -1119,15 +1162,38 @@ export const dataService = {
           console.log(`Vault: Storage upload success for ${newDoc.id}`);
         }
 
-        // Update local and remote with the URL version
+        // Update local cache with URL version
         const updatedWithUrl = updated.map(d => d.id === newDoc.id ? finalDoc : d);
         localStorage.setItem(localKey, JSON.stringify(updatedWithUrl));
         
-        const saved = await saveConfig(localKey, updatedWithUrl);
-        if (saved) {
-          console.log(`Vault: ${newDoc.id} persisted to Supabase successfully.`);
-        } else {
-          console.error(`Vault: Supabase config save FAILED for ${newDoc.id}.`);
+        // 1. Try dedicated employee_docs table
+        let savedToDocsTable = false;
+        try {
+          const { error: dbErr } = await supabase
+            .from('employee_docs')
+            .upsert({
+              id: finalDoc.id,
+              emp_id: Number(finalDoc.empId),
+              data: finalDoc
+            });
+          if (!dbErr) {
+            savedToDocsTable = true;
+            console.log(`Vault: ${finalDoc.id} persisted to employee_docs table successfully.`);
+          } else {
+            console.warn(`Vault: employee_docs table save failed: ${dbErr.message}. Trying config fallback...`);
+          }
+        } catch (e) {
+          console.warn('Vault: employee_docs table write exception, trying config fallback...');
+        }
+
+        // 2. Fallback to app_config / letter_templates shadow configs
+        if (!savedToDocsTable) {
+          const saved = await saveConfig(localKey, updatedWithUrl);
+          if (saved) {
+            console.log(`Vault: ${newDoc.id} persisted to Supabase config successfully.`);
+          } else {
+            console.error(`Vault: Supabase config save FAILED for ${newDoc.id}.`);
+          }
         }
       } catch (err) {
         console.error(`Vault: Critical upload failure for ${newDoc.id}:`, err.message);
@@ -1143,7 +1209,24 @@ export const dataService = {
     catch { existing = []; }
     const updated = existing.filter(d => String(d.id) !== String(docId));
     localStorage.setItem(localKey, JSON.stringify(updated));
-    if (supabase) saveConfig(localKey, updated).catch(e => console.warn('Vault delete sync:', e));
+
+    if (supabase) {
+      // 1. Try deleting from employee_docs table first
+      try {
+        const { error: dbErr } = await supabase
+          .from('employee_docs')
+          .delete()
+          .eq('id', String(docId));
+        if (!dbErr) {
+          console.log(`Vault: Deleted ${docId} from employee_docs table.`);
+        }
+      } catch (e) {
+        console.warn('Vault: employee_docs delete failed, attempting config sync.');
+      }
+      
+      // 2. Sync updated list to app_config / letter_templates config fallback
+      saveConfig(localKey, updated).catch(e => console.warn('Vault delete config sync:', e));
+    }
   },
 
 
