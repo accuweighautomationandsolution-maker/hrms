@@ -10,7 +10,7 @@ import { generatePDF } from '../utils/exportUtils';
 const Payroll = () => {
   const { showNotification } = useNotification();
   const userRole = authService.getUserRole();
-  const isAdmin = userRole === 'admin' || userRole === 'hr' || userRole === 'hr_admin';
+  const isAdmin = userRole === 'management' || userRole === 'admin' || userRole === 'hr' || userRole === 'hr_admin';
 
   const [dbRecords, setDbRecords] = useState({});
   const [paymentModalData, setPaymentModalData] = useState(null);
@@ -250,7 +250,7 @@ const Payroll = () => {
   }, [employeesWithPayroll, searchTerm]);
 
   const handleUpdateStatus = async (empId, updates) => {
-    const isAuthorized = userRole === 'admin' || userRole === 'hr' || userRole === 'hr_admin';
+    const isAuthorized = userRole === 'management' || userRole === 'admin' || userRole === 'hr' || userRole === 'hr_admin';
     if (!isAuthorized) {
       showNotification("Access Denied: Only Admin/HR can update payroll status", "error");
       return;
@@ -322,7 +322,7 @@ const Payroll = () => {
   };
 
   const handleBulkFinalize = async () => {
-    const isAuthorized = userRole === 'admin' || userRole === 'hr' || userRole === 'hr_admin';
+    const isAuthorized = userRole === 'management' || userRole === 'admin' || userRole === 'hr' || userRole === 'hr_admin';
     if (!isAuthorized) {
       showNotification("Access Denied: Only Admin/HR can process payroll", "error");
       return;
