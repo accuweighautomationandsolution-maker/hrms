@@ -125,12 +125,7 @@ app.get('/api/pull', async (req, res) => {
       if (isNaN(dt.getTime())) return;
       
       const empId = String(log.deviceUserId);
-      let year = dt.getFullYear();
-      
-      // AUTO-CORRECT: Device clock is stuck in 2021/2022, map it to current year 2026
-      if (year < 2026) {
-        year = 2026;
-      }
+      const year = dt.getFullYear();
       
       const month = String(dt.getMonth() + 1).padStart(2, '0');
       const day = String(dt.getDate()).padStart(2, '0');
