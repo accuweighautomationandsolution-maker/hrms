@@ -5,17 +5,16 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-async function checkEmployees() {
-  const { data, error } = await supabase
-    .from('employees')
-    .select('id, name, biometric_code, emp_code, status');
+async function countAttendance() {
+  const { count, error } = await supabase
+    .from('attendance')
+    .select('*', { count: 'exact', head: true });
     
   if (error) {
     console.error(error);
   } else {
-    console.log('Employees in Supabase:');
-    console.table(data);
+    console.log(`Total attendance records in database: ${count}`);
   }
 }
 
-checkEmployees();
+countAttendance();

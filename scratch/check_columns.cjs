@@ -5,17 +5,19 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-async function checkEmployees() {
+async function checkColumns() {
   const { data, error } = await supabase
     .from('employees')
-    .select('id, name, biometric_code, emp_code, status');
-    
+    .select('*')
+    .limit(1);
+  
   if (error) {
-    console.error(error);
+    console.error('Error:', error.message);
+  } else if (data.length > 0) {
+    console.log('Columns found in employees table:', Object.keys(data[0]));
   } else {
-    console.log('Employees in Supabase:');
-    console.table(data);
+    console.log('No employees found.');
   }
 }
 
-checkEmployees();
+checkColumns();

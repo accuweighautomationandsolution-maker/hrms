@@ -5,17 +5,13 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-async function checkEmployees() {
-  const { data, error } = await supabase
-    .from('employees')
-    .select('id, name, biometric_code, emp_code, status');
-    
+async function checkHolidays() {
+  const { data, error } = await supabase.from('holidays').select('*');
   if (error) {
-    console.error(error);
+    console.error('Error fetching holidays:', error);
   } else {
-    console.log('Employees in Supabase:');
-    console.table(data);
+    console.log('Holidays in database:', data);
   }
 }
 
-checkEmployees();
+checkHolidays();

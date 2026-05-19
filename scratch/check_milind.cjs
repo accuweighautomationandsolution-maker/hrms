@@ -5,17 +5,25 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-async function checkEmployees() {
+async function checkMilindAttendance() {
   const { data, error } = await supabase
-    .from('employees')
-    .select('id, name, biometric_code, emp_code, status');
+    .from('attendance')
+    .select('*')
+    .eq('emp_id', 1779101235079);
     
   if (error) {
     console.error(error);
   } else {
-    console.log('Employees in Supabase:');
-    console.table(data);
+    console.log(`Total records for Milind (1779101235079): ${data.length}`);
+    console.table(data.map(r => ({
+      id: r.id,
+      date: r.date,
+      punch_in: r.punch_in,
+      punch_out: r.punch_out,
+      status: r.status,
+      source: r.data?.source
+    })));
   }
 }
 
-checkEmployees();
+checkMilindAttendance();

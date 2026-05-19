@@ -478,7 +478,9 @@ const Attendance = () => {
     const isOddSaturday = dow === 6 && (saturdayNumber === 1 || saturdayNumber === 3 || saturdayNumber === 5);
     
     if (holidaySet.has(day) || isOddSaturday || dow === 0) {
-      return rec ? 'holiday-worked' : 'holiday';
+      // Only count as worked if they actually punched in. 
+      // An empty 'Absent' record should just show as a regular holiday.
+      return (rec && rec.punchIn) ? 'holiday-worked' : 'holiday';
     }
     
     if (rec) return rec.punchOut ? 'present' : 'punch-in-only';

@@ -179,10 +179,23 @@ export const getHolidayDates = (year, month, customs = []) => {
   // 2. Add Custom Holidays (Flatten Ranges)
   (customs || []).forEach(c => {
     if (!c.fromDate || !c.toDate) return;
-    const start = new Date(c.fromDate);
-    const end = new Date(c.toDate);
+    
+    // Robust local date parsing to avoid UTC timezone shifts
+    const parseLocalDate = (dateStr) => {
+      const parts = dateStr.split('T')[0].split('-');
+      if (parts.length !== 3) return new Date(dateStr);
+      return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    };
+
+    const start = parseLocalDate(c.fromDate);
+    let end = parseLocalDate(c.toDate);
     
     if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
+    
+    // Fallback: If to_date is mistakenly before from_date, treat it as a single-day holiday
+    if (end < start) {
+      end = new Date(start);
+    }
     
     // Check if the range overlaps with the requested month
     const currentDate = new Date(start);

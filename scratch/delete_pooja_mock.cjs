@@ -5,17 +5,20 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-async function checkEmployees() {
-  const { data, error } = await supabase
-    .from('employees')
-    .select('id, name, biometric_code, emp_code, status');
+async function deletePoojaMockData() {
+  console.log('Deleting mock test records for Pooja...');
+  
+  // Delete the records we identified with 'Test Sync Script'
+  const { data, error } = await supabase.from('attendance')
+    .delete()
+    .eq('emp_id', 16)
+    .in('date', ['2026-05-18', '2026-05-19']);
     
   if (error) {
-    console.error(error);
+    console.error('Delete error:', error);
   } else {
-    console.log('Employees in Supabase:');
-    console.table(data);
+    console.log('Successfully deleted mock records.');
   }
 }
 
-checkEmployees();
+deletePoojaMockData();

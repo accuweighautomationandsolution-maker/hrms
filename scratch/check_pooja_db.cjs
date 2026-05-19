@@ -5,17 +5,20 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-async function checkEmployees() {
-  const { data, error } = await supabase
-    .from('employees')
-    .select('id, name, biometric_code, emp_code, status');
+async function checkPoojaDbAttendance() {
+  const { data, error } = await supabase.from('attendance')
+    .select('*')
+    .eq('emp_id', 16)
+    .order('date', { ascending: false });
     
   if (error) {
     console.error(error);
   } else {
-    console.log('Employees in Supabase:');
-    console.table(data);
+    console.log(`Pooja's total records in DB: ${data.length}`);
+    data.slice(0, 10).forEach(r => {
+      console.log(`  Date: ${r.date}, Punch In: ${r.punch_in}, Punch Out: ${r.punch_out}, Status: ${r.status}, Data:`, r.data);
+    });
   }
 }
 
-checkEmployees();
+checkPoojaDbAttendance();

@@ -5,17 +5,17 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-async function checkEmployees() {
-  const { data, error } = await supabase
-    .from('employees')
-    .select('id, name, biometric_code, emp_code, status');
+async function updatePoojaBioCode() {
+  const { data, error } = await supabase.from('employees')
+    .update({ biometric_code: '16' })
+    .eq('id', 16)
+    .select();
     
   if (error) {
-    console.error(error);
+    console.error('Error updating biometric code:', error);
   } else {
-    console.log('Employees in Supabase:');
-    console.table(data);
+    console.log('Successfully updated Pooja\'s biometric code in Supabase:', data);
   }
 }
 
-checkEmployees();
+updatePoojaBioCode();

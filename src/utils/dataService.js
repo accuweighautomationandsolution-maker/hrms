@@ -263,13 +263,15 @@ export const dataService = {
       id,
       name: empData.name || '',
       email: empData.email || '',
+      emp_code: empData.empCode || empData.emp_code || '',
+      biometric_code: empData.biometricCode || empData.biometric_code || '',
+      designation: empData.role || empData.designation || '',
+      department: empData.department || '',
+      joining_date: empData.joiningDate || empData.joining_date || empData.joinDate || null,
       status,
+      role: empData.role || 'employee',
       data: { ...empData, id, status }
     };
-    
-    // We omit employment_type, designation, and department from the top-level row
-    // because they are confirmed missing in some schema versions. 
-    // They are safely stored inside the 'data' JSONB object above.
     
     try {
       // Always use upsert so documents and profile updates are never silently dropped.
@@ -295,8 +297,13 @@ export const dataService = {
       id: emp.id,
       name: emp.name || '',
       email: emp.email || '',
-      emp_code: emp.empCode || '',
+      emp_code: emp.empCode || emp.emp_code || '',
+      biometric_code: emp.biometricCode || emp.biometric_code || '',
+      designation: emp.role || emp.designation || '',
+      department: emp.department || '',
+      joining_date: emp.joiningDate || emp.joining_date || emp.joinDate || null,
       status: emp.status || 'Active',
+      role: emp.role || 'employee',
       data: emp
     }));
     await supabase.from('employees').upsert(rows);
@@ -368,6 +375,7 @@ export const dataService = {
 
             const json = r.data || {};
             map[k] = {
+              id: r.id,
               punchIn: json.punchIn || (r.punch_in ? new Date(r.punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null),
               punchOut: json.punchOut || (r.punch_out ? new Date(r.punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null),
               status: r.status,
@@ -392,64 +400,98 @@ export const dataService = {
   saveAttendance: async (recordsMap) => {
     if (!supabase || !recordsMap || Object.keys(recordsMap).length === 0) return;
     
-    const rows = Object.entries(recordsMap).map(([key, val]) => {
-      const lastUnderscore = key.lastIndexOf('_');
-      const empId = key.substring(0, lastUnderscore);
-      const dateStr = key.substring(lastUnderscore + 1);
-      
-      // GENERATE EXACT PRIMARY KEY ID to bypass missing 'emp_id,date' unique constraint
-      const dateParts = dateStr.split('-');
-      const y = dateParts[0];
-      const m = parseInt(dateParts[1], 10) - 1; // Match legacy JS month (0-11)
-      const d = parseInt(dateParts[2], 10);
-      const generatedId = parseInt(`${empId}${y}${m}${d}`);
-
-      let punchInTs = null;
-      if (val.punchIn && val.punchIn.includes(':')) {
-        punchInTs = new Date(`${dateStr}T${val.punchIn}:00`).toISOString();
-      } else if (val.punchIn) {
-        punchInTs = val.punchIn;
-      }
-
-      let punchOutTs = null;
-      if (val.punchOut && val.punchOut.includes(':')) {
-        punchOutTs = new Date(`${dateStr}T${val.punchOut}:00`).toISOString();
-      } else if (val.punchOut) {
-        punchOutTs = val.punchOut;
-      }
-
-      return {
-        id: generatedId,
-        emp_id: String(empId), 
-        date: dateStr,
-        punch_in: punchInTs,
-        punch_out: punchOutTs,
-        status: val.punchOut ? 'Present' : (val.punchIn ? 'Incomplete' : 'Absent'),
-        // STORE RAW STRINGS IN DATA TO PRESERVE LOCAL TIME
-        data: { 
-          remark: val.remark, 
-          source: val.source,
-          punchIn: val.punchIn,
-          punchOut: val.punchOut
-        }
-      };
-    });
-
     try {
-      // Chunked upsert using generated primary key to bypass missing constraint
-      for (let i = 0; i < rows.length; i += 1000) {
-        const chunk = rows.slice(i, i + 1000);
-        const { error, data } = await supabase.from('attendance')
-          .upsert(chunk, { onConflict: 'id' })
-          .select();
+      const entries = Object.entries(recordsMap);
+      
+      // Process in chunks to avoid overwhelming query limits
+      for (let i = 0; i < entries.length; i += 500) {
+        const chunkEntries = entries.slice(i, i + 500);
+        
+        // 1. Collect all empIds and dates in this chunk to query existing records
+        const chunkEmpIds = [...new Set(chunkEntries.map(([k]) => k.substring(0, k.lastIndexOf('_'))))];
+        const chunkDates = [...new Set(chunkEntries.map(([k]) => k.substring(k.lastIndexOf('_') + 1)))];
+        
+        // 2. Fetch existing records to find real database IDs and avoid duplicate key errors
+        const { data: existingData, error: fetchErr } = await supabase.from('attendance')
+          .select('id, emp_id, date')
+          .in('emp_id', chunkEmpIds)
+          .in('date', chunkDates);
           
-        if (error) {
-          console.error('saveAttendance DB Error:', error);
-          // Alert the user with the actual DB error to stop silent failures
-          alert(`📊 Database Save Failed!\n\nError: ${error.message}\nCode: ${error.code}\n\nPlease check if your Supabase 'attendance' table has RLS enabled or missing 'emp_id,date' unique constraint.`);
-          throw error;
+        if (fetchErr) throw fetchErr;
+          
+        const existingMap = {};
+        if (existingData) {
+          existingData.forEach(r => {
+            existingMap[`${r.emp_id}_${r.date}`] = r.id;
+          });
         }
-        console.log(`dataService: Successfully upserted ${chunk.length} records.`, data);
+
+        const rowsToUpsert = [];
+        const rowsToInsert = [];
+
+        chunkEntries.forEach(([key, val]) => {
+          const lastUnderscore = key.lastIndexOf('_');
+          const empId = key.substring(0, lastUnderscore);
+          const dateStr = key.substring(lastUnderscore + 1);
+
+          let punchInTs = null;
+          if (val.punchIn && val.punchIn.includes(':')) {
+            punchInTs = new Date(`${dateStr}T${val.punchIn}:00`).toISOString();
+          } else if (val.punchIn) {
+            punchInTs = val.punchIn;
+          }
+
+          let punchOutTs = null;
+          if (val.punchOut && val.punchOut.includes(':')) {
+            punchOutTs = new Date(`${dateStr}T${val.punchOut}:00`).toISOString();
+          } else if (val.punchOut) {
+            punchOutTs = val.punchOut;
+          }
+
+          const row = {
+            emp_id: String(empId), 
+            date: dateStr,
+            punch_in: punchInTs,
+            punch_out: punchOutTs,
+            status: val.punchOut ? 'Present' : (val.punchIn ? 'Incomplete' : 'Absent'),
+            // STORE RAW STRINGS IN DATA TO PRESERVE LOCAL TIME
+            data: { 
+              remark: val.remark, 
+              source: val.source,
+              punchIn: val.punchIn,
+              punchOut: val.punchOut
+            }
+          };
+
+          // Use the real ID from DB if it exists, or fallback to the one passed in the map
+          const existingId = existingMap[key] || val.id;
+          if (existingId) {
+            row.id = existingId;
+            rowsToUpsert.push(row);
+          } else {
+            rowsToInsert.push(row);
+          }
+        });
+
+        if (rowsToUpsert.length > 0) {
+          const { error } = await supabase.from('attendance').upsert(rowsToUpsert, { onConflict: 'id' });
+          if (error) {
+            console.error('saveAttendance Upsert Error:', error);
+            alert(`📊 Database Upsert Failed!\n\nError: ${error.message}\nCode: ${error.code}`);
+            throw error;
+          }
+        }
+        
+        if (rowsToInsert.length > 0) {
+          const { error } = await supabase.from('attendance').insert(rowsToInsert);
+          if (error) {
+            console.error('saveAttendance Insert Error:', error);
+            alert(`📊 Database Insert Failed!\n\nError: ${error.message}\nCode: ${error.code}`);
+            throw error;
+          }
+        }
+        
+        console.log(`dataService: Successfully saved chunk of ${chunkEntries.length} records.`);
       }
     } catch (err) {
       console.error('dataService: saveAttendance critical failure:', err);

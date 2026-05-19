@@ -5,17 +5,20 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-async function checkEmployees() {
+async function printRecent() {
   const { data, error } = await supabase
-    .from('employees')
-    .select('id, name, biometric_code, emp_code, status');
+    .from('attendance')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(10);
     
   if (error) {
     console.error(error);
   } else {
-    console.log('Employees in Supabase:');
-    console.table(data);
+    data.forEach((r, i) => {
+      console.log(`[${i}] ID: ${r.id}, emp_id: ${r.emp_id}, date: ${r.date}, punch_in: ${r.punch_in}, punch_out: ${r.punch_out}, status: ${r.status}, source: ${r.data?.source}, created_at: ${r.created_at}`);
+    });
   }
 }
 
-checkEmployees();
+printRecent();

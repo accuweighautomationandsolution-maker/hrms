@@ -5,18 +5,28 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-async function checkSchema() {
-  const { data, error } = await supabase.from('user_profiles').select('*').limit(1);
+async function getAttendanceSchema() {
+  console.log('Querying table constraints...');
+  const { data, error } = await supabase.rpc('get_table_schema', { table_name: 'attendance' });
+  
   if (error) {
-    console.error('Error fetching user_profiles:', error);
-    return;
-  }
-  console.log('Sample User Profile Columns:');
-  if (data && data.length > 0) {
-    console.log(Object.keys(data[0]));
+    // If rpc doesn't exist, query standard PG catalog
+    console.log('RPC not found, attempting raw SQL query...');
+    const { data: sqlData, error: sqlErr } = await supabase
+      .from('attendance')
+      .select('*')
+      .limit(1);
+    if (sqlErr) {
+      console.error('Error selecting:', sqlErr.message);
+    } else {
+      console.log('Sample row structure:', sqlData);
+    }
   } else {
-    console.log('No profiles found to inspect keys.');
+    console.log('Schema:', data);
   }
+  
+  // Let's get table definition by querying PG catalog directly via custom function if possible,
+  // or let's select existing constraints if any.
 }
 
-checkSchema();
+getAttendanceSchema();
