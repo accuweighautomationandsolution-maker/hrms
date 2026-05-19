@@ -267,6 +267,10 @@ const Attendance = () => {
   };
 
   const handleBioSync = async () => {
+    if (isEmployee) {
+      alert("Unauthorized: Employees cannot sync biometric data.");
+      return;
+    }
     setSyncLoading(true);
     const startTime = Date.now();
     try {
@@ -408,6 +412,10 @@ const Attendance = () => {
   };
 
   const handleConfirmImport = async () => {
+    if (isEmployee) {
+      alert("Unauthorized: Employees cannot import attendance data.");
+      return;
+    }
     if (!importPreview?.logs?.length) return;
     setImportLoading(true);
     try {
