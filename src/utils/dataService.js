@@ -159,59 +159,155 @@ export const dataService = {
   /**
    * SECURITY: Resolves the currently logged-in user's own employee record.
    * 
-   * This is the ONLY correct way for employee-role components to identify which
-   * employee record belongs to the current session. It performs a direct DB query
-   * by email, server-side, BEFORE any role-based data scrubbing.
+   * Uses a 4-tier fallback strategy to find the employee record regardless
+   * of how the user account was created or what data is stored in user_profiles.
    * 
-   * NEVER use emps[0] or currentUser.id === emp.id as a fallback — those cause
-   * cross-employee data leakage (e.g. Pooja seeing Milind's data).
+   * Strategy:
+   *   1. Match by email (most reliable if both tables have the same email)
+   *   2. Match by name (fallback when emails differ)
+   *   3. Match by emp_code / emp_id field from user_profiles if it stores an employee code
+   *   4. Return null — NEVER returns a random employee as a fallback
    * 
-   * Returns: employee row object or null (if no match found)
+   * Returns: employee row object or null
    */
   getMyEmployeeProfile: async (currentUser) => {
     if (!supabase || !currentUser) return null;
     try {
+      // ── Strategy 1: Email match (fast, server-side) ──
       const email = currentUser.email?.trim()?.toLowerCase();
-      if (!email) {
-        console.warn('getMyEmployeeProfile: currentUser has no email — cannot resolve employee record.');
-        return null;
-      }
+      if (email) {
+        const { data: byEmail, error: emailErr } = await supabase
+          .from('employees')
+          .select('*')
+          .ilike('email', email)
+          .maybeSingle();
 
-      // Primary lookup: by email (most reliable cross-table link)
-      const { data: byEmail, error: emailErr } = await supabase
-        .from('employees')
-        .select('*')
-        .ilike('email', email)
-        .maybeSingle();
-
-      if (!emailErr && byEmail) {
-        console.log(`getMyEmployeeProfile: Resolved employee by email → ID ${byEmail.id} (${byEmail.name})`);
-        // Normalize and return full row
-        let parsedData = {};
-        if (typeof byEmail.data === 'string') {
-          try { parsedData = JSON.parse(byEmail.data); } catch(e) { parsedData = {}; }
-        } else if (byEmail.data && typeof byEmail.data === 'object') {
-          parsedData = byEmail.data;
+        if (!emailErr && byEmail) {
+          console.log(`getMyEmployeeProfile [email match]: ${byEmail.name} (ID: ${byEmail.id})`);
+          return dataService._normalizeEmployeeRow(byEmail);
         }
-        return {
-          ...parsedData,
-          id: byEmail.id,
-          name: byEmail.name || parsedData.name || '',
-          email: byEmail.email || parsedData.email || '',
-          empCode: byEmail.emp_code || parsedData.empCode || '',
-          role: byEmail.designation || parsedData.role || '',
-          department: byEmail.department || parsedData.department || '',
-          status: byEmail.status || parsedData.status || 'Active',
-          empType: byEmail.employment_type || parsedData.empType || 'Probation',
-          biometricCode: byEmail.biometric_code || parsedData.biometricCode || '',
-        };
       }
 
-      console.warn(`getMyEmployeeProfile: No employee record found for email "${email}".`);
+      // ── Strategy 2: Name match ──
+      const name = currentUser.name?.trim();
+      if (name) {
+        const { data: byName, error: nameErr } = await supabase
+          .from('employees')
+          .select('*')
+          .ilike('name', name)
+          .maybeSingle();
+
+        if (!nameErr && byName) {
+          console.log(`getMyEmployeeProfile [name match]: ${byName.name} (ID: ${byName.id})`);
+          return dataService._normalizeEmployeeRow(byName);
+        }
+      }
+
+      // ── Strategy 3: emp_code / emp_id field from user_profiles ──
+      // The user_profiles.emp_id field may store a real employee code OR 'INTERNAL_AUTH:xxx'
+      const rawEmpId = currentUser.emp_id || currentUser.empCode || '';
+      if (rawEmpId && !rawEmpId.startsWith('INTERNAL_AUTH:')) {
+        const { data: byCode, error: codeErr } = await supabase
+          .from('employees')
+          .select('*')
+          .or(`emp_code.ilike.${rawEmpId},id.eq.${rawEmpId}`)
+          .maybeSingle();
+
+        if (!codeErr && byCode) {
+          console.log(`getMyEmployeeProfile [emp_code match]: ${byCode.name} (ID: ${byCode.id})`);
+          return dataService._normalizeEmployeeRow(byCode);
+        }
+      }
+
+      // ── Strategy 4: All strategies failed — return null, NEVER a random employee ──
+      console.warn(`getMyEmployeeProfile: Could not resolve employee for user "${email || name}". No attendance will be shown.`);
       return null;
     } catch (err) {
       console.error('getMyEmployeeProfile exception:', err.message);
       return null;
+    }
+  },
+
+  /**
+   * Internal helper: normalizes a raw Supabase employees row into the app's standard format.
+   */
+  _normalizeEmployeeRow: (row) => {
+    if (!row) return null;
+    let parsedData = {};
+    if (typeof row.data === 'string') {
+      try { parsedData = JSON.parse(row.data); } catch(e) { parsedData = {}; }
+    } else if (row.data && typeof row.data === 'object') {
+      parsedData = row.data;
+    }
+    return {
+      ...parsedData,
+      id: row.id,
+      name: row.name || parsedData.name || '',
+      email: row.email || parsedData.email || '',
+      empCode: row.emp_code || parsedData.empCode || '',
+      role: row.designation || parsedData.role || '',
+      department: row.department || parsedData.department || '',
+      status: row.status || parsedData.status || 'Active',
+      empType: row.employment_type || parsedData.empType || 'Probation',
+      biometricCode: row.biometric_code || parsedData.biometricCode || '',
+      grossSalary: row.gross_salary || parsedData.grossSalary || 0,
+      advanceLoanEMI: row.advance_loan_emi || parsedData.advanceLoanEMI || 0,
+    };
+  },
+
+  /**
+   * EMPLOYEE VIEW: Fetch attendance records for a SINGLE employee by their DB id.
+   * 
+   * This is MUCH more efficient than getAttendance() for employee-role views:
+   *  - Loads only ~1000 records instead of 45,000+
+   *  - Works even if RLS restricts cross-employee reads
+   *  - Returns same map format as getAttendance() for compatibility
+   */
+  getAttendanceForEmployee: async (empId) => {
+    if (!supabase || !empId) return {};
+    try {
+      const map = {};
+      let start = 0;
+      const CHUNK_SIZE = 1000;
+      let hasMore = true;
+      const empIdStr = String(empId);
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('attendance')
+          .select('*')
+          .eq('emp_id', empIdStr)
+          .order('date', { ascending: false })
+          .range(start, start + CHUNK_SIZE - 1);
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          hasMore = false;
+        } else {
+          data.forEach(r => {
+            const k = `${String(r.emp_id)}_${r.date}`;
+            if (map[k]) return;
+            const json = r.data || {};
+            map[k] = {
+              id: r.id,
+              punchIn: json.punchIn || (r.punch_in ? new Date(r.punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null),
+              punchOut: json.punchOut || (r.punch_out ? new Date(r.punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null),
+              status: r.status,
+              remark: json.remark || '',
+              source: json.source || 'Database'
+            };
+          });
+          start += CHUNK_SIZE;
+          if (data.length < CHUNK_SIZE) hasMore = false;
+        }
+      }
+
+      console.log(`getAttendanceForEmployee(${empId}): Loaded ${Object.keys(map).length} records.`);
+      return map;
+    } catch (err) {
+      console.error('getAttendanceForEmployee Error:', err);
+      return {};
     }
   },
 
@@ -369,6 +465,21 @@ export const dataService = {
     }));
     await supabase.from('employees').upsert(rows);
     return list;
+  },
+
+  /**
+   * Admin helper: updates the email column of a specific employee record.
+   * Used by UserManagement's "Link Employee Record" feature to sync the
+   * employee's DB email with their login account email, enabling
+   * getMyEmployeeProfile's email-match strategy to resolve correctly.
+   */
+  _supabaseUpdateEmployeeEmail: async (empId, newEmail) => {
+    if (!supabase) return { error: new Error('Database not available') };
+    const { error } = await supabase
+      .from('employees')
+      .update({ email: newEmail.trim().toLowerCase(), updated_at: new Date().toISOString() })
+      .eq('id', empId);
+    return { error: error || null };
   },
 
   deleteEmployee: async (id) => {

@@ -14,9 +14,11 @@ import {
   ChevronDown,
   Loader2,
   Eye,
-  EyeOff
+  EyeOff,
+  Link2
 } from "lucide-react";
 import { authService } from "../utils/authService";
+import { dataService } from "../utils/dataService";
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -36,6 +38,13 @@ const UserManagement = () => {
   });
   const [formError, setFormError] = useState("");
   const [visiblePasswords, setVisiblePasswords] = useState({});
+
+  // Employee Linking State
+  const [linkingUser, setLinkingUser] = useState(null); // { id, name, email }
+  const [allEmployees, setAllEmployees] = useState([]);
+  const [selectedEmpToLink, setSelectedEmpToLink] = useState('');
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [linkError, setLinkError] = useState('');
 
   const togglePasswordVisibility = (userId) => {
     setVisiblePasswords(prev => ({
@@ -99,6 +108,39 @@ const UserManagement = () => {
     if(window.confirm(`Are you sure you want to change this user's access role?`)) {
       await authService.updateUserRole(userId, newRole);
       loadData();
+    }
+  };
+
+  const handleOpenLinkModal = async (user) => {
+    setLinkingUser(user);
+    setSelectedEmpToLink('');
+    setLinkError('');
+    if (allEmployees.length === 0) {
+      const emps = await dataService.getEmployees().catch(() => []);
+      setAllEmployees(emps);
+    }
+  };
+
+  const handleLinkEmployee = async () => {
+    if (!selectedEmpToLink || !linkingUser) return;
+    setLinkLoading(true);
+    setLinkError('');
+    try {
+      const emp = allEmployees.find(e => String(e.id) === String(selectedEmpToLink));
+      if (!emp) throw new Error('Employee not found.');
+
+      // Update the employee record's email to match the login account's email
+      // This makes getMyEmployeeProfile's email-match strategy succeed
+      const { error } = await dataService._supabaseUpdateEmployeeEmail(emp.id, linkingUser.email);
+      if (error) throw new Error(error.message);
+
+      alert(`✅ Successfully linked "${linkingUser.name}" to employee record "${emp.name}"!\n\nEmployee record email updated to: ${linkingUser.email}`);
+      setLinkingUser(null);
+      setSelectedEmpToLink('');
+    } catch (err) {
+      setLinkError(err.message);
+    } finally {
+      setLinkLoading(false);
     }
   };
 
@@ -274,6 +316,16 @@ const UserManagement = () => {
                         </td>
                         <td style={{ padding: '1rem', textAlign: 'right' }}>
                           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                            {user.role === 'employee' && (
+                              <button
+                                className="btn btn-ghost"
+                                style={{ padding: '0.4rem', color: 'var(--color-primary)' }}
+                                title="Link to Employee Record"
+                                onClick={() => handleOpenLinkModal(user)}
+                              >
+                                <Link2 size={16} />
+                              </button>
+                            )}
                             <button 
                                 className="btn btn-ghost"
                                 style={{ padding: '0.4rem' }}
@@ -408,6 +460,57 @@ const UserManagement = () => {
                 <button type="submit" className="btn btn-primary" style={{ backgroundColor: 'var(--color-text-main)' }}>Activate & Create Account</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Link Employee Record Modal */}
+      {linkingUser && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1001, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', padding: '1rem' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '500px', padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--color-border)', backgroundColor: 'rgba(37,99,235,0.04)' }}>
+              <h3 style={{ fontSize: '1.1rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Link2 size={20} color="var(--color-primary)" /> Link Account to Employee Record
+              </h3>
+              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
+                This will update the employee record's email to <strong>{linkingUser.email}</strong> so the system can correctly map <strong>{linkingUser.name}</strong>'s login to their attendance, leaves, and payroll data.
+              </p>
+            </div>
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {linkError && (
+                <div className="auth-error-box" style={{ margin: 0 }}>
+                  <AlertCircle size={16} /> {linkError}
+                </div>
+              )}
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Select Employee Record to Link</label>
+                <select
+                  className="form-input"
+                  value={selectedEmpToLink}
+                  onChange={e => setSelectedEmpToLink(e.target.value)}
+                  style={{ width: '100%' }}
+                >
+                  <option value="">-- Choose employee record --</option>
+                  {allEmployees.filter(e => e.status === 'Active').map(e => (
+                    <option key={e.id} value={e.id}>
+                      {e.name} {e.empCode ? `(${e.empCode})` : ''} {e.email ? `— ${e.email}` : '— No email'}
+                    </option>
+                  ))}
+                </select>
+                <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.5rem' }}>
+                  💡 The selected employee's email will be updated to <strong>{linkingUser.email}</strong> to enable automatic matching.
+                </p>
+              </div>
+            </div>
+            <div style={{ padding: '1.25rem 1.5rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+              <button className="btn btn-ghost" onClick={() => setLinkingUser(null)} disabled={linkLoading}>Cancel</button>
+              <button
+                className="btn btn-primary"
+                disabled={!selectedEmpToLink || linkLoading}
+                onClick={handleLinkEmployee}
+              >
+                {linkLoading ? 'Linking...' : 'Link & Save'}
+              </button>
+            </div>
           </div>
         </div>
       )}

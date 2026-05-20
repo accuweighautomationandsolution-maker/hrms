@@ -178,24 +178,35 @@ const Attendance = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // For employee role: resolve their own employee record FIRST via email (server-side),
+        // For employee role: resolve their own employee record FIRST via email/name (server-side),
         // before any data scrubbing happens. This prevents cross-employee data leakage.
         const myProfile = isEmployee
           ? await dataService.getMyEmployeeProfile(currentUser).catch(() => null)
           : null;
 
+        // For employee role: fetch only their own attendance records (much faster, avoids RLS issues)
+        // For admin/management: fetch all records
+        const attFetch = (isEmployee && myProfile)
+          ? dataService.getAttendanceForEmployee(myProfile.id).catch(() => ({}))
+          : dataService.getAttendance().catch(() => ({}));
+
         const [emps, att, hol, bConf, lSync] = await Promise.all([
           dataService.getEmployees().catch(() => []),
-          dataService.getAttendance().catch(() => ({})),
+          attFetch,
           dataService.getCustomHolidays().catch(() => []),
           dataService.getBiometricConfig().catch(() => null),
           dataService.getConfig('biometric_last_sync', null).catch(() => null)
         ]);
 
         if (isMounted) {
-          console.log("Attendance: Data Load Success", { emps: emps.length, att: Object.keys(att || {}).length, userRole, myProfile: myProfile?.name });
+          console.log('Attendance: Data Load Success', {
+            emps: emps.length,
+            att: Object.keys(att || {}).length,
+            userRole,
+            myProfile: myProfile?.name,
+            myProfileId: myProfile?.id
+          });
           setEmployeesList(emps);
-          if (emps.length === 0) console.warn("Attendance: Employee list is empty. Check RLS or data existence.");
           setRecords(att);
           setHolidayList(hol);
           if (bConf) setBioConfig(bConf);
@@ -206,21 +217,21 @@ const Attendance = () => {
             // NEVER fall back to emps[0] — that shows another employee's data.
             if (myProfile) {
               // Find the matching entry in the scrubbed emps list (for display consistency),
-              // but fall back to myProfile itself since it has the correct employee ID.
+              // but always fall back to myProfile itself since it has the verified employee ID.
               const empInList = emps.find(e => String(e.id) === String(myProfile.id));
               setSelectedEmp(empInList || myProfile);
               console.log(`Attendance: Employee resolved → ${myProfile.name} (ID: ${myProfile.id})`);
             } else {
-              // Genuine "no employee record linked to this account" — show empty, not wrong data
+              // Genuine "no employee record linked to this account" — show error UI, not wrong data
               setSelectedEmp(null);
-              console.warn('Attendance: Could not resolve employee record for current user. No data shown.');
+              console.warn('Attendance: Could not resolve employee record for current user.');
             }
           } else if (emps.length > 0) {
             setSelectedEmp(emps[0]);
           }
         }
       } catch (err) {
-        console.error("Attendance: Critical Load Error:", err);
+        console.error('Attendance: Critical Load Error:', err);
       } finally {
         clearTimeout(safetyTimeout);
         if (isMounted) setLoading(false);
@@ -584,6 +595,31 @@ const Attendance = () => {
         <div style={{ textAlign: 'center' }}>
           <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 1rem' }}></div>
           <p style={{ color: 'var(--color-text-muted)', fontWeight: '500' }}>Loading attendance matrix...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show a helpful error when the employee account cannot be linked to an employee record
+  if (isEmployee && !selectedEmp) {
+    return (
+      <div className="page-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <div className="card" style={{ maxWidth: '520px', width: '100%', padding: '2.5rem', textAlign: 'center' }}>
+          <div style={{ width: 64, height: 64, borderRadius: '50%', backgroundColor: 'rgba(245,158,11,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+            <span style={{ fontSize: '2rem' }}>🔗</span>
+          </div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.75rem' }}>Account Not Yet Linked</h2>
+          <p style={{ color: 'var(--color-text-muted)', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+            Your login account (<strong>{currentUser?.email}</strong>) could not be matched to an employee record in the system.
+            Please contact your HR Administrator to link your account.
+          </p>
+          <div style={{ backgroundColor: 'rgba(37,99,235,0.05)', borderRadius: '8px', padding: '1rem', border: '1px solid rgba(37,99,235,0.1)', textAlign: 'left' }}>
+            <p style={{ fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.5rem' }}>What HR needs to verify:</p>
+            <ul style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', lineHeight: 1.8, paddingLeft: '1.25rem', margin: 0 }}>
+              <li>Your employee record email matches your login email: <strong>{currentUser?.email}</strong></li>
+              <li>Or your employee name matches your account name: <strong>{currentUser?.name}</strong></li>
+            </ul>
+          </div>
         </div>
       </div>
     );
