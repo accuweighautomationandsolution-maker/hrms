@@ -3,20 +3,25 @@ import { authService } from './authService';
 
 // ── Generic Supabase Helpers (Pure Supabase, No localStorage) ───────────
 
-// Fetches all rows from a table where data is stored in a JSONB 'data' column
 const sbGetAll = async (table, defaultVal = []) => {
   if (!supabase) return defaultVal;
   try {
-    // Order by id desc as a safe fallback — created_at may not exist in all tables
-    const { data, error } = await supabase.from(table).select('data').order('id', { ascending: false });
+    const fetchPromise = supabase.from(table).select('data');
+    
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`sbGetAll(${table}) timed out after 10s`)), 10000)
+    );
+
+    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
     if (error) {
-      // If id ordering fails, try without ordering
-      const { data: d2, error: e2 } = await supabase.from(table).select('data');
-      if (e2) { console.error(`sbGetAll(${table}):`, e2); return defaultVal; }
-      return (d2 || []).filter(r => r.data != null).map(r => r.data);
+      console.error(`sbGetAll(${table}) query error:`, error.message);
+      return defaultVal;
     }
     return (data || []).filter(r => r.data != null).map(r => r.data);
-  } catch (e) { console.error(`sbGetAll(${table}) exception:`, e); return defaultVal; }
+  } catch (e) {
+    console.error(`sbGetAll(${table}) exception:`, e.message);
+    return defaultVal;
+  }
 };
 
 // Generic write: upserts a list of records to a JSONB table
@@ -895,8 +900,51 @@ export const dataService = {
   // ── Policies ──────────────────────────────────────────────
   getPolicies: async () => {
     if (!supabase) return [];
-    const { data } = await supabase.from('policies').select('*').order('created_at', { ascending: false });
-    return data || [];
+    try {
+      console.log('dataService: Fetching policies from Supabase...');
+      const fetchPromise = supabase.from('policies').select('*');
+      
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('getPolicies query timed out after 10s')), 10000)
+      );
+
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+      if (error) {
+        console.error('Supabase Query Error (policies):', error.message);
+        return [];
+      }
+
+      const list = (data || []).map(r => {
+        let parsedData = {};
+        if (typeof r.data === 'string') {
+          try { parsedData = JSON.parse(r.data); } catch(e) { parsedData = {}; }
+        } else if (r.data && typeof r.data === 'object') {
+          parsedData = r.data;
+        }
+
+        return {
+          ...parsedData,
+          id: r.id,
+          title: r.title || parsedData.title || '',
+          category: r.category || parsedData.category || 'HR Policies',
+          status: r.status || parsedData.status || 'Active',
+          version: parsedData.version || '1.0',
+          effectiveDate: parsedData.effectiveDate || '',
+          uploadDate: parsedData.uploadDate || r.created_at?.split('T')[0] || '',
+          fileName: parsedData.fileName || '',
+          fileUrl: parsedData.fileUrl || '',
+          fileSize: parsedData.fileSize || '',
+          summary: parsedData.summary || ''
+        };
+      });
+
+      // Sort by id desc safely in Javascript
+      list.sort((a, b) => String(b.id || '').localeCompare(String(a.id || '')));
+      return list;
+    } catch (err) {
+      console.error('Critical Exception in getPolicies:', err.message);
+      return [];
+    }
   },
 
   savePolicies: async (policies) => {

@@ -45,10 +45,12 @@ const PolicyManagement = ({ userRole }) => {
   }, []);
 
   const filteredPolicies = useMemo(() => {
-    return policies.filter(p => 
-      p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.category.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    return (policies || []).filter(p => {
+      const title = p.title || '';
+      const category = p.category || '';
+      return title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+             category.toLowerCase().includes(searchQuery.toLowerCase());
+    });
   }, [policies, searchQuery]);
 
   const user = authService.getCurrentUser();
