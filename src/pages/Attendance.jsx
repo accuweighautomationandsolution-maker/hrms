@@ -224,7 +224,17 @@ const Attendance = () => {
       return;
     }
 
-    BiometricService.getDeviceStatus(bioConfig.ip, bioConfig.port).then(d => setDevices(d));
+    const checkStatus = () => {
+      BiometricService.getDeviceStatus(bioConfig.ip, bioConfig.port).then(d => {
+        setDevices(d);
+        if (d && d[0] && d[0].lastSyncTime) {
+          setLastSync(new Date(d[0].lastSyncTime).toLocaleString());
+        }
+      });
+    };
+
+    checkStatus();
+    const intervalId = setInterval(checkStatus, 10000); // Poll status every 10s
 
     // Subscribe to Push events for real-time reflection
     const unsubscribe = BiometricService.subscribeToPushEvents(async (punch) => {
@@ -252,7 +262,10 @@ const Attendance = () => {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      clearInterval(intervalId);
+      unsubscribe();
+    };
   }, [bioConfig, bioIdMap]);
 
   const holidays = useMemo(() => getHolidayDates(year, month, holidayList || []), [year, month, holidayList]);
@@ -582,15 +595,6 @@ const Attendance = () => {
         {/* Biometric Controls */}
         {!isEmployee && (
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-            {bioConfig.isEnabled && devices[0] && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', padding: '0.4rem 0.6rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: devices[0]?.status === 'Online' ? 'var(--color-success)' : 'var(--color-danger)' }}></div>
-                  <span style={{ fontWeight: '600' }}>X2008: {devices[0]?.status || 'Checking...'}</span>
-                </div>
-                {lastSync && <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>Last Sync: {lastSync}</span>}
-              </div>
-            )}
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', backgroundColor: 'var(--color-surface)', padding: '0.2rem 0.5rem', borderRadius: '6px', border: '1px solid var(--color-border)' }}>
               <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--color-text-muted)' }}>Sync Range:</span>
               <input type="date" value={syncDateRange.from} onChange={e => setSyncDateRange(p => ({ ...p, from: e.target.value }))} style={{ fontSize: '0.75rem', padding: '0.2rem', border: 'none', background: 'transparent' }} title="From Date" />
@@ -643,6 +647,153 @@ const Attendance = () => {
           </div>
         )}
       </div>
+
+      {/* Biometric Integration Dashboard */}
+      {bioConfig.isEnabled && devices[0] && !isEmployee && (
+        <div className="card" style={{
+          marginBottom: '1.5rem',
+          padding: '1.25rem',
+          background: 'linear-gradient(135deg, var(--color-surface) 0%, rgba(37,99,235,0.03) 100%)',
+          border: '1px solid var(--color-border)',
+          borderRadius: '12px',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '1.25rem',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.025)'
+        }}>
+          {/* Bridge Status */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '10px',
+              backgroundColor: devices[0].bridgeStatus === 'Online' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: devices[0].bridgeStatus === 'Online' ? 'var(--color-success)' : 'var(--color-danger)'
+            }}>
+              <Activity size={20} className={devices[0].activeSessionState !== 'idle' ? 'animate-pulse' : ''} />
+            </div>
+            <div>
+              <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '600', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bridge Service</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.15rem' }}>
+                <span style={{ fontWeight: '700', fontSize: '0.95rem', color: 'var(--color-text-main)' }}>
+                  {devices[0].bridgeStatus || 'Offline'}
+                </span>
+                <span style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: devices[0].bridgeStatus === 'Online' ? 'var(--color-success)' : 'var(--color-danger)',
+                  boxShadow: devices[0].bridgeStatus === 'Online' ? '0 0 8px var(--color-success)' : 'none'
+                }}></span>
+              </div>
+            </div>
+          </div>
+
+          {/* Machine Connection */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '10px',
+              backgroundColor: devices[0].status === 'Online' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: devices[0].status === 'Online' ? 'var(--color-success)' : 'var(--color-danger)'
+            }}>
+              <CheckCircle2 size={20} />
+            </div>
+            <div>
+              <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '600', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Biometric Terminal</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.15rem' }}>
+                <span style={{ fontWeight: '700', fontSize: '0.95rem', color: 'var(--color-text-main)' }}>
+                  {devices[0].status || 'Offline'}
+                </span>
+                <span style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: devices[0].status === 'Online' ? 'var(--color-success)' : 'var(--color-danger)',
+                  boxShadow: devices[0].status === 'Online' ? '0 0 8px var(--color-success)' : 'none'
+                }}></span>
+              </div>
+            </div>
+          </div>
+
+          {/* Last Sync */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '10px',
+              backgroundColor: 'rgba(37,99,235,0.08)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--color-primary)'
+            }}>
+              <Clock size={20} />
+            </div>
+            <div>
+              <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '600', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Last Auto-Sync Check</p>
+              <p style={{ margin: 0, fontWeight: '700', fontSize: '0.95rem', color: 'var(--color-text-main)', marginTop: '0.15rem' }}>
+                {devices[0].lastSyncTime ? new Date(devices[0].lastSyncTime).toLocaleTimeString() : 'Never'}
+              </p>
+            </div>
+          </div>
+
+          {/* Records & Active State */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '10px',
+              backgroundColor: 'rgba(79,70,229,0.08)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--color-primary)'
+            }}>
+              <FileSpreadsheet size={20} />
+            </div>
+            <div>
+              <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '600', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cumulative Synced Logs</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.15rem' }}>
+                <span style={{ fontWeight: '700', fontSize: '0.95rem', color: 'var(--color-text-main)' }}>
+                  {devices[0].totalRecordsSynced || 0}
+                </span>
+                {devices[0].activeSessionState !== 'idle' && (
+                  <span className="badge badge-info" style={{ fontSize: '0.65rem', animation: 'pulse 1.5s infinite' }}>
+                    {devices[0].activeSessionState === 'connecting' ? 'Connecting...' : 'Syncing...'}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Info details */}
+          <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--color-border)', paddingTop: '0.75rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+            <span><strong>Device:</strong> {devices[0].deviceName} ({devices[0].model})</span>
+            <span>•</span>
+            <span><strong>Serial:</strong> {devices[0].serialNumber}</span>
+            <span>•</span>
+            <span><strong>Terminal IP:</strong> {devices[0].ip}</span>
+            <span>•</span>
+            <span><strong>Terminal Stats:</strong> {devices[0].userCount} Users | {devices[0].logCount} Logs</span>
+            {devices[0].lastError && (
+              <>
+                <span>•</span>
+                <span style={{ color: 'var(--color-danger)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <AlertTriangle size={12} /> {devices[0].lastError}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: isEmployee ? '1fr' : '220px 1fr', gap: '1.5rem' }}>
 

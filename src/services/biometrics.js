@@ -154,9 +154,8 @@ export const BiometricService = {
    * Health check for the device.
    */
   getDeviceStatus: async (ip, port) => {
-    // First try the bridge
     try {
-      const response = await fetch(`http://localhost:9000/api/status?ip=${ip}&port=${port}`, {
+      const response = await fetch(`http://localhost:9000/api/bridge-status`, {
         signal: AbortSignal.timeout(3000)
       });
       if (response.ok) {
@@ -165,22 +164,36 @@ export const BiometricService = {
           deviceId: 'IDX-X2008-PRO',
           model: 'Identix X2008',
           location: 'Office Gateway',
-          status: data.status,
+          status: data.deviceStatus,
+          bridgeStatus: data.bridgeStatus,
+          activeSessionState: data.activeSessionState,
+          lastSyncTime: data.lastSyncTime,
+          totalRecordsSynced: data.totalRecordsSynced,
+          reconnectAttempts: data.reconnectAttempts,
+          lastError: data.lastError,
+          lastSuccessfulConnection: data.lastSuccessfulConnection,
+          userCount: data.userCount,
+          logCount: data.logCount,
           method: 'TCP/IP via Bridge',
           lastPing: new Date().toLocaleTimeString(),
           ip: `${ip}:${port}`
         }];
       }
     } catch (e) {
-      // Bridge not running — show as online if local IP (optimistic)
+      console.warn("Failed to reach biometric bridge status endpoint:", e.message);
     }
     
-    const isLocal = ip.startsWith('192') || ip.startsWith('127') || ip.startsWith('10.');
     return [{
       deviceId: 'IDX-X2008-PRO', 
       model: 'Identix X2008',
       location: 'Office Gateway',
-      status: isLocal ? 'Bridge Offline' : 'Offline',
+      status: 'Offline',
+      bridgeStatus: 'Offline',
+      activeSessionState: 'idle',
+      lastSyncTime: null,
+      totalRecordsSynced: 0,
+      reconnectAttempts: 0,
+      lastError: 'Bridge service is not running or unreachable on port 9000',
       method: 'TCP/IP (ADMS Enabled)',
       lastPing: new Date().toLocaleTimeString(),
       ip: `${ip}:${port}`
