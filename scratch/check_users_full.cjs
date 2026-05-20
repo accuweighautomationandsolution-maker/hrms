@@ -1,3 +1,6 @@
+console.time("CHECK_USERS_FLOW");
+console.log("SCRIPT STARTED: check_users_full.cjs");
+
 const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = 'https://qqpwlhguxxqqpsnigmpn.supabase.co';
