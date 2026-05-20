@@ -477,7 +477,7 @@ export const dataService = {
     if (!supabase) return { error: new Error('Database not available') };
     const { error } = await supabase
       .from('employees')
-      .update({ email: newEmail.trim().toLowerCase(), updated_at: new Date().toISOString() })
+      .update({ email: newEmail.trim().toLowerCase() })
       .eq('id', empId);
     return { error: error || null };
   },
