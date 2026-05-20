@@ -155,6 +155,66 @@ const storageUploadBase64 = async (folder, base64DataUrl, filename, mimeType) =>
 
 export const dataService = {
   // ── Employees ─────────────────────────────────────────────────────────────
+
+  /**
+   * SECURITY: Resolves the currently logged-in user's own employee record.
+   * 
+   * This is the ONLY correct way for employee-role components to identify which
+   * employee record belongs to the current session. It performs a direct DB query
+   * by email, server-side, BEFORE any role-based data scrubbing.
+   * 
+   * NEVER use emps[0] or currentUser.id === emp.id as a fallback — those cause
+   * cross-employee data leakage (e.g. Pooja seeing Milind's data).
+   * 
+   * Returns: employee row object or null (if no match found)
+   */
+  getMyEmployeeProfile: async (currentUser) => {
+    if (!supabase || !currentUser) return null;
+    try {
+      const email = currentUser.email?.trim()?.toLowerCase();
+      if (!email) {
+        console.warn('getMyEmployeeProfile: currentUser has no email — cannot resolve employee record.');
+        return null;
+      }
+
+      // Primary lookup: by email (most reliable cross-table link)
+      const { data: byEmail, error: emailErr } = await supabase
+        .from('employees')
+        .select('*')
+        .ilike('email', email)
+        .maybeSingle();
+
+      if (!emailErr && byEmail) {
+        console.log(`getMyEmployeeProfile: Resolved employee by email → ID ${byEmail.id} (${byEmail.name})`);
+        // Normalize and return full row
+        let parsedData = {};
+        if (typeof byEmail.data === 'string') {
+          try { parsedData = JSON.parse(byEmail.data); } catch(e) { parsedData = {}; }
+        } else if (byEmail.data && typeof byEmail.data === 'object') {
+          parsedData = byEmail.data;
+        }
+        return {
+          ...parsedData,
+          id: byEmail.id,
+          name: byEmail.name || parsedData.name || '',
+          email: byEmail.email || parsedData.email || '',
+          empCode: byEmail.emp_code || parsedData.empCode || '',
+          role: byEmail.designation || parsedData.role || '',
+          department: byEmail.department || parsedData.department || '',
+          status: byEmail.status || parsedData.status || 'Active',
+          empType: byEmail.employment_type || parsedData.empType || 'Probation',
+          biometricCode: byEmail.biometric_code || parsedData.biometricCode || '',
+        };
+      }
+
+      console.warn(`getMyEmployeeProfile: No employee record found for email "${email}".`);
+      return null;
+    } catch (err) {
+      console.error('getMyEmployeeProfile exception:', err.message);
+      return null;
+    }
+  },
+
   getEmployees: async () => {
     if (!supabase) {
       console.warn('dataService: Supabase client is null. Returning empty employee list.');

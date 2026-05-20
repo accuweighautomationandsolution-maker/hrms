@@ -178,6 +178,12 @@ const Attendance = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
+        // For employee role: resolve their own employee record FIRST via email (server-side),
+        // before any data scrubbing happens. This prevents cross-employee data leakage.
+        const myProfile = isEmployee
+          ? await dataService.getMyEmployeeProfile(currentUser).catch(() => null)
+          : null;
+
         const [emps, att, hol, bConf, lSync] = await Promise.all([
           dataService.getEmployees().catch(() => []),
           dataService.getAttendance().catch(() => ({})),
@@ -187,7 +193,7 @@ const Attendance = () => {
         ]);
 
         if (isMounted) {
-          console.log("Attendance: Data Load Success", { emps: emps.length, att: Object.keys(att || {}).length, userRole });
+          console.log("Attendance: Data Load Success", { emps: emps.length, att: Object.keys(att || {}).length, userRole, myProfile: myProfile?.name });
           setEmployeesList(emps);
           if (emps.length === 0) console.warn("Attendance: Employee list is empty. Check RLS or data existence.");
           setRecords(att);
@@ -196,9 +202,18 @@ const Attendance = () => {
           if (lSync) setLastSync(lSync);
 
           if (isEmployee) {
-            if (emps.length > 0) {
-              const emp = emps.find(e => String(e.id) === String(currentUser?.id));
-              setSelectedEmp(emp || emps[0]);
+            // SECURITY: Use the pre-resolved profile from getMyEmployeeProfile.
+            // NEVER fall back to emps[0] — that shows another employee's data.
+            if (myProfile) {
+              // Find the matching entry in the scrubbed emps list (for display consistency),
+              // but fall back to myProfile itself since it has the correct employee ID.
+              const empInList = emps.find(e => String(e.id) === String(myProfile.id));
+              setSelectedEmp(empInList || myProfile);
+              console.log(`Attendance: Employee resolved → ${myProfile.name} (ID: ${myProfile.id})`);
+            } else {
+              // Genuine "no employee record linked to this account" — show empty, not wrong data
+              setSelectedEmp(null);
+              console.warn('Attendance: Could not resolve employee record for current user. No data shown.');
             }
           } else if (emps.length > 0) {
             setSelectedEmp(emps[0]);

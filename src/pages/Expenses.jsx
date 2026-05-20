@@ -34,6 +34,10 @@ const SummaryCard = ({ title, value, colorClass }) => (
 );
 
 const Expenses = () => {
+  const currentUser = authService.getCurrentUser();
+  const userRole = authService.getUserRole();
+  const isEmployee = userRole === 'employee';
+
   const [showModal, setShowModal] = useState(false);
   const [linkedAdvance, setLinkedAdvance] = useState('none');
   const [targetSite, setTargetSite] = useState('');
@@ -42,6 +46,7 @@ const Expenses = () => {
   const [projects, setProjects] = useState([]);
   const [isAddingNewProject, setIsAddingNewProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
+  const [resolvedMyEmpId, setResolvedMyEmpId] = useState(null);
 
   const [expenseItems, setExpenseItems] = useState([
     { id: Date.now(), date: new Date().toISOString().split('T')[0], category: '', amount: '', description: '', attachment: null }
@@ -55,6 +60,12 @@ const Expenses = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
+        // SECURITY: Resolve actual employee record by email for employee-role users.
+        const myEmpProfile = isEmployee
+          ? await dataService.getMyEmployeeProfile(currentUser).catch(() => null)
+          : null;
+        if (myEmpProfile) setResolvedMyEmpId(myEmpProfile.id);
+
         const [records, advances, prjs] = await Promise.all([
           dataService.getExpenses(),
           dataService.getAdvanceHistory(),
@@ -70,15 +81,19 @@ const Expenses = () => {
       }
     };
     fetchData();
-  }, [reloads]);
+  }, [reloads, currentUser?.id, isEmployee]);
 
   const filteredExpenses = useMemo(() => {
-    return expenseRecords.filter(r => 
-        r.site.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.name.toLowerCase().includes(searchTerm.toLowerCase())
+    // SECURITY: Employee-role users only see their own expenses
+    const visibleRecords = isEmployee && resolvedMyEmpId
+      ? expenseRecords.filter(r => String(r.empId) === String(resolvedMyEmpId))
+      : expenseRecords;
+    return visibleRecords.filter(r => 
+        (r.site || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (r.category || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (r.name || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [expenseRecords, searchTerm]);
+  }, [expenseRecords, searchTerm, isEmployee, resolvedMyEmpId]);
 
   const handleAddItem = () => {
     setExpenseItems([...expenseItems, { id: Date.now(), date: new Date().toISOString().split('T')[0], category: '', amount: '', description: '', attachment: null }]);
@@ -108,12 +123,13 @@ const Expenses = () => {
 
     const currentUser = authService.getCurrentUser();
     const currentUserName = currentUser ? currentUser.name : 'Employee User';
+    const myEmpId = resolvedMyEmpId || (currentUser ? currentUser.id : null);
 
     const newEntries = expenseItems.map(item => ({
         id: Date.now() + Math.floor(Math.random() * 1000),
         date: item.date,
         name: currentUserName,
-        empId: currentUser ? currentUser.id : 1, 
+        empId: myEmpId, 
         department: currentUser ? currentUser.department : 'Engineering',
         site: targetSite,
         category: item.category || 'Others',

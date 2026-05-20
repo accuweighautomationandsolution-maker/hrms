@@ -27,6 +27,7 @@ const LeaveManagement = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [activeEmp, setActiveEmp] = useState(null);
+  const [resolvedMyEmpId, setResolvedMyEmpId] = useState(null);
   
   // Real-time synchronization of employment status for leave eligibility
   const isProbation = activeEmp?.empType === 'Probation' || currentUser?.empType === 'Probation';
@@ -35,20 +36,40 @@ const LeaveManagement = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
+        // SECURITY: Resolve actual employee record by email before any ID comparisons.
+        // currentUser.id is a user_profiles UUID, NOT an employees table ID.
+        const myEmpProfile = isEmployee
+          ? await dataService.getMyEmployeeProfile(currentUser).catch(() => null)
+          : null;
+
+        const resolvedId = myEmpProfile ? myEmpProfile.id : null;
+        if (isEmployee && resolvedId) setResolvedMyEmpId(resolvedId);
+
+        // Use the resolved employee's actual ID for all data filtering
+        const myEmpId = resolvedId || currentUser.id;
+
         const [leaves, emps, paidBal, sickBal, casualBal] = await Promise.all([
           dataService.getLeaveRequests(),
           dataService.getEmployees(),
-          dataService.getEmployeeBalance(currentUser.id, 'Paid'),
-          dataService.getEmployeeBalance(currentUser.id, 'Sick'),
-          dataService.getEmployeeBalance(currentUser.id, 'Casual')
+          dataService.getEmployeeBalance(myEmpId, 'Paid'),
+          dataService.getEmployeeBalance(myEmpId, 'Sick'),
+          dataService.getEmployeeBalance(myEmpId, 'Casual')
         ]);
         
         // Find current user's employee record to get real status
-        const myRecord = emps.find(e => e.id === currentUser.id || e.empCode === currentUser.empCode);
-        if (myRecord) setActiveEmp(myRecord);
+        if (myEmpProfile) {
+          setActiveEmp(myEmpProfile);
+        } else {
+          const myRecord = emps.find(e => e.id === currentUser.id || e.empCode === currentUser.empCode);
+          if (myRecord) setActiveEmp(myRecord);
+        }
 
         if (isEmployee) {
-          setRequests(leaves.filter(l => l.empId === currentUser.id || l.empId === currentUser.empCode));
+          // Filter leaves strictly by the resolved employee ID (string and number safe)
+          setRequests(leaves.filter(l =>
+            String(l.empId) === String(myEmpId) ||
+            String(l.emp_id) === String(myEmpId)
+          ));
         } else {
           setRequests(leaves);
         }
@@ -233,7 +254,7 @@ const LeaveManagement = () => {
                   
                   const newRequest = {
                     id: Date.now(),
-                    empId: currentUser.id,
+                    empId: resolvedMyEmpId || currentUser.id,
                     name: currentUser.name,
                     type: leaveType,
                     startDate,

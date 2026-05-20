@@ -35,8 +35,10 @@ const Advances = () => {
   const [employeesList, setEmployeesList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  // resolvedMyEmpId holds the ACTUAL employees table ID for the current user
+  const [resolvedMyEmpId, setResolvedMyEmpId] = useState(null);
   
-  const [selectedEmpId, setSelectedEmpId] = useState(isEmployee ? currentUser.id : '');
+  const [selectedEmpId, setSelectedEmpId] = useState('');
   const [advanceType, setAdvanceType] = useState('Personal Advance');
   const [amount, setAmount] = useState('');
   const [installments, setInstallments] = useState('1');
@@ -48,6 +50,18 @@ const Advances = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
+        // SECURITY: Resolve actual employee record by email for employee-role users.
+        // currentUser.id is a user_profiles UUID, NOT an employees table ID.
+        const myEmpProfile = isEmployee
+          ? await dataService.getMyEmployeeProfile(currentUser).catch(() => null)
+          : null;
+
+        const resolvedId = myEmpProfile ? myEmpProfile.id : null;
+        if (isEmployee) {
+          setResolvedMyEmpId(resolvedId);
+          setSelectedEmpId(resolvedId ? String(resolvedId) : '');
+        }
+
         const [advData, empsData] = await Promise.all([
           dataService.getAdvanceHistory(),
           dataService.getEmployees()
@@ -61,14 +75,15 @@ const Advances = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [currentUser?.id, isEmployee]);
 
   const activeEmployees = useMemo(() => {
     return employeesList.filter(e => 
       e.status === 'Active' && 
-      (isEmployee ? (e.id === Number(currentUser.id)) : true)
+      // SECURITY: use resolvedMyEmpId (the actual employees table ID), not currentUser.id
+      (isEmployee ? (resolvedMyEmpId !== null ? String(e.id) === String(resolvedMyEmpId) : false) : true)
     );
-  }, [employeesList, isEmployee, currentUser.id]);
+  }, [employeesList, isEmployee, resolvedMyEmpId]);
 
   const filteredEmployees = useMemo(() => {
     return activeEmployees.filter(e => 
@@ -197,14 +212,21 @@ const Advances = () => {
 
   const stats = useMemo(() => {
     const totalEMI = activeEmployees.reduce((sum, e) => sum + (e.advanceLoanEMI || 0), 0);
-    const myHistory = advances.filter(h => isEmployee ? (h.empId === Number(currentUser?.id)) : true);
+    // SECURITY: Filter using resolvedMyEmpId (actual employees table ID)
+    const myHistory = advances.filter(h => isEmployee
+      ? (resolvedMyEmpId !== null && String(h.empId) === String(resolvedMyEmpId))
+      : true
+    );
     const totalPrincipal = myHistory.reduce((sum, h) => sum + (h.amount || 0), 0);
     return { totalEMI, totalPrincipal, historyCount: myHistory.length };
-  }, [activeEmployees, advances, isEmployee, currentUser?.id]);
+  }, [activeEmployees, advances, isEmployee, resolvedMyEmpId]);
 
   const displayHistory = useMemo(() => {
-    return advances.filter(h => isEmployee ? (h.empId === Number(currentUser?.id)) : true);
-  }, [advances, isEmployee, currentUser?.id]);
+    return advances.filter(h => isEmployee
+      ? (resolvedMyEmpId !== null && String(h.empId) === String(resolvedMyEmpId))
+      : true
+    );
+  }, [advances, isEmployee, resolvedMyEmpId]);
 
   if (loading) {
     return (
