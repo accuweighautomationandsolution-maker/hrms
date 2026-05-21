@@ -152,26 +152,43 @@ export const authService = {
     }
 
     // Strategy 2: Internal Shadow Auth (for Testing/Staging)
+    // Credentials are stored in auth_logs as a SHADOW_CRED record (avoids BIGINT emp_id type conflict)
     const { data: profiles } = await supabase.from('user_profiles').select('*').eq('email', normEmail);
     const profile = profiles?.[0];
 
-    if (profile && profile.emp_id && profile.emp_id.startsWith('INTERNAL_AUTH:')) {
-      const encoded = profile.emp_id.replace('INTERNAL_AUTH:', '');
+    if (profile) {
       try {
-        const decoded = atob(encoded);
-        if (decoded === password) {
-          if (!profile.active) throw new Error('Your account is deactivated.');
-          
-          _cachedProfile = profile;
-          await addAuthLog('LOGIN_SUCCESS_INTERNAL', email, 'Login successful via Internal Auth Mode.');
-          
-          // Trigger session callback manually since Supabase didn't
-          if (_sessionCallback) _sessionCallback(profile);
-          
-          return { profile, forcePasswordReset: profile.force_password_reset };
+        const { data: shadowRows } = await supabase
+          .from('auth_logs')
+          .select('data')
+          .eq('id', `SHADOW_CRED_${normEmail}`)
+          .maybeSingle();
+
+        if (shadowRows?.data?.hash) {
+          const decoded = atob(shadowRows.data.hash);
+          if (decoded === password) {
+            if (!profile.active) throw new Error('Your account is deactivated.');
+            _cachedProfile = profile;
+            await addAuthLog('LOGIN_SUCCESS_INTERNAL', email, 'Login successful via Internal Auth Mode.');
+            if (_sessionCallback) _sessionCallback(profile);
+            return { profile, forcePasswordReset: profile.force_password_reset };
+          }
+        }
+
+        // Legacy fallback: check old emp_id field (TEXT type only — skip if BIGINT)
+        if (profile.emp_id && typeof profile.emp_id === 'string' && profile.emp_id.startsWith('INTERNAL_AUTH:')) {
+          const encoded = profile.emp_id.replace('INTERNAL_AUTH:', '');
+          const decoded = atob(encoded);
+          if (decoded === password) {
+            if (!profile.active) throw new Error('Your account is deactivated.');
+            _cachedProfile = profile;
+            await addAuthLog('LOGIN_SUCCESS_INTERNAL', email, 'Login successful via Internal Auth (legacy).');
+            if (_sessionCallback) _sessionCallback(profile);
+            return { profile, forcePasswordReset: profile.force_password_reset };
+          }
         }
       } catch (err) {
-        console.error('Internal Auth decoding failed:', err);
+        console.error('Internal Auth check failed:', err);
       }
     }
 
@@ -198,29 +215,32 @@ export const authService = {
       .from('user_profiles').select('id').eq('email', normEmail).maybeSingle();
     if (existing) throw new Error('User with this email already exists.');
 
-    // Internal Auth Logic: We still try to create a Supabase user for consistency,
-    // but we store the password internally to bypass verification emails in the app.
+    // Try to create a real Supabase Auth user (instant login, no email verification
+    // needed if Supabase has "Confirm email" disabled in Auth settings).
     let userId = `INT_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    let supabaseAuthCreated = false;
     
     try {
-      // We use signUp but don't care if it fails due to confirmation settings
-      // as long as we have the internal fallback.
-      const { data } = await supabase.auth.signUp({
+      const { data, error: signUpErr } = await supabase.auth.signUp({
         email: normEmail,
         password,
         options: { data: { name } }
       });
-      if (data.user) userId = data.user.id;
+      if (!signUpErr && data.user) {
+        userId = data.user.id;
+        supabaseAuthCreated = true;
+      }
     } catch (e) {
-      console.warn('Supabase Auth signUp skipped/failed, proceeding with Internal profile:', e.message);
+      console.warn('Supabase Auth signUp skipped/failed, using internal profile:', e.message);
     }
 
+    // Build profile WITHOUT emp_id to avoid BIGINT type conflict.
+    // The emp_id column is BIGINT in the DB and cannot store text strings.
     const profile = {
       id: userId, 
       email: normEmail, 
       name, 
       role,
-      emp_id: `INTERNAL_AUTH:${btoa(password)}`, // Shadow Auth Storage
       active: true, 
       force_password_reset: false,
       created_at: new Date().toISOString(), 
@@ -229,6 +249,23 @@ export const authService = {
 
     const { error: insError } = await supabase.from('user_profiles').insert(profile);
     if (insError) throw new Error(`Failed to create profile: ${insError.message}`);
+
+    // Store internal auth credential in auth_logs as a SHADOW_CRED record.
+    // This avoids the BIGINT constraint on emp_id and uses only TEXT/JSONB columns.
+    if (!supabaseAuthCreated) {
+      const shadowId = `SHADOW_CRED_${normEmail}`;
+      await supabase.from('auth_logs').upsert({
+        id: shadowId,
+        data: {
+          id: shadowId,
+          type: 'SHADOW_CRED',
+          email: normEmail,
+          hash: btoa(password),
+          userId,
+          createdAt: new Date().toISOString(),
+        }
+      }, { onConflict: 'id' });
+    }
 
     await addAuthLog('USER_CREATED_INTERNAL', _cachedProfile?.email || 'SYSTEM', `Account provisioned instantly: ${email}`);
     return profile;
@@ -254,11 +291,28 @@ export const authService = {
 
     const { data: profile } = await supabase.from('user_profiles').select('email').eq('id', userId).single();
     
+    // Update user profile (do NOT write to emp_id — it is BIGINT and cannot hold text)
     await supabase.from('user_profiles').update({
-      emp_id: `INTERNAL_AUTH:${btoa(newPassword)}`,
       force_password_reset: true, 
       updated_at: new Date().toISOString()
     }).eq('id', userId);
+
+    // Update shadow credential record in auth_logs
+    if (profile?.email) {
+      const normEmail = normalizeEmail(profile.email);
+      const shadowId = `SHADOW_CRED_${normEmail}`;
+      await supabase.from('auth_logs').upsert({
+        id: shadowId,
+        data: {
+          id: shadowId,
+          type: 'SHADOW_CRED',
+          email: normEmail,
+          hash: btoa(newPassword),
+          userId,
+          updatedAt: new Date().toISOString(),
+        }
+      }, { onConflict: 'id' });
+    }
 
     // Also try to update Supabase Auth if possible
     try {
@@ -287,9 +341,23 @@ export const authService = {
   async getUsers() {
     const { data, error } = await supabase.from('user_profiles').select('*').order('created_at');
     if (error) { console.error('getUsers:', error); return []; }
+
+    // Fetch all shadow credential records to display passwords in admin panel
+    const { data: shadowRows } = await supabase
+      .from('auth_logs')
+      .select('data')
+      .like('id', 'SHADOW_CRED_%');
+    const shadowMap = {};
+    (shadowRows || []).forEach(r => {
+      if (r.data?.email && r.data?.hash) {
+        try { shadowMap[r.data.email] = atob(r.data.hash); } catch(e) {}
+      }
+    });
+
     return (data || []).map(u => {
-      let plain = null;
-      if (u.emp_id && u.emp_id.startsWith('INTERNAL_AUTH:')) {
+      // Legacy: check old emp_id field (only works if column was changed to TEXT)
+      let plain = shadowMap[u.email] || null;
+      if (!plain && u.emp_id && typeof u.emp_id === 'string' && u.emp_id.startsWith('INTERNAL_AUTH:')) {
         try { plain = atob(u.emp_id.replace('INTERNAL_AUTH:', '')); } catch(e) {}
       }
       return { ...u, plainPassword: plain };
