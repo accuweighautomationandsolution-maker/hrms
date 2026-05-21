@@ -17,23 +17,41 @@ const ESICReport = () => {
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
     const [employees, setEmployees] = useState([]);
-    const [attendanceRecords, setAttendanceRecords] = useState({});
+    const [presentDaysMap, setPresentDaysMap] = useState({});
     const [loading, setLoading] = useState(true);
+    const [salaryStructures, setSalaryStructures] = useState({});
+    const [dbRecords, setDbRecords] = useState({});
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [empsData, attData] = await Promise.all([
+                const [empsData, structuresMap, dbRecs] = await Promise.all([
                     dataService.getEmployees(),
-                    dataService.getAttendance()
+                    dataService.getSalaryStructuresMap().catch(() => ({})),
+                    dataService.getPayrollRecordsByMonth(month, year).catch(() => [])
                 ]);
                 const filteredEmps = empsData.filter(e => {
                     const hasIp = e.esicIp || (e.esicNumber && e.esicNumber !== 'N/A');
                     return e.hasESIC !== false && hasIp;
                 });
+                
+                const dayCounts = {};
+                await Promise.all(filteredEmps.map(async (emp) => {
+                    dayCounts[emp.id] = await dataService.getPresentDaysCount(emp.id, month, year);
+                }));
+
+                const dbRecsMap = {};
+                dbRecs.forEach(r => {
+                    if (r && r.empId) {
+                        dbRecsMap[String(r.empId)] = r;
+                    }
+                });
+
                 setEmployees(filteredEmps);
-                setAttendanceRecords(attData);
+                setSalaryStructures(structuresMap);
+                setDbRecords(dbRecsMap);
+                setPresentDaysMap(dayCounts);
             } catch (err) {
                 console.error("Failed to load ESIC report data:", err);
             } finally {
@@ -41,17 +59,46 @@ const ESICReport = () => {
             }
         };
         fetchData();
-    }, []);
+    }, [month, year]);
 
     const reportData = useMemo(() => {
         const list = selectedEmpId === 'all' ? employees : employees.filter(e => e.id === Number(selectedEmpId));
         
         return list.map(emp => {
             const daysInMonth = new Date(year, month + 1, 0).getDate();
-            const presentDays = dataService.getPresentDaysCount(emp.id, month, year, attendanceRecords);
+            const dbRec = dbRecords[String(emp.id)] || {};
+            const presentDays = dbRec.daysPresent !== undefined ? dbRec.daysPresent : (presentDaysMap[emp.id] || 0);
             
+            const struct = salaryStructures[String(emp.id)] || {};
+            const pfCapped = struct.pfCapped !== false;
+            const hraPercent = struct.hraPercent !== undefined ? struct.hraPercent : 40;
+            const conveyance = struct.salConveyance || 0;
+            const performance = struct.salPerformance || 0;
+            const otherManual = struct.salOther || 0;
+            const specialManual = struct.salSpecial || 0;
+
             // Re-calculate based on actual days worked for precision
-            const components = calculateSalaryComponents(emp.grossSalary || emp.dayRate || 0, true, 0, emp.category, presentDays, daysInMonth);
+            const components = dbRec.payrollGenerated && dbRec.payrollContext
+                ? dbRec.payrollContext
+                : calculateSalaryComponents(
+                    emp.grossSalary || emp.dayRate || 0, 
+                    pfCapped, 
+                    0, 
+                    emp.category, 
+                    presentDays, 
+                    daysInMonth,
+                    {
+                        hasPF: struct.hasPF !== undefined ? struct.hasPF : !!emp.uanNumber,
+                        hasESIC: struct.hasESIC !== undefined ? struct.hasESIC : !!emp.esicNumber,
+                        year,
+                        month,
+                        hraPercent,
+                        salConveyance: conveyance,
+                        salPerformance: performance,
+                        salOther: otherManual,
+                        salSpecial: specialManual
+                    }
+                );
             
             // Map status to ESIC Reason Codes
             let reasonCode = 0;
@@ -66,14 +113,14 @@ const ESICReport = () => {
                 name: emp.name.toUpperCase().replace(/[^A-Z ]/g, ''), // Strict Image constraint
                 ipNumber: emp.esicIp || emp.esicNumber || '0000000000',
                 workingDays: Math.ceil(presentDays > 0 ? presentDays : 0),
-                monthlyWages: Math.round(components.earnings.totalEarnings), 
+                monthlyWages: Math.round(components.esicReport.grossWages), 
                 eeContri: components.esicReport.eeShare,
                 erContri: components.esicReport.erShare,
                 reasonCode: reasonCode,
                 lastWorkingDay: emp.status === 'Inactive' ? emp.exitDate || '' : ''
             };
         }).filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    }, [selectedEmpId, year, month, employees, attendanceRecords, searchTerm]);
+    }, [selectedEmpId, year, month, employees, presentDaysMap, salaryStructures, dbRecords, searchTerm]);
 
     const totals = useMemo(() => {
         return reportData.reduce((acc, curr) => ({

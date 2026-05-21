@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { IndianRupee, Download, Search, Filter, Eye, AlertCircle, Info, FileText, FileSpreadsheet, Printer, Mail, X, Lock, History, Check } from 'lucide-react';
-import { calculateSalaryComponents, formatCurrency, getHolidayDates, numberToWords } from '../utils/payrollCalculator';
+import { calculateSalaryComponents, formatCurrency, getHolidayDates, numberToWords, getOnRollWorkerPayableDays } from '../utils/payrollCalculator';
 import { dataService } from '../utils/dataService';
 import { authService } from '../utils/authService';
 import { useNotification } from '../context/NotificationContext';
@@ -46,6 +46,20 @@ const Payroll = () => {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [holidayWorked, setHolidayWorked] = useState([]);
+  const [salaryStructures, setSalaryStructures] = useState({});
+  const [processModalEmp, setProcessModalEmp] = useState(null);
+  const [procDaysPresent, setProcDaysPresent] = useState(0);
+  const [procOTAmount, setProcOTAmount] = useState(0);
+  const [procAdvanceDeduction, setProcAdvanceDeduction] = useState(0);
+
+  const handleOpenProcessModal = (emp) => {
+    setProcessModalEmp(emp);
+    setProcDaysPresent(emp.daysPresent);
+    setProcOTAmount(0);
+    const struct = salaryStructures[String(emp.id)] || {};
+    const defaultAdvance = struct.advanceLoanEMI !== undefined ? struct.advanceLoanEMI : (emp.advanceLoanEMI || 0);
+    setProcAdvanceDeduction(defaultAdvance);
+  };
 
   // ── INTERNAL HELPERS (Inlined for stability) ───────────────────────────
 
@@ -110,33 +124,287 @@ const Payroll = () => {
     );
   };
 
+  const ProcessPayrollModal = ({ employee, onClose }) => {
+    const struct = salaryStructures[String(employee.id)] || {};
+    
+    // Live calculation inside modal
+    const liveContext = employee.category === 'Contractual Worker'
+      ? {
+          earnings: {
+            gross: Math.round((Number(employee.dayRate) || 0) * (Number(procDaysPresent) || 0) + Number(procOTAmount)),
+            totalEarnings: Math.round((Number(employee.dayRate) || 0) * (Number(procDaysPresent) || 0) + Number(procOTAmount)),
+            basic: 0,
+            da: 0,
+            hra: 0,
+            washingAllowance: 0,
+            specialAllowance: 0,
+            conveyance: 0,
+            performance: 0,
+            otherManual: 0,
+            otAmount: Number(procOTAmount)
+          },
+          deductions: {
+            pf: 0,
+            esic: 0,
+            pt: 0,
+            tds: 0,
+            advance: Number(procAdvanceDeduction),
+            total: Number(procAdvanceDeduction)
+          },
+          netPay: Math.max(0, Math.round((Number(employee.dayRate) || 0) * (Number(procDaysPresent) || 0) + Number(procOTAmount) - Number(procAdvanceDeduction))),
+          isBalanced: true,
+          divisor: getOnRollWorkerPayableDays(year, month) // arbitrary
+        }
+      : calculateSalaryComponents(
+          employee.grossSalary,
+          struct.pfCapped !== false,
+          Number(procAdvanceDeduction) || 0,
+          employee.category,
+          Number(procDaysPresent) || 0,
+          30,
+          {
+            hasPF: struct.hasPF !== undefined ? struct.hasPF : !!employee.uanNumber,
+            hasESIC: struct.hasESIC !== undefined ? struct.hasESIC : !!employee.esicNumber,
+            year,
+            month,
+            hraPercent: struct.hraPercent !== undefined ? struct.hraPercent : 40,
+            salConveyance: struct.salConveyance || 0,
+            salPerformance: struct.salPerformance || 0,
+            salOther: struct.salOther || 0,
+            salSpecial: struct.salSpecial || 0,
+            otAmount: Number(procOTAmount) || 0
+          }
+        );
+
+    const handleConfirmProcess = async () => {
+      const updates = {
+        payrollGenerated: true,
+        payrollContext: liveContext,
+        daysPresent: Number(procDaysPresent),
+        createdAt: new Date().toISOString()
+      };
+      try {
+        const updatedRecord = await dataService.updatePayrollRecord(
+          month,
+          year,
+          employee.id,
+          updates,
+          authService.getCurrentUser()?.name || 'Admin'
+        );
+        if (updatedRecord) {
+          setDbRecords(prev => ({
+            ...prev,
+            [String(employee.id)]: updatedRecord
+          }));
+          showNotification("Payroll generated successfully", "success");
+        } else {
+          showNotification("Failed to generate payroll", "error");
+        }
+      } catch (e) {
+        console.error(e);
+        showNotification("Failed to generate payroll", "error");
+      } finally {
+        onClose();
+      }
+    };
+
+    return (
+      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+        <div className="card" style={{ width: '100%', maxWidth: '600px', padding: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem' }}>
+            <h3 style={{ margin: 0 }}>⚙️ Process Payroll — {employee.name}</h3>
+            <button className="btn btn-ghost" onClick={onClose} style={{ padding: '0.25rem' }}><X size={20} /></button>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div>
+              <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Employee Code</p>
+              <p style={{ margin: 0, fontWeight: '700' }}>{employee.empCode}</p>
+            </div>
+            <div>
+              <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Category</p>
+              <p style={{ margin: 0, fontWeight: '700' }}>{employee.category || 'Staff Employee'}</p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginBottom: '1.5rem' }}>
+            <div className="form-group">
+              <label className="form-label">Days Present (Attendance count: {employee.daysPresent})</label>
+              <input 
+                type="number" 
+                step="0.5"
+                min="0"
+                max="31"
+                className="form-input" 
+                style={{ width: '100%' }} 
+                value={procDaysPresent} 
+                onChange={e => setProcDaysPresent(Number(e.target.value))} 
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Overtime (OT) Amount (₹)</label>
+              <input 
+                type="number" 
+                min="0"
+                className="form-input" 
+                style={{ width: '100%' }} 
+                value={procOTAmount} 
+                onChange={e => setProcOTAmount(Number(e.target.value))} 
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Advance / Loan Deduction (₹)</label>
+              <input 
+                type="number" 
+                min="0"
+                className="form-input" 
+                style={{ width: '100%' }} 
+                value={procAdvanceDeduction} 
+                onChange={e => setProcAdvanceDeduction(Number(e.target.value))} 
+              />
+            </div>
+          </div>
+
+          {/* LIVE PREVIEW CONTAINER */}
+          <div style={{ backgroundColor: 'var(--color-surface)', padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--color-border)', marginBottom: '1.5rem' }}>
+            <h4 style={{ margin: '0 0 1rem', fontSize: '0.9rem', color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Live Payout Preview</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.9rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Gross Earnings:</span>
+                <span style={{ fontWeight: '600' }}>{formatCurrency(liveContext.earnings.gross)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Total Deductions:</span>
+                <span style={{ fontWeight: '600', color: 'var(--color-danger)' }}>{formatCurrency(liveContext.deductions.total)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--color-border)', paddingTop: '0.5rem', fontWeight: '800', fontSize: '1.1rem' }}>
+                <span>Net Take Home:</span>
+                <span style={{ color: 'var(--color-success)' }}>{formatCurrency(liveContext.netPay)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--color-border)', paddingTop: '1.25rem' }}>
+            <button className="btn btn-outline" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleConfirmProcess}>Confirm & Process</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const PayslipModal = ({ employee, onClose }) => {
     const { payrollContext } = employee;
     const { earnings, deductions, netPay } = payrollContext;
+    
+    // Formatting helper
+    const fmt = (val) => formatCurrency(val || 0);
+
     return (
       <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
         <div className="card" style={{ width: '100%', maxWidth: '850px', padding: '2rem', maxHeight: '95vh', overflowY: 'auto' }}>
-          <div id="payslip-capture">
-            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-              <h1 style={{ margin: 0, color: 'var(--color-primary)' }}>ACCUWEIGH HRMS</h1>
-              <p style={{ margin: 0, fontWeight: '700' }}>Payslip for {MONTH_NAMES[month]} {year}</p>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '2rem' }}>
-              <div style={{ backgroundColor: '#f9fafb', padding: '1rem', borderRadius: '8px' }}>
-                <p><strong>Employee:</strong> {employee.name} ({employee.empCode})</p>
-                <p><strong>Designation:</strong> {employee.role}</p>
+          <div id="payslip-capture" style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '12px', color: '#1e293b' }}>
+            
+            {/* Header / Branding */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #e2e8f0', paddingBottom: '1.5rem', marginBottom: '1.5rem' }}>
+              <div>
+                <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '800', color: '#2563eb' }}>ACCUWEIGH</h1>
+                <p style={{ margin: '0.2rem 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: '600' }}>Automation & Solution Pvt. Ltd.</p>
               </div>
-              <div style={{ backgroundColor: '#f9fafb', padding: '1rem', borderRadius: '8px' }}>
-                <p><strong>Total Earnings:</strong> {formatCurrency(earnings.gross)}</p>
-                <p><strong>Total Deductions:</strong> {formatCurrency(deductions.total)}</p>
+              <div style={{ textAlign: 'right' }}>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}>PAYSLIP</h3>
+                <p style={{ margin: '0.2rem 0 0', fontSize: '0.9rem', fontWeight: '600', color: '#475569' }}>For the month of {MONTH_NAMES[month]} {year}</p>
               </div>
             </div>
-            <div style={{ backgroundColor: 'rgba(37,99,235,0.1)', padding: '1.5rem', borderRadius: '12px', textAlign: 'center' }}>
-                <p style={{ margin: 0, color: 'var(--color-primary)', fontWeight: '700' }}>NET TAKE HOME</p>
-                <h2 style={{ margin: 0, fontSize: '2rem' }}>{formatCurrency(netPay)}</h2>
+
+            {/* Employee Details Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem', marginBottom: '1.5rem', backgroundColor: '#f8fafc', padding: '1.25rem', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.9rem' }}>
+              <div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <tr><td style={{ padding: '0.3rem 0', color: '#64748b', fontWeight: '500' }}>Employee Name:</td><td style={{ padding: '0.3rem 0', fontWeight: '700', color: '#0f172a' }}>{employee.name}</td></tr>
+                    <tr><td style={{ padding: '0.3rem 0', color: '#64748b', fontWeight: '500' }}>Employee Code:</td><td style={{ padding: '0.3rem 0', fontWeight: '700', color: '#0f172a' }}>{employee.empCode || 'N/A'}</td></tr>
+                    <tr><td style={{ padding: '0.3rem 0', color: '#64748b', fontWeight: '500' }}>Designation:</td><td style={{ padding: '0.3rem 0', fontWeight: '600', color: '#334155' }}>{employee.role || 'N/A'}</td></tr>
+                    <tr><td style={{ padding: '0.3rem 0', color: '#64748b', fontWeight: '500' }}>Department:</td><td style={{ padding: '0.3rem 0', fontWeight: '600', color: '#334155' }}>{employee.department || 'N/A'}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <tr><td style={{ padding: '0.3rem 0', color: '#64748b', fontWeight: '500' }}>Category:</td><td style={{ padding: '0.3rem 0', fontWeight: '600', color: '#334155' }}>{employee.category || 'Staff Employee'}</td></tr>
+                    <tr><td style={{ padding: '0.3rem 0', color: '#64748b', fontWeight: '500' }}>UAN Number:</td><td style={{ padding: '0.3rem 0', fontWeight: '600', color: '#334155' }}>{employee.uanNumber || 'N/A'}</td></tr>
+                    <tr><td style={{ padding: '0.3rem 0', color: '#64748b', fontWeight: '500' }}>ESIC Number:</td><td style={{ padding: '0.3rem 0', fontWeight: '600', color: '#334155' }}>{employee.esicNumber || 'N/A'}</td></tr>
+                    <tr><td style={{ padding: '0.3rem 0', color: '#64748b', fontWeight: '500' }}>Days Present:</td><td style={{ padding: '0.3rem 0', fontWeight: '700', color: '#0f172a' }}>{employee.daysPresent} / {payrollContext.divisor || 30} days</td></tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
+
+            {/* Earnings and Deductions Table */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0', border: '1px solid #cbd5e1', borderRadius: '8px', overflow: 'hidden', marginBottom: '1.5rem', fontSize: '0.85rem' }}>
+              
+              {/* Earnings Column */}
+              <div style={{ borderRight: '1px solid #cbd5e1' }}>
+                <div style={{ backgroundColor: '#f1f5f9', padding: '0.6rem 1rem', borderBottom: '1px solid #cbd5e1', fontWeight: '700', color: '#1e293b' }}>EARNINGS COMPONENTS</div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>Basic Salary</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(earnings.basic)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>Dearness Allowance (DA)</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(earnings.da)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>HRA</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(earnings.hra)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>Washing Allowance</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(earnings.washingAllowance)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>Conveyance & Fuel</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(earnings.conveyance)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>Special Allowance</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(earnings.specialAllowance)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>Performance Incentive</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(earnings.performance)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #cbd5e1' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>Other Allowance</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(earnings.otherManual)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #cbd5e1' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>Overtime (OT) Amount</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(earnings.otAmount)}</td></tr>
+                    <tr style={{ backgroundColor: '#f8fafc', fontWeight: '700' }}><td style={{ padding: '0.6rem 1rem', color: '#0f172a' }}>Gross Earnings</td><td style={{ padding: '0.6rem 1rem', textAlign: 'right', color: '#0f172a' }}>{fmt(earnings.gross)}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Deductions Column */}
+              <div>
+                <div style={{ backgroundColor: '#f1f5f9', padding: '0.6rem 1rem', borderBottom: '1px solid #cbd5e1', fontWeight: '700', color: '#1e293b' }}>DEDUCTIONS & STATUTORY</div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>PF (Employee Share)</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(deductions.pf)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>ESIC (Employee Share)</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(deductions.esic)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>Professional Tax (PT)</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(deductions.pt)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>TDS (Income Tax)</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(deductions.tds)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>Advance / Loan Deduction</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(deductions.advance)}</td></tr>
+                    {/* Spacer rows */}
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: 'transparent' }}>-</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', color: 'transparent' }}>0</td></tr>
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: 'transparent' }}>-</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', color: 'transparent' }}>0</td></tr>
+                    <tr style={{ borderBottom: '1px solid #cbd5e1' }}><td style={{ padding: '0.5rem 1rem', color: 'transparent' }}>-</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', color: 'transparent' }}>0</td></tr>
+                    <tr style={{ borderBottom: '1px solid #cbd5e1' }}><td style={{ padding: '0.5rem 1rem', color: 'transparent' }}>-</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', color: 'transparent' }}>0</td></tr>
+                    <tr style={{ backgroundColor: '#f8fafc', fontWeight: '700' }}><td style={{ padding: '0.6rem 1rem', color: '#0f172a' }}>Total Deductions</td><td style={{ padding: '0.6rem 1rem', textAlign: 'right', color: '#0f172a' }}>{fmt(deductions.total)}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+            </div>
+
+            {/* Bottom Net Take Home */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#eff6ff', padding: '1.25rem 1.5rem', borderRadius: '8px', border: '1px solid #bfdbfe', marginBottom: '1.5rem' }}>
+              <div>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: '#2563eb', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>NET TAKE HOME PAY</p>
+                <p style={{ margin: '0.2rem 0 0', fontSize: '0.85rem', color: '#475569', fontWeight: '600', fontStyle: 'italic' }}>({numberToWords(netPay)})</p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <h2 style={{ margin: 0, fontSize: '1.75rem', fontWeight: '800', color: '#1e3a8a' }}>{fmt(netPay)}</h2>
+              </div>
+            </div>
+
+            {/* Footer note */}
+            <p style={{ margin: 0, fontSize: '0.7rem', color: '#94a3b8', textAlign: 'center', fontStyle: 'italic' }}>This is a computer-generated payslip and does not require a signature.</p>
+
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
+
+          {/* Action buttons */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem', borderTop: '1px solid var(--color-border)', paddingTop: '1.25rem' }}>
             <button className="btn btn-primary" onClick={() => {
               if (employee.payrollGenerated && !employee.payslipGenerated) {
                 handleUpdateStatus(employee.id, { payslipGenerated: true });
@@ -173,10 +441,11 @@ const Payroll = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [emps, hols, dbRecs] = await Promise.all([
+        const [emps, hols, dbRecs, structuresMap] = await Promise.all([
           dataService.getEmployees().catch(() => []),
           dataService.getCustomHolidays().catch(() => []),
-          dataService.getPayrollRecordsByMonth(month, year).catch(() => [])
+          dataService.getPayrollRecordsByMonth(month, year).catch(() => []),
+          dataService.getSalaryStructuresMap().catch(() => ({}))
         ]);
         
         const attMap = {};
@@ -204,6 +473,7 @@ const Payroll = () => {
           setAttendanceMap(attMap);
           setBalanceMap(balMap);
           setDbRecords(dbRecsMap);
+          setSalaryStructures(structuresMap);
         }
       } catch (err) {
         console.error("Failed to load payroll:", err);
@@ -220,8 +490,36 @@ const Payroll = () => {
     return employees.map(emp => {
       const daysPresent = attendanceMap[emp.id] || 0;
       const dbRec = dbRecords[String(emp.id)] || {};
+      const struct = salaryStructures[String(emp.id)] || {};
+
+      const pfCapped = struct.pfCapped !== false;
+      const hraPercent = struct.hraPercent !== undefined ? struct.hraPercent : 40;
+      const conveyance = struct.salConveyance || 0;
+      const performance = struct.salPerformance || 0;
+      const otherManual = struct.salOther || 0;
+      const specialManual = struct.salSpecial || 0;
+      const advanceDeduction = struct.advanceLoanEMI !== undefined ? struct.advanceLoanEMI : (emp.advanceLoanEMI || 0);
+
       const calculatedContext = emp.category !== 'Contractual Worker'
-        ? calculateSalaryComponents(emp.grossSalary, true, emp.advanceLoanEMI || 0, emp.category, daysPresent, 30, { hasPF: !!emp.uanNumber, hasESIC: !!emp.esicNumber })
+        ? calculateSalaryComponents(
+            emp.grossSalary, 
+            pfCapped, 
+            advanceDeduction, 
+            emp.category, 
+            daysPresent, 
+            30, 
+            { 
+              hasPF: struct.hasPF !== undefined ? struct.hasPF : !!emp.uanNumber, 
+              hasESIC: struct.hasESIC !== undefined ? struct.hasESIC : !!emp.esicNumber,
+              year,
+              month,
+              hraPercent,
+              salConveyance: conveyance,
+              salPerformance: performance,
+              salOther: otherManual,
+              salSpecial: specialManual
+            }
+          )
         : null;
 
       return {
@@ -240,7 +538,7 @@ const Payroll = () => {
           : calculatedContext
       };
     });
-  }, [employees, attendanceMap, balanceMap, dbRecords, month, year]);
+  }, [employees, attendanceMap, balanceMap, dbRecords, salaryStructures, month, year]);
 
   const filteredEmployees = useMemo(() => {
     return employeesWithPayroll.filter(e => 
@@ -486,7 +784,7 @@ const Payroll = () => {
                               <button 
                                 className="btn btn-primary" 
                                 style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', height: 'auto' }} 
-                                onClick={() => handleUpdateStatus(emp.id, { payrollGenerated: true })}
+                                onClick={() => handleOpenProcessModal(emp)}
                               >
                                 Generate
                               </button>
@@ -591,6 +889,10 @@ const Payroll = () => {
       {selectedEmployee && (selectedEmployee.category === 'Contractual Worker' ? 
         <ContractualPayslipModal employee={selectedEmployee} onClose={() => setSelectedEmployee(null)} /> : 
         <PayslipModal employee={selectedEmployee} onClose={() => setSelectedEmployee(null)} />
+      )}
+
+      {processModalEmp && (
+        <ProcessPayrollModal employee={processModalEmp} onClose={() => setProcessModalEmp(null)} />
       )}
 
       {/* Payment Details Entry Modal */}

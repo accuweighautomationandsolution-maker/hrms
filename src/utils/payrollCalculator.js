@@ -19,18 +19,53 @@ const ESIC_PERCENTAGE_EMPLOYER = 0.0325;
 const ESIC_GROSS_LIMIT = 21000;
 const PT_AMOUNT_MH = 200;
 
+export const getOnRollWorkerPayableDays = (year, month) => {
+  // month is 0-indexed: 0 = Jan, 1 = Feb, etc.
+  if (month === 1) { // February
+    const isLeap = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+    return isLeap ? 25 : 24;
+  }
+  
+  // Count Saturdays in the month
+  let satCount = 0;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dow = new Date(year, month, d).getDay();
+    if (dow === 6) { // 6 = Saturday
+      satCount++;
+    }
+  }
+  
+  return satCount === 5 ? 27 : 26;
+};
+
 export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, advanceDeduction = 0, category = 'Staff Employee', daysWorked = 30, daysInMonth = 30, options = {}) => {
   const baseGross = Number(targetGrossInput) || 0;
+
+  // Resolve year and month
+  const yr = options.year !== undefined ? Number(options.year) : new Date().getFullYear();
+  const mth = options.month !== undefined ? Number(options.month) : new Date().getMonth();
+
+  // Automatically detect actual calendar days in the selected month
+  const actualDaysInMonth = new Date(yr, mth + 1, 0).getDate();
+
+  const cat = (category || '').toLowerCase().trim();
+  const isOnRollWorker = cat === 'on role worker' || cat === 'on-roll worker';
+  const isContractualWorker = cat === 'contractual worker';
+
+  let divisor = actualDaysInMonth;
   let effectiveGross = baseGross;
 
-  // 0. Category-Based Gross Calculation proration
-  if (category === 'Contractual Worker') {
+  if (isContractualWorker) {
+    // Contractual worker payout is calculated as dayRate * daysWorked, so baseGross is dayRate
     effectiveGross = baseGross * daysWorked;
-  } else if (category === 'On role worker') {
-    const workingDaysDivisor = daysInMonth > 28 ? (daysInMonth - 4) : 24;
-    effectiveGross = (baseGross / workingDaysDivisor) * daysWorked;
+  } else if (isOnRollWorker) {
+    divisor = getOnRollWorkerPayableDays(yr, mth);
+    effectiveGross = (baseGross / divisor) * daysWorked;
   } else {
-    effectiveGross = (baseGross / daysInMonth) * daysWorked;
+    // Staff employee
+    divisor = actualDaysInMonth;
+    effectiveGross = (baseGross / divisor) * daysWorked;
   }
 
   // Flags from options
@@ -49,15 +84,19 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
   const otherManual = Number(options.salOther) || 0;
   const specialManual = Number(options.salSpecial) || 0;
   
-  // 3. Washing Allowance (1000 Max, Pro-rated by attendance)
-  const washingAllowance = Math.round((1000 / daysInMonth) * daysWorked);
+  // 3. Washing Allowance (1000 Max, Pro-rated by divisor and attendance)
+  const washingAllowance = Math.round((1000 / divisor) * daysWorked);
 
   // 4. Calculate Component Total and Remaining Balance
-  // componentTotal = sum of all earnings defined
+  // componentTotal = sum of all earnings defined (excluding variable OT for structure balance)
   const componentTotal = basic + da + hra + washingAllowance + conveyance + performance + otherManual + specialManual;
   const remainingAmount = effectiveGross - componentTotal;
   
-  // 5. Deductions
+  // 5. Overtime (OT) Pay
+  const otAmount = Number(options.otAmount) || 0;
+  const totalEarnings = componentTotal + otAmount;
+
+  // 6. Deductions
   let pfEligibleAmount = basic + da;
   if (pfCapped && pfEligibleAmount > PF_CAP_AMOUNT) {
     pfEligibleAmount = PF_CAP_AMOUNT;
@@ -66,33 +105,42 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
   // PF Deduction (Zero if disabled)
   const pfDeduction = hasPF ? Math.max(0, Math.round(pfEligibleAmount * PF_PERCENTAGE)) : 0;
 
-  // ESIC Deduction (Zero if disabled)
+  // ESIC Calculation
+  // If ESIC is enabled, it should be calculated on the following total:
+  // Basic + DA + HRA + Washing Allowance + Performance Allowance + Other Allowance + OT
+  const esicWages = basic + da + hra + washingAllowance + performance + otherManual + otAmount;
+  
   let esicDeduction = 0;
   let esicEmployerContribution = 0;
-  if (hasESIC && componentTotal <= ESIC_GROSS_LIMIT) {
-    esicDeduction = Math.max(0, Math.ceil(componentTotal * ESIC_PERCENTAGE_EMPLOYEE));
-    esicEmployerContribution = Math.max(0, Math.ceil(componentTotal * ESIC_PERCENTAGE_EMPLOYER));
+  if (hasESIC) {
+    esicDeduction = Math.max(0, Math.ceil(esicWages * ESIC_PERCENTAGE_EMPLOYEE));
+    esicEmployerContribution = Math.max(0, Math.ceil(esicWages * ESIC_PERCENTAGE_EMPLOYER));
   }
 
-  const ptDeduction = componentTotal > 10000 ? PT_AMOUNT_MH : 0; 
+  // PT: ₹300 for February (month = 1), ₹200 for normal months (if Gross > ₹10,000)
+  let ptDeduction = 0;
+  if (totalEarnings > 10000) {
+    ptDeduction = (mth === 1) ? 300 : 200;
+  }
 
   let tdsDeduction = 0;
-  const annualGross = componentTotal * 12;
+  const annualGross = totalEarnings * 12;
   if (annualGross > 700000) {
     tdsDeduction = Math.max(0, Math.round(((annualGross - 700000) * 0.10) / 12));
   }
 
   const totalDeduction = pfDeduction + esicDeduction + ptDeduction + tdsDeduction + advanceDeduction;
-  const finalNetPay = Math.max(0, componentTotal - totalDeduction);
+  const finalNetPay = Math.max(0, totalEarnings - totalDeduction);
 
-  // 6. Employer Shares
-  // Employer shares are also zero if PF is disabled
+  // 7. Employer Shares
+  // Employer shares are also zero if PF is disabled.
+  // EPF is the remaining difference of statutory 13% total to guarantee exact 13% sum.
+  const totalPFStatutory = hasPF ? Math.max(0, Math.round(pfEligibleAmount * 0.13)) : 0;
   const erPension = hasPF ? Math.max(0, Math.round(pfEligibleAmount * ER_PENSION_PERCENTAGE)) : 0;
-  const erEPF = hasPF ? Math.max(0, Math.round(pfEligibleAmount * PF_PERCENTAGE) - erPension) : 0;
   const edli = hasPF ? Math.max(0, Math.round(pfEligibleAmount * EDLI_PERCENTAGE)) : 0;
   const admin = hasPF ? Math.max(0, Math.round(pfEligibleAmount * ADMIN_PERCENTAGE)) : 0;
+  const erEPF = hasPF ? Math.max(0, totalPFStatutory - erPension - edli - admin) : 0;
   
-  const totalPFStatutory = erPension + erEPF + edli + admin; 
   const totalErStatutory = totalPFStatutory + esicEmployerContribution;
 
   return {
@@ -105,8 +153,9 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
       conveyance,
       performance,
       otherManual,
-      gross: componentTotal,
-      totalEarnings: componentTotal,
+      otAmount,
+      gross: totalEarnings,
+      totalEarnings,
     },
     deductions: {
       pf: pfDeduction,
@@ -127,7 +176,7 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
       admin
     },
     esicReport: {
-      grossWages: Math.round(componentTotal),
+      grossWages: Math.round(esicWages),
       eeShare: esicDeduction,
       erShare: esicEmployerContribution,
       total: esicDeduction + esicEmployerContribution
@@ -135,7 +184,8 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
     erTotalStatutory: totalErStatutory,
     netPay: finalNetPay,
     remainingAmount: Math.round(remainingAmount),
-    isBalanced: Math.abs(remainingAmount) < 1
+    isBalanced: Math.abs(remainingAmount) < 1,
+    divisor
   };
 };
 

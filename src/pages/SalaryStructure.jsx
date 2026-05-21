@@ -17,7 +17,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     roleApplied: '', datePrepared: new Date().toISOString().split('T')[0],
     targetSalary: '', hraPercent: 40,
     salConveyance: '', salSpecial: '', salOther: '', salPerformance: '',
-    hasPF: true, hasESIC: false,
+    hasPF: true, pfCapped: true, hasESIC: false,
     dayRate: ''
   });
 
@@ -102,7 +102,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
   const targetGross = Number(form.targetSalary) || 0;
   const payroll = calculateSalaryComponents(
     targetGross,
-    true, // pfCapped (we'll keep this true as standard)
+    form.pfCapped !== false, // pfCapped state from form
     0,
     empCategory || 'Staff Employee',
     30,
@@ -718,9 +718,12 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
                   <div style={{ backgroundColor: 'rgba(239,68,68,0.1)', padding: '1rem', borderBottom: '1px solid var(--color-border)', textAlign: 'center' }}>
                     <h3 style={{ margin: 0, color: 'var(--color-danger)', fontSize: '1.1rem' }}>Deductions (Monthly)</h3>
                   </div>
-                  <div style={{ padding: '1rem', display: 'flex', justifyContent: 'center', gap: '2rem', borderBottom: '1px solid var(--color-border)' }}>
+                  <div style={{ padding: '1rem', display: 'flex', justifyContent: 'center', gap: '1.5rem', borderBottom: '1px solid var(--color-border)' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', fontWeight: '600' }}>
                       <input type="checkbox" checked={form.hasPF} onChange={(e) => handleInput('hasPF', e.target.checked)} style={{ width: '16px', height: '16px' }} /> Enforce PF
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', fontWeight: '600', opacity: form.hasPF ? 1 : 0.5 }}>
+                      <input type="checkbox" checked={form.pfCapped !== false} onChange={(e) => handleInput('pfCapped', e.target.checked)} disabled={!form.hasPF} style={{ width: '16px', height: '16px' }} /> Cap PF (₹15k Limit)
                     </label>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', fontWeight: '600' }}>
                       <input type="checkbox" checked={form.hasESIC} onChange={(e) => handleInput('hasESIC', e.target.checked)} style={{ width: '16px', height: '16px' }} /> Enforce ESIC

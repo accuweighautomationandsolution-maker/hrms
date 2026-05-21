@@ -1571,6 +1571,27 @@ export const dataService = {
     return data ? data.data : null;
   },
 
+  getSalaryStructuresMap: async () => {
+    if (!supabase) return {};
+    try {
+      const { data, error } = await supabase.from('salary_structures_ext').select('emp_id, data');
+      if (error) {
+        console.error('Error fetching all salary structures:', error);
+        return {};
+      }
+      const map = {};
+      (data || []).forEach(r => {
+        if (r.emp_id && r.data) {
+          map[String(r.emp_id)] = r.data;
+        }
+      });
+      return map;
+    } catch (err) {
+      console.error('Exception in getSalaryStructuresMap:', err);
+      return {};
+    }
+  },
+
   saveSalaryStructure: async (empId, structData) => {
     if (!supabase) return;
     try {
