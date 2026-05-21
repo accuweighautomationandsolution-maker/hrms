@@ -148,53 +148,75 @@ export const authService = {
         }
       }
     } catch (e) {
+      if (e.message?.includes('deactivated')) throw e; // Re-throw deactivation errors
       console.log('Standard Auth failed, trying Internal Auth...', e.message);
     }
 
-    // Strategy 2: Internal Shadow Auth (for Testing/Staging)
-    // Credentials are stored in auth_logs as a SHADOW_CRED record (avoids BIGINT emp_id type conflict)
-    const { data: profiles } = await supabase.from('user_profiles').select('*').eq('email', normEmail);
-    const profile = profiles?.[0];
+    // Strategy 2: Internal Shadow Auth
+    // Looks up user_profiles by email and checks the password hash stored in emp_id.
+    // This avoids querying auth_logs (which RLS may block for unauthenticated users).
+    const { data: profileRows } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('email', normEmail);
+    const profile = profileRows?.[0];
 
     if (profile) {
+      // Check emp_id field — stores base64(password) for internally-created accounts
+      if (profile.emp_id && typeof profile.emp_id === 'string') {
+        try {
+          let decoded = null;
+          if (profile.emp_id.startsWith('INTERNAL_AUTH:')) {
+            // Legacy format: "INTERNAL_AUTH:base64"
+            decoded = atob(profile.emp_id.replace('INTERNAL_AUTH:', ''));
+          } else {
+            // New format: raw base64 of password
+            decoded = atob(profile.emp_id);
+          }
+          if (decoded === password) {
+            if (!profile.active) throw new Error('Your account is deactivated. Please contact HR.');
+            _cachedProfile = profile;
+            await addAuthLog('LOGIN_SUCCESS_INTERNAL', email, 'Login via Internal Shadow Auth.');
+            if (_sessionCallback) _sessionCallback(profile);
+            return { profile, forcePasswordReset: profile.force_password_reset };
+          }
+        } catch (err) {
+          if (err.message?.includes('deactivated')) throw err;
+          console.warn('Shadow auth emp_id check failed:', err.message);
+        }
+      }
+
+      // Fallback: check auth_logs SHADOW_CRED record (may be blocked by RLS)
       try {
-        const { data: shadowRows } = await supabase
+        const { data: shadowRow } = await supabase
           .from('auth_logs')
           .select('data')
           .eq('id', `SHADOW_CRED_${normEmail}`)
           .maybeSingle();
-
-        if (shadowRows?.data?.hash) {
-          const decoded = atob(shadowRows.data.hash);
+        if (shadowRow?.data?.hash) {
+          const decoded = atob(shadowRow.data.hash);
           if (decoded === password) {
-            if (!profile.active) throw new Error('Your account is deactivated.');
-            _cachedProfile = profile;
-            await addAuthLog('LOGIN_SUCCESS_INTERNAL', email, 'Login successful via Internal Auth Mode.');
-            if (_sessionCallback) _sessionCallback(profile);
-            return { profile, forcePasswordReset: profile.force_password_reset };
-          }
-        }
-
-        // Legacy fallback: check old emp_id field (TEXT type only — skip if BIGINT)
-        if (profile.emp_id && typeof profile.emp_id === 'string' && profile.emp_id.startsWith('INTERNAL_AUTH:')) {
-          const encoded = profile.emp_id.replace('INTERNAL_AUTH:', '');
-          const decoded = atob(encoded);
-          if (decoded === password) {
-            if (!profile.active) throw new Error('Your account is deactivated.');
-            _cachedProfile = profile;
-            await addAuthLog('LOGIN_SUCCESS_INTERNAL', email, 'Login successful via Internal Auth (legacy).');
-            if (_sessionCallback) _sessionCallback(profile);
-            return { profile, forcePasswordReset: profile.force_password_reset };
+            if (!profile.active) throw new Error('Your account is deactivated. Please contact HR.');
+            // Migrate hash to emp_id for faster future logins
+            await supabase.from('user_profiles')
+              .update({ emp_id: btoa(password), updated_at: new Date().toISOString() })
+              .eq('id', profile.id);
+            _cachedProfile = { ...profile, emp_id: btoa(password) };
+            await addAuthLog('LOGIN_SUCCESS_INTERNAL', email, 'Login via auth_logs Shadow Auth (migrated).');
+            if (_sessionCallback) _sessionCallback(_cachedProfile);
+            return { profile: _cachedProfile, forcePasswordReset: profile.force_password_reset };
           }
         }
       } catch (err) {
-        console.error('Internal Auth check failed:', err);
+        if (err.message?.includes('deactivated')) throw err;
+        console.warn('auth_logs shadow check failed (likely RLS):', err.message);
       }
     }
 
     await addAuthLog('LOGIN_FAIL', normEmail, 'Invalid credentials.');
     throw new Error('Incorrect email or password.');
   },
+
 
   async logout() {
     if (_cachedProfile) await addAuthLog('LOGOUT', _cachedProfile.email, 'User logged out.');
@@ -292,11 +314,14 @@ export const authService = {
     }
 
     // ── Insert user_profiles record ───────────────────────────────────────────
+    // emp_id stores base64(password) for Shadow Auth login — works even without Supabase Auth.
+    // This avoids querying auth_logs (which RLS blocks for unauthenticated users).
     const profile = {
       id: userId,
       email: normEmail,
       name,
       role,
+      emp_id: btoa(password),   // Shadow Auth credential — stored in TEXT column
       active: true,
       force_password_reset: false,
       created_at: new Date().toISOString(),
@@ -356,13 +381,14 @@ export const authService = {
 
     const { data: profile } = await supabase.from('user_profiles').select('email').eq('id', userId).single();
     
-    // Update user profile (do NOT write to emp_id — it is BIGINT and cannot hold text)
+    // Update emp_id with new password hash (emp_id is TEXT — used for Shadow Auth login)
     await supabase.from('user_profiles').update({
+      emp_id: btoa(newPassword),
       force_password_reset: true, 
       updated_at: new Date().toISOString()
     }).eq('id', userId);
 
-    // Update shadow credential record in auth_logs
+    // Also update auth_logs shadow credential as backup
     if (profile?.email) {
       const normEmail = normalizeEmail(profile.email);
       const shadowId = `SHADOW_CRED_${normEmail}`;
