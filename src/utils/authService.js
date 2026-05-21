@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase, supabaseAdmin } from './supabaseClient';
 
 // ── In-memory session cache (avoids async getCurrentUser in every component) ──
 let _cachedProfile = null;
@@ -211,63 +211,117 @@ export const authService = {
     if (pwdError) throw new Error(pwdError);
 
     const normEmail = normalizeEmail(email);
+
+    // Check if a user_profile already exists for this email
     const { data: existing } = await supabase
       .from('user_profiles').select('id').eq('email', normEmail).maybeSingle();
     if (existing) throw new Error('User with this email already exists.');
 
-    // Try to create a real Supabase Auth user (instant login, no email verification
-    // needed if Supabase has "Confirm email" disabled in Auth settings).
-    let userId = `INT_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-    let supabaseAuthCreated = false;
-    
-    try {
-      const { data, error: signUpErr } = await supabase.auth.signUp({
+    let userId = null;
+
+    // ── Strategy A: Admin API (requires VITE_SUPABASE_SERVICE_ROLE_KEY in .env) ──
+    // This is the recommended approach — bypasses email confirmation, gives real UUID.
+    if (supabaseAdmin) {
+      const { data: adminData, error: adminErr } = await supabaseAdmin.auth.admin.createUser({
+        email: normEmail,
+        password,
+        email_confirm: true,   // Auto-confirm, no verification email sent
+        user_metadata: { name },
+      });
+
+      if (adminErr) {
+        // If the user already exists in auth.users (orphaned from failed previous attempt),
+        // delete it and retry once.
+        if (adminErr.message?.toLowerCase().includes('already been registered') ||
+            adminErr.message?.toLowerCase().includes('already exists')) {
+          console.warn('Orphaned auth user detected. Deleting and retrying...');
+          // Find the existing user by email and delete them
+          const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
+          const orphan = listData?.users?.find(u => u.email === normEmail);
+          if (orphan) {
+            await supabaseAdmin.auth.admin.deleteUser(orphan.id);
+            // Retry
+            const { data: retryData, error: retryErr } = await supabaseAdmin.auth.admin.createUser({
+              email: normEmail,
+              password,
+              email_confirm: true,
+              user_metadata: { name },
+            });
+            if (retryErr) throw new Error(`Failed to create auth user: ${retryErr.message}`);
+            userId = retryData.user.id;
+          } else {
+            throw new Error(`User already exists in auth but not found in list. Please check Supabase dashboard.`);
+          }
+        } else {
+          throw new Error(`Failed to create auth user: ${adminErr.message}`);
+        }
+      } else {
+        userId = adminData.user.id;
+      }
+    } else {
+      // ── Strategy B: Regular signUp (requires email confirmation to be DISABLED in Supabase) ──
+      // Go to: Supabase Dashboard → Authentication → Providers → Email → Toggle OFF "Confirm email"
+      // OR add VITE_SUPABASE_SERVICE_ROLE_KEY to your .env file for the Admin API.
+      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
         email: normEmail,
         password,
         options: { data: { name } }
       });
-      if (!signUpErr && data.user) {
-        userId = data.user.id;
-        supabaseAuthCreated = true;
+
+      if (signUpErr) {
+        throw new Error(
+          `Auth signup failed: ${signUpErr.message}. ` +
+          `Add VITE_SUPABASE_SERVICE_ROLE_KEY to .env for reliable user creation.`
+        );
       }
-    } catch (e) {
-      console.warn('Supabase Auth signUp skipped/failed, using internal profile:', e.message);
+
+      if (!signUpData?.user?.id) {
+        // Supabase returns null user when the email already exists in auth.users
+        // This happens when a previous creation attempt partially succeeded.
+        throw new Error(
+          `This email (${normEmail}) already exists in the authentication system from a ` +
+          `previous failed attempt. To fix this:\n\n` +
+          `1. Go to Supabase Dashboard → Authentication → Users\n` +
+          `2. Find and delete "${normEmail}"\n` +
+          `3. Try creating the user again.\n\n` +
+          `OR add VITE_SUPABASE_SERVICE_ROLE_KEY to .env to fix this automatically.`
+        );
+      }
+
+      userId = signUpData.user.id;
     }
 
-    // Build profile WITHOUT emp_id to avoid BIGINT type conflict.
-    // The emp_id column is BIGINT in the DB and cannot store text strings.
+    // ── Insert user_profiles record using the valid UUID from auth.users ──
+    // Note: emp_id is intentionally omitted — it is BIGINT in the DB and cannot store text.
     const profile = {
-      id: userId, 
-      email: normEmail, 
-      name, 
+      id: userId,
+      email: normEmail,
+      name,
       role,
-      active: true, 
+      active: true,
       force_password_reset: false,
-      created_at: new Date().toISOString(), 
+      created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
     const { error: insError } = await supabase.from('user_profiles').insert(profile);
     if (insError) throw new Error(`Failed to create profile: ${insError.message}`);
 
-    // Store internal auth credential in auth_logs as a SHADOW_CRED record.
-    // This avoids the BIGINT constraint on emp_id and uses only TEXT/JSONB columns.
-    if (!supabaseAuthCreated) {
-      const shadowId = `SHADOW_CRED_${normEmail}`;
-      await supabase.from('auth_logs').upsert({
+    // Store shadow credential for internal auth fallback (login without active session)
+    const shadowId = `SHADOW_CRED_${normEmail}`;
+    await supabase.from('auth_logs').upsert({
+      id: shadowId,
+      data: {
         id: shadowId,
-        data: {
-          id: shadowId,
-          type: 'SHADOW_CRED',
-          email: normEmail,
-          hash: btoa(password),
-          userId,
-          createdAt: new Date().toISOString(),
-        }
-      }, { onConflict: 'id' });
-    }
+        type: 'SHADOW_CRED',
+        email: normEmail,
+        hash: btoa(password),
+        userId,
+        createdAt: new Date().toISOString(),
+      }
+    }, { onConflict: 'id' });
 
-    await addAuthLog('USER_CREATED_INTERNAL', _cachedProfile?.email || 'SYSTEM', `Account provisioned instantly: ${email}`);
+    await addAuthLog('USER_CREATED', _cachedProfile?.email || 'SYSTEM', `Account provisioned: ${email}`);
     return profile;
   },
 
