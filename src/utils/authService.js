@@ -218,81 +218,80 @@ export const authService = {
     if (existing) throw new Error('User with this email already exists.');
 
     let userId = null;
+    let authMethod = 'unknown';
 
-    // ── Strategy A: Admin API (requires VITE_SUPABASE_SERVICE_ROLE_KEY in .env) ──
-    // This is the recommended approach — bypasses email confirmation, gives real UUID.
+    // ── Strategy A: Admin API (service role key) ──────────────────────────────
     if (supabaseAdmin) {
-      const { data: adminData, error: adminErr } = await supabaseAdmin.auth.admin.createUser({
-        email: normEmail,
-        password,
-        email_confirm: true,   // Auto-confirm, no verification email sent
-        user_metadata: { name },
-      });
+      try {
+        const { data: adminData, error: adminErr } = await supabaseAdmin.auth.admin.createUser({
+          email: normEmail,
+          password,
+          email_confirm: true,
+          user_metadata: { name },
+        });
 
-      if (adminErr) {
-        // If the user already exists in auth.users (orphaned from failed previous attempt),
-        // delete it and retry once.
-        if (adminErr.message?.toLowerCase().includes('already been registered') ||
-            adminErr.message?.toLowerCase().includes('already exists')) {
-          console.warn('Orphaned auth user detected. Deleting and retrying...');
-          // Find the existing user by email and delete them
-          const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
-          const orphan = listData?.users?.find(u => u.email === normEmail);
-          if (orphan) {
-            await supabaseAdmin.auth.admin.deleteUser(orphan.id);
-            // Retry
-            const { data: retryData, error: retryErr } = await supabaseAdmin.auth.admin.createUser({
-              email: normEmail,
-              password,
-              email_confirm: true,
-              user_metadata: { name },
-            });
-            if (retryErr) throw new Error(`Failed to create auth user: ${retryErr.message}`);
-            userId = retryData.user.id;
+        if (!adminErr && adminData?.user?.id) {
+          userId = adminData.user.id;
+          authMethod = 'admin';
+        } else if (adminErr) {
+          const msg = adminErr.message?.toLowerCase() || '';
+          if (msg.includes('already registered') || msg.includes('already exists')) {
+            // Orphaned auth user — delete and retry
+            console.warn('Orphaned auth user detected, cleaning up...');
+            const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+            const orphan = listData?.users?.find(u => u.email?.toLowerCase() === normEmail);
+            if (orphan) {
+              await supabaseAdmin.auth.admin.deleteUser(orphan.id);
+              const { data: retry, error: retryErr } = await supabaseAdmin.auth.admin.createUser({
+                email: normEmail, password, email_confirm: true, user_metadata: { name },
+              });
+              if (!retryErr && retry?.user?.id) {
+                userId = retry.user.id;
+                authMethod = 'admin-retry';
+              }
+            }
+          } else if (msg.includes('invalid api key') || msg.includes('invalid jwt')) {
+            // Invalid service role key — fall through to Strategy B
+            console.warn('Service role key is invalid. Falling back to signUp strategy.');
           } else {
-            throw new Error(`User already exists in auth but not found in list. Please check Supabase dashboard.`);
+            console.warn('Admin API failed:', adminErr.message, '— falling back to signUp.');
           }
-        } else {
-          throw new Error(`Failed to create auth user: ${adminErr.message}`);
         }
-      } else {
-        userId = adminData.user.id;
+      } catch (e) {
+        console.warn('Admin API exception, falling back:', e.message);
       }
-    } else {
-      // ── Strategy B: Regular signUp (requires email confirmation to be DISABLED in Supabase) ──
-      // Go to: Supabase Dashboard → Authentication → Providers → Email → Toggle OFF "Confirm email"
-      // OR add VITE_SUPABASE_SERVICE_ROLE_KEY to your .env file for the Admin API.
+    }
+
+    // ── Strategy B: Regular signUp (works when Supabase "Confirm email" is OFF) ──
+    if (!userId) {
       const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
         email: normEmail,
         password,
         options: { data: { name } }
       });
 
-      if (signUpErr) {
-        throw new Error(
-          `Auth signup failed: ${signUpErr.message}. ` +
-          `Add VITE_SUPABASE_SERVICE_ROLE_KEY to .env for reliable user creation.`
-        );
+      if (!signUpErr && signUpData?.user?.id) {
+        userId = signUpData.user.id;
+        authMethod = 'signup';
+      } else if (signUpData?.user === null && !signUpErr) {
+        // Email already exists in auth.users (Supabase hides this to prevent enumeration).
+        // This is the "orphaned user" case — signUp returns null silently.
+        // We need the FK constraint removed (see SQL below) to proceed with Strategy C.
+        console.warn('Email already exists in auth.users (orphaned). Trying internal UUID.');
       }
-
-      if (!signUpData?.user?.id) {
-        // Supabase returns null user when the email already exists in auth.users
-        // This happens when a previous creation attempt partially succeeded.
-        throw new Error(
-          `This email (${normEmail}) already exists in the authentication system from a ` +
-          `previous failed attempt. To fix this:\n\n` +
-          `1. Go to Supabase Dashboard → Authentication → Users\n` +
-          `2. Find and delete "${normEmail}"\n` +
-          `3. Try creating the user again.\n\n` +
-          `OR add VITE_SUPABASE_SERVICE_ROLE_KEY to .env to fix this automatically.`
-        );
-      }
-
-      userId = signUpData.user.id;
     }
 
-    // ── Insert user_profiles record using the valid UUID from auth.users ──
-    // Note: emp_id is intentionally omitted — it is BIGINT in the DB and cannot store text.
+    // ── Strategy C: Internal UUID (requires FK constraint dropped on user_profiles.id) ──
+    // Run this SQL ONCE in Supabase SQL Editor to enable this fallback:
+    //   ALTER TABLE user_profiles DROP CONSTRAINT IF EXISTS user_profiles_id_fkey;
+    // After that, internal users can log in via Shadow Auth (email+password lookup).
+    if (!userId) {
+      userId = crypto.randomUUID();
+      authMethod = 'internal';
+      console.info('Using internal UUID for user profile. Login will use Shadow Auth.');
+    }
+
+    // ── Insert user_profiles record ───────────────────────────────────────────
     const profile = {
       id: userId,
       email: normEmail,
@@ -305,9 +304,19 @@ export const authService = {
     };
 
     const { error: insError } = await supabase.from('user_profiles').insert(profile);
-    if (insError) throw new Error(`Failed to create profile: ${insError.message}`);
+    if (insError) {
+      if (insError.message?.includes('foreign key') || insError.message?.includes('violates')) {
+        throw new Error(
+          `Database constraint error: The user_profiles table requires a valid Supabase Auth UUID.\n\n` +
+          `QUICK FIX — Run this SQL once in your Supabase SQL Editor:\n` +
+          `ALTER TABLE user_profiles DROP CONSTRAINT IF EXISTS user_profiles_id_fkey;\n\n` +
+          `Then try again. This allows internal accounts to be created without email confirmation.`
+        );
+      }
+      throw new Error(`Failed to create profile: ${insError.message}`);
+    }
 
-    // Store shadow credential for internal auth fallback (login without active session)
+    // ── Store shadow credential for password-based login fallback ─────────────
     const shadowId = `SHADOW_CRED_${normEmail}`;
     await supabase.from('auth_logs').upsert({
       id: shadowId,
@@ -317,13 +326,15 @@ export const authService = {
         email: normEmail,
         hash: btoa(password),
         userId,
+        authMethod,
         createdAt: new Date().toISOString(),
       }
     }, { onConflict: 'id' });
 
-    await addAuthLog('USER_CREATED', _cachedProfile?.email || 'SYSTEM', `Account provisioned: ${email}`);
+    await addAuthLog('USER_CREATED', _cachedProfile?.email || 'SYSTEM', `Account provisioned [${authMethod}]: ${email}`);
     return profile;
   },
+
 
   async updatePassword(newPassword) {
     const pwdError = validatePassword(newPassword);
