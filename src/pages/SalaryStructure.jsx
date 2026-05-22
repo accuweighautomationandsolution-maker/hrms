@@ -99,14 +99,21 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
   };
 
   // Shared Calculation Engine Integration
+  // For salary structure preview, always use full month (attendanceRatio = 1).
+  // We pass the actual days of the current month as both daysWorked and daysInMonth.
   const targetGross = Number(form.targetSalary) || 0;
+  const now = new Date();
+  const previewYear = now.getFullYear();
+  const previewMonth = now.getMonth(); // 0-indexed
+  const previewDaysInMonth = new Date(previewYear, previewMonth + 1, 0).getDate();
+
   const payroll = calculateSalaryComponents(
     targetGross,
     form.pfCapped !== false, // pfCapped state from form
     0,
     empCategory || 'Staff Employee',
-    30,
-    30,
+    previewDaysInMonth, // daysWorked = full month → ratio = 1
+    previewDaysInMonth,
     {
       salConveyance: form.salConveyance,
       salPerformance: form.salPerformance,
@@ -114,11 +121,14 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
       salSpecial: form.salSpecial,
       hraPercent: form.hraPercent,
       hasPF: form.hasPF,
-      hasESIC: form.hasESIC
+      hasESIC: form.hasESIC,
+      year: previewYear,
+      month: previewMonth
     }
   );
 
   const { earnings, deductions, netPay, remainingAmount, isBalanced } = payroll;
+
 
   /* ── Number to Words ─────────────────────────────────── */
   const numberToWords = (num) => {

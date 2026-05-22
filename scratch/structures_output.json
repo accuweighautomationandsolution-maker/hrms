@@ -1,0 +1,160 @@
+[
+  {
+    "emp_id": 1777901773378,
+    "data": {
+      "city": "Pune",
+      "empId": 1777901773378,
+      "hasPF": false,
+      "state": "Maharashtra",
+      "dayRate": "",
+      "hasESIC": false,
+      "zipCode": "411041",
+      "salOther": "1763",
+      "hraPercent": 40,
+      "salSpecial": "",
+      "lastUpdated": "2026-05-04T13:36:13.853Z",
+      "roleApplied": "Jr. HR Executive",
+      "addressLine1": "Swami Angan, Abhinav College Road,",
+      "datePrepared": "2025-11-04",
+      "targetSalary": "14200",
+      "candidateName": "Pooja Govind Masalage",
+      "salConveyance": "1000",
+      "salPerformance": "",
+      "candidateLastName": "Masalage",
+      "candidateMiddleName": "Govind"
+    },
+    "last_updated": "2026-05-04T13:36:13.853+00:00"
+  },
+  {
+    "emp_id": 1777902730633,
+    "data": {
+      "city": " Pune",
+      "empId": 1777902730633,
+      "hasPF": false,
+      "state": "Maharashtra",
+      "dayRate": "",
+      "hasESIC": false,
+      "zipCode": "411041",
+      "salOther": "1763",
+      "hraPercent": 40,
+      "salSpecial": "",
+      "lastUpdated": "2026-05-04T13:52:11.244Z",
+      "roleApplied": "Jr. HR Executive",
+      "addressLine1": "Swami Angan, Abhinav College Road",
+      "datePrepared": "2025-11-04",
+      "targetSalary": "14200",
+      "candidateName": "Pooja Govind Masalage",
+      "salConveyance": "1000",
+      "salPerformance": "",
+      "candidateLastName": "Masalage",
+      "candidateMiddleName": "Govind"
+    },
+    "last_updated": "2026-05-04T13:52:11.244+00:00"
+  },
+  {
+    "emp_id": 1777903792645,
+    "data": {
+      "city": "Pune",
+      "empId": 1777903792645,
+      "hasPF": false,
+      "state": "Maharashtra",
+      "dayRate": "",
+      "hasESIC": false,
+      "zipCode": "411041",
+      "salOther": "1763",
+      "hraPercent": 40,
+      "salSpecial": "",
+      "lastUpdated": "2026-05-04T14:09:53.481Z",
+      "roleApplied": "Jr. HR Executive",
+      "addressLine1": "Swami Angan, Abhinav College Road, Narhe",
+      "datePrepared": "2025-11-04",
+      "targetSalary": "14200",
+      "candidateName": "Pooja Govind Masalage",
+      "salConveyance": "1000",
+      "salPerformance": "",
+      "candidateLastName": "Masalage",
+      "candidateMiddleName": "Govind"
+    },
+    "last_updated": "2026-05-04T14:09:53.481+00:00"
+  },
+  {
+    "emp_id": 1778483602354,
+    "data": {
+      "empId": 1778483602354,
+      "hasPF": false,
+      "salOther": "1756",
+      "hraPercent": "24",
+      "lastUpdated": "2026-05-13T11:46:48.420Z",
+      "roleApplied": "Jr. Executive - HR",
+      "datePrepared": "2025-11-03",
+      "targetSalary": "14200",
+      "candidateName": "Pooja Govind Masalage",
+      "salConveyance": "1000",
+      "salPerformance": "1200",
+      "candidateLastName": "Masalage",
+      "candidateMiddleName": "Govind"
+    },
+    "last_updated": "2026-05-13T11:46:48.42+00:00"
+  },
+  {
+    "emp_id": 1778504199335,
+    "data": {
+      "city": "Test City",
+      "empId": 1778504199335,
+      "state": "Test State",
+      "zipCode": "123456",
+      "lastUpdated": "2026-05-11T12:56:40.511Z",
+      "roleApplied": "",
+      "addressLine1": "Test Address",
+      "targetSalary": "50000",
+      "candidateName": "Grade Test",
+      "candidateLastName": "Test",
+      "candidateMiddleName": ""
+    },
+    "last_updated": "2026-05-11T12:56:40.511+00:00"
+  },
+  {
+    "emp_id": 1779101235079,
+    "data": {
+      "empId": "1779101235079",
+      "grade": "G3",
+      "hasPF": true,
+      "empCode": "E252661",
+      "joinDate": "2026-01-19",
+      "salOther": "6200",
+      "department": "Finance",
+      "hraPercent": "30",
+      "salSpecial": "2635",
+      "lastUpdated": "2026-05-18T10:47:16.576Z",
+      "roleApplied": "Sr. Finance Executive",
+      "targetSalary": "42000",
+      "candidateName": "Milind Sopan Chavan",
+      "salConveyance": "3500",
+      "candidateLastName": "Chavan",
+      "candidateMiddleName": "Sopan"
+    },
+    "last_updated": "2026-05-18T10:47:16.736988+00:00"
+  },
+  {
+    "emp_id": 16,
+    "data": {
+      "empId": "16",
+      "grade": "G3",
+      "hasPF": false,
+      "empCode": "E252659",
+      "joinDate": "2025-11-04",
+      "salOther": "1894",
+      "department": "HR",
+      "hraPercent": "30",
+      "lastUpdated": "2026-05-22T08:10:38.115Z",
+      "roleApplied": "Jr. Executive - HR",
+      "datePrepared": "2025-11-03",
+      "targetSalary": "14200",
+      "candidateName": "Pooja Govind Masalage",
+      "salConveyance": "1500",
+      "candidateLastName": "Masalage",
+      "candidateMiddleName": "Govind"
+    },
+    "last_updated": "2026-05-14T10:48:46.985675+00:00"
+  }
+]

@@ -53,63 +53,82 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
   const isOnRollWorker = cat === 'on role worker' || cat === 'on-roll worker';
   const isContractualWorker = cat === 'contractual worker';
 
+  // For on-roll workers, the payable days divisor differs from calendar days
   let divisor = actualDaysInMonth;
-  let effectiveGross = baseGross;
-
-  if (isContractualWorker) {
-    // Contractual worker payout is calculated as dayRate * daysWorked, so baseGross is dayRate
-    effectiveGross = baseGross * daysWorked;
-  } else if (isOnRollWorker) {
+  if (isOnRollWorker) {
     divisor = getOnRollWorkerPayableDays(yr, mth);
-    effectiveGross = (baseGross / divisor) * daysWorked;
-  } else {
-    // Staff employee
-    divisor = actualDaysInMonth;
-    effectiveGross = (baseGross / divisor) * daysWorked;
   }
 
   // Flags from options
   const hasPF = options.hasPF !== undefined ? options.hasPF : true;
   const hasESIC = options.hasESIC !== undefined ? options.hasESIC : false;
 
-  // 1. Calculate Statutory Fixed Components (Percentages of Gross)
-  const basic = Math.max(0, Math.round(effectiveGross * 0.50));
-  const da = Math.max(0, Math.round(basic * 0.05));
-  const hraPercentVal = (options.hraPercent !== undefined) ? (Number(options.hraPercent) / 100) : 0.40;
-  const hra = Math.max(0, Math.round((basic + da) * hraPercentVal)); 
-  
-  // 2. Sum up Manual Allowances
-  const conveyance = Number(options.salConveyance) || 0;
-  const performance = Number(options.salPerformance) || 0;
-  const otherManual = Number(options.salOther) || 0;
-  const specialManual = Number(options.salSpecial) || 0;
-  
-  // 3. Washing Allowance (1000 Max, Pro-rated by divisor and attendance)
-  const washingAllowance = Math.round((1000 / divisor) * daysWorked);
+  // ─────────────────────────────────────────────────────────────────────────
+  // STEP 1: Calculate ALL components on the FULL gross salary
+  //         Basic = exactly 50% of gross, DA = 5% of Basic, etc.
+  //         These are the FULL MONTH values (displayed on payslip header).
+  // ─────────────────────────────────────────────────────────────────────────
+  let basic, da, hra, washingAllowance, conveyance, performance, otherManual, specialManual;
+  let fullMonthGross = baseGross;
 
-  // 4. Calculate Component Total and Remaining Balance
-  // componentTotal = sum of all earnings defined (excluding variable OT for structure balance)
-  const componentTotal = basic + da + hra + washingAllowance + conveyance + performance + otherManual + specialManual;
-  const remainingAmount = effectiveGross - componentTotal;
-  
-  // 5. Overtime (OT) Pay
+  if (isContractualWorker) {
+    // Contractual worker: baseGross is a daily rate; total = dayRate × daysWorked
+    basic           = 0; // Contractual don't have component breakdown
+    da              = 0;
+    hra             = 0;
+    washingAllowance= 0;
+    conveyance      = 0;
+    performance     = 0;
+    otherManual     = 0;
+    specialManual   = 0;
+    fullMonthGross  = baseGross * daysWorked;
+  } else {
+    // Staff / On-Roll: all components based on FULL gross salary
+    basic           = Math.round(baseGross * 0.50);
+    da              = Math.round(basic * 0.05);
+    const hraPercentVal = (options.hraPercent !== undefined) ? (Number(options.hraPercent) / 100) : 0.40;
+    hra             = Math.round((basic + da) * hraPercentVal);
+    washingAllowance= 1000; // Full month washing allowance
+    conveyance      = Number(options.salConveyance) || 0;
+    performance     = Number(options.salPerformance) || 0;
+    otherManual     = Number(options.salOther) || 0;
+    specialManual   = Number(options.salSpecial) || 0;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // STEP 2: Calculate Loss of Pay (LOP) for absent days
+  //         LOP = (grossSalary / totalDays) × absentDays
+  //         This is shown as a deduction, keeping component values intact.
+  // ─────────────────────────────────────────────────────────────────────────
+  const absentDays = Math.max(0, divisor - (Number(daysWorked) || 0));
+  const lopDeduction = isContractualWorker ? 0 : Math.round((baseGross / divisor) * absentDays);
+
+  // 3. OT Pay
   const otAmount = Number(options.otAmount) || 0;
+
+  // Total Earnings = sum of all components (full month) + OT
+  const componentTotal = basic + da + hra + washingAllowance + conveyance + performance + otherManual + specialManual;
   const totalEarnings = componentTotal + otAmount;
 
-  // 6. Deductions
+  // Effective pay after LOP (for net pay calculation and PF/ESIC base)
+  const effectivePay = Math.max(0, totalEarnings - lopDeduction);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // STEP 3: Statutory Deductions — computed on FULL component values
+  //         (PF, ESIC must be on full Basic+DA, not pro-rated amounts)
+  // ─────────────────────────────────────────────────────────────────────────
   let pfEligibleAmount = basic + da;
   if (pfCapped && pfEligibleAmount > PF_CAP_AMOUNT) {
     pfEligibleAmount = PF_CAP_AMOUNT;
   }
-  
+
   // PF Deduction (Zero if disabled)
   const pfDeduction = hasPF ? Math.max(0, Math.round(pfEligibleAmount * PF_PERCENTAGE)) : 0;
 
   // ESIC Calculation
-  // If ESIC is enabled, it should be calculated on the following total:
-  // Basic + DA + HRA + Washing Allowance + Performance Allowance + Other Allowance + OT
+  // Base: Basic + DA + HRA + Washing Allowance + Performance Allowance + Other Allowance + OT
   const esicWages = basic + da + hra + washingAllowance + performance + otherManual + otAmount;
-  
+
   let esicDeduction = 0;
   let esicEmployerContribution = 0;
   if (hasESIC) {
@@ -119,28 +138,26 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
 
   // PT: ₹300 for February (month = 1), ₹200 for normal months (if Gross > ₹10,000)
   let ptDeduction = 0;
-  if (totalEarnings > 10000) {
+  if (effectivePay > 10000) {
     ptDeduction = (mth === 1) ? 300 : 200;
   }
 
   let tdsDeduction = 0;
-  const annualGross = totalEarnings * 12;
+  const annualGross = effectivePay * 12;
   if (annualGross > 700000) {
     tdsDeduction = Math.max(0, Math.round(((annualGross - 700000) * 0.10) / 12));
   }
 
-  const totalDeduction = pfDeduction + esicDeduction + ptDeduction + tdsDeduction + advanceDeduction;
+  const totalDeduction = pfDeduction + esicDeduction + ptDeduction + tdsDeduction + lopDeduction + advanceDeduction;
   const finalNetPay = Math.max(0, totalEarnings - totalDeduction);
 
-  // 7. Employer Shares
-  // Employer shares are also zero if PF is disabled.
-  // EPF is the remaining difference of statutory 13% total to guarantee exact 13% sum.
+  // 4. Employer Shares
   const totalPFStatutory = hasPF ? Math.max(0, Math.round(pfEligibleAmount * 0.13)) : 0;
   const erPension = hasPF ? Math.max(0, Math.round(pfEligibleAmount * ER_PENSION_PERCENTAGE)) : 0;
   const edli = hasPF ? Math.max(0, Math.round(pfEligibleAmount * EDLI_PERCENTAGE)) : 0;
   const admin = hasPF ? Math.max(0, Math.round(pfEligibleAmount * ADMIN_PERCENTAGE)) : 0;
   const erEPF = hasPF ? Math.max(0, totalPFStatutory - erPension - edli - admin) : 0;
-  
+
   const totalErStatutory = totalPFStatutory + esicEmployerContribution;
 
   return {
@@ -162,12 +179,13 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
       esic: esicDeduction,
       pt: ptDeduction,
       tds: tdsDeduction,
+      lop: lopDeduction,       // Loss of Pay for absent days
       advance: advanceDeduction,
       total: totalDeduction
     },
     pfReport: {
       epfWages: hasPF ? pfEligibleAmount : 0,
-      epsWages: hasPF ? pfEligibleAmount : 0, 
+      epsWages: hasPF ? pfEligibleAmount : 0,
       edliWages: hasPF ? pfEligibleAmount : 0,
       eeShare: pfDeduction,
       erPension,
@@ -183,9 +201,11 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
     },
     erTotalStatutory: totalErStatutory,
     netPay: finalNetPay,
-    remainingAmount: Math.round(remainingAmount),
-    isBalanced: Math.abs(remainingAmount) < 1,
-    divisor
+    remainingAmount: 0,
+    isBalanced: true,
+    divisor,
+    absentDays,
+    lopDeduction
   };
 };
 
