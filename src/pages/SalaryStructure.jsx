@@ -27,10 +27,12 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     let isMounted = true;
     const effectiveEmpId = empId || (location.state && location.state.empId);
 
-    const safetyTimeout = setTimeout(() => {
-      // We don't have a global loading state here, but we can log
-      if (isMounted) console.warn("SalaryStructure: Fetch timeout reached.");
-    }, 8000);
+    // Only set a safety timeout if we actually have an empId to fetch
+    const safetyTimeout = effectiveEmpId && !isEmbedded && !hasFetched.current
+      ? setTimeout(() => {
+          if (isMounted) console.warn("SalaryStructure: Fetch timeout reached.");
+        }, 8000)
+      : null;
 
     const fetchExisting = async () => {
       if (effectiveEmpId && !isEmbedded && !hasFetched.current) {
@@ -60,7 +62,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
         } catch (err) {
           console.error("Error fetching salary/employee details:", err);
         } finally {
-          clearTimeout(safetyTimeout);
+          if (safetyTimeout) clearTimeout(safetyTimeout);
         }
       }
     };

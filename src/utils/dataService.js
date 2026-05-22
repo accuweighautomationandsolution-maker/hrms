@@ -419,36 +419,68 @@ export const dataService = {
 
   saveEmployee: async (empData) => {
     if (!supabase) return empData;
-    const id = empData.id || Date.now();
+    const isExisting = !!empData.id && !empData.isNew;
     const status = empData.status || 'Active';
-    const row = {
-      id,
-      name: empData.name || '',
-      email: empData.email || '',
-      emp_code: empData.empCode || empData.emp_code || '',
-      biometric_code: empData.biometricCode || empData.biometric_code || '',
-      designation: empData.role || empData.designation || '',
-      department: empData.department || '',
-      joining_date: empData.joiningDate || empData.joining_date || empData.joinDate || null,
-      status,
-      role: empData.role || 'employee',
-      data: { ...empData, id, status }
-    };
-    
-    try {
-      // Always use upsert so documents and profile updates are never silently dropped.
-      // Insert-only (isNew) is handled via onConflict behavior.
-      const { error } = await supabase
-        .from('employees')
-        .upsert(row, { onConflict: 'id' });
 
-      if (error) {
-        console.error("Error saving employee to Supabase:", error);
-        throw error;
+    try {
+      if (isExisting) {
+        // UPDATE existing employee — use upsert with the known id
+        const row = {
+          id: empData.id,
+          name: empData.name || '',
+          email: empData.email || '',
+          emp_code: empData.empCode || empData.emp_code || '',
+          biometric_code: empData.biometricCode || empData.biometric_code || '',
+          designation: empData.role || empData.designation || '',
+          department: empData.department || '',
+          joining_date: empData.joiningDate || empData.joining_date || empData.joinDate || null,
+          status,
+          role: empData.role || 'employee',
+          data: { ...empData, id: empData.id, status }
+        };
+        const { error } = await supabase
+          .from('employees')
+          .upsert(row, { onConflict: 'id' });
+        if (error) {
+          console.error('Error updating employee in Supabase:', error);
+          throw error;
+        }
+        return row.data;
+      } else {
+        // INSERT new employee — let Supabase auto-generate the BIGSERIAL id
+        const row = {
+          name: empData.name || '',
+          email: empData.email || '',
+          emp_code: empData.empCode || empData.emp_code || '',
+          biometric_code: empData.biometricCode || empData.biometric_code || '',
+          designation: empData.role || empData.designation || '',
+          department: empData.department || '',
+          joining_date: empData.joiningDate || empData.joining_date || empData.joinDate || null,
+          status,
+          role: empData.role || 'employee',
+          data: {} // placeholder; updated below after we get the real id
+        };
+        const { data: inserted, error } = await supabase
+          .from('employees')
+          .insert(row)
+          .select()
+          .single();
+        if (error) {
+          console.error('Error inserting employee in Supabase:', error);
+          throw error;
+        }
+        // Patch the data JSONB with the real auto-generated id
+        const realId = inserted.id;
+        const fullData = { ...empData, id: realId, status };
+        const { error: patchErr } = await supabase
+          .from('employees')
+          .update({ data: fullData })
+          .eq('id', realId);
+        if (patchErr) console.warn('saveEmployee: data patch failed (non-blocking)', patchErr.message);
+        return fullData;
       }
-      return row.data;
     } catch (err) {
-      console.error("Exception in saveEmployee:", err);
+      console.error('Exception in saveEmployee:', err);
       throw err;
     }
   },

@@ -275,17 +275,37 @@ const EmployeeDirectory = ({ userRole }) => {
     (!form.hasESIC || form.esicIp)
   );
 
+  const getMissingFields = () => {
+    const missing = [];
+    if (!form.firstName) missing.push('First Name (Tab 1)');
+    if (!form.lastName) missing.push('Last Name (Tab 1)');
+    if (!form.email) missing.push('Email (Tab 1)');
+    if (!form.contact) missing.push('Contact Number (Tab 1)');
+    if (!form.empId) missing.push('Employee Code (Tab 2)');
+    if (!form.biometricCode) missing.push('Biometric Code (Tab 2)');
+    if (!form.joinDate) missing.push('Joining Date (Tab 2)');
+    if (!form.empCategory) missing.push('Employee Category (Tab 2)');
+    if (!form.grade) missing.push('Grade (Tab 2)');
+    if (form.hasPF && !form.uan) missing.push('UAN Number (Tab 5)');
+    if (form.hasPF && !form.pfMemberId) missing.push('PF Member ID (Tab 5)');
+    if (form.hasESIC && !form.esicIp) missing.push('ESIC IP Number (Tab 5)');
+    return missing;
+  };
+
   const handleSave = async () => {
-    if (!isFormValid) {
-      setErrorMsg('CRITICAL: All compulsory fields marked with * must be filled in all sections before onboarding.');
-      showNotification('Validation Failed: Compulsory fields missing.', 'error');
+    const missing = getMissingFields();
+    if (missing.length > 0) {
+      const msg = `Missing required fields: ${missing.join(' | ')}`;
+      setErrorMsg(msg);
+      showNotification('Validation Failed: ' + missing[0], 'error');
       return;
     }
     
     setLoading(true);
     try {
       const empData = {
-        id: form.id || Date.now(),
+        // For existing employees: use their saved id. For new employees: omit id (Supabase will auto-generate BIGSERIAL).
+        ...(form.id ? { id: form.id } : {}),
         isNew: !form.id,
         name: `${form.firstName} ${form.middleName ? form.middleName + ' ' : ''}${form.lastName}`.trim(),
         email: form.email,
