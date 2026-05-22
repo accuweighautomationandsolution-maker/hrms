@@ -42,7 +42,8 @@ const EmployeeDirectory = ({ userRole }) => {
     salaryConfig: null
   });
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);       // page-level initial load
+  const [isSaving, setIsSaving] = useState(false);     // save-button spinner only
   const [uploadedFiles, setUploadedFiles] = useState([]);
 
   useEffect(() => {
@@ -300,11 +301,20 @@ const EmployeeDirectory = ({ userRole }) => {
       showNotification('Validation Failed: ' + missing[0], 'error');
       return;
     }
-    
-    setLoading(true);
+
+    setIsSaving(true);
+    setErrorMsg('');
+
+    // 15-second safety timeout so the button never hangs forever
+    const saveTimeout = setTimeout(() => {
+      setIsSaving(false);
+      setErrorMsg('Request timed out. Please check your internet connection and try again.');
+      showNotification('Save timed out. Please try again.', 'error');
+    }, 15000);
+
     try {
       const empData = {
-        // For existing employees: use their saved id. For new employees: omit id (Supabase will auto-generate BIGSERIAL).
+        // For existing employees: use their saved id. For new employees: omit id (Supabase auto-generates BIGSERIAL).
         ...(form.id ? { id: form.id } : {}),
         isNew: !form.id,
         name: `${form.firstName} ${form.middleName ? form.middleName + ' ' : ''}${form.lastName}`.trim(),
@@ -351,37 +361,39 @@ const EmployeeDirectory = ({ userRole }) => {
       };
 
       const savedEmp = await dataService.saveEmployee(empData);
-      
-      // Always save salary structure for every employee when profile is saved
-      // Uses upsert internally so works for both new hires and profile updates
+
+      // Save salary structure — non-blocking, never prevents employee record from saving
       const salaryToSave = form.salaryConfig || {
         targetSalary: 0,
         empId: savedEmp.id,
         candidateName: savedEmp.name
       };
-      try {
-        await dataService.saveSalaryStructure(savedEmp.id, {
-          ...salaryToSave,
-          empId: savedEmp.id,
-          candidateName: savedEmp.name
-        });
-      } catch (salaryErr) {
-        // Salary save failure should not block the profile save
-        console.error('Salary structure save failed (non-blocking):', salaryErr.message);
-      }
+      dataService.saveSalaryStructure(savedEmp.id, {
+        ...salaryToSave,
+        empId: savedEmp.id,
+        candidateName: savedEmp.name
+      }).catch(salaryErr => {
+        console.warn('Salary structure save failed (non-blocking):', salaryErr?.message);
+      });
 
-      const emps = await dataService.getEmployees();
-      setEmployees(emps);
-      setSearchTerm(''); // Clear search so new employee is visible
+      // Refresh employee list in background — do NOT block success notification
+      dataService.getEmployees().then(emps => {
+        setEmployees(emps);
+      }).catch(() => {});
+
+      clearTimeout(saveTimeout);
       showNotification(`Employee ${form.id ? 'Updated' : 'Onboarded'} Successfully!`, 'success');
       setShowModal(false);
       resetForm();
     } catch (err) {
-      console.error("Save employee failed:", err);
-      setErrorMsg(`Failed to save: ${err.message || 'Database error occurred. Please check Supabase permissions.'}`);
-      showNotification(`Failed to save employee. Check permissions.`, 'error');
+      clearTimeout(saveTimeout);
+      console.error('Save employee failed:', err);
+      const msg = err?.message || 'Database error. Please check Supabase permissions.';
+      setErrorMsg(`Failed to save: ${msg}`);
+      showNotification(`Failed to save employee: ${msg}`, 'error');
     } finally {
-      setLoading(false);
+      clearTimeout(saveTimeout);
+      setIsSaving(false);
     }
   };
 
@@ -1081,16 +1093,29 @@ const EmployeeDirectory = ({ userRole }) => {
                 {!isEmployee && (
                   <>
                     {activeTab < 7 ? (
-                      <button className="btn btn-primary" onClick={() => setActiveTab(activeTab + 1)}>Next Block →</button>
+                      <button className="btn btn-primary" onClick={() => setActiveTab(activeTab + 1)} disabled={isSaving}>Next Block →</button>
                     ) : (
                       <button className="btn btn-primary" 
                         onClick={handleSave} 
+                        disabled={isSaving}
                         style={{ 
-                          backgroundColor: isFormValid ? 'var(--color-success)' : 'var(--color-text-muted)', 
-                          borderColor: isFormValid ? 'var(--color-success)' : 'var(--color-border)',
-                          cursor: 'pointer'
+                          backgroundColor: isSaving ? 'var(--color-text-muted)' : (isFormValid ? 'var(--color-success)' : 'var(--color-text-muted)'), 
+                          borderColor: isFormValid && !isSaving ? 'var(--color-success)' : 'var(--color-border)',
+                          cursor: isSaving ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          minWidth: '220px',
+                          justifyContent: 'center'
                         }}>
-                        <Save size={16} /> Save & Complete Onboarding
+                        {isSaving ? (
+                          <>
+                            <span style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }}></span>
+                            Saving Employee...
+                          </>
+                        ) : (
+                          <><Save size={16} /> Save & Complete Onboarding</>
+                        )}
                       </button>
                     )}
                   </>

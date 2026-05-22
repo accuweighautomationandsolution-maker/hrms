@@ -422,9 +422,18 @@ export const dataService = {
     const isExisting = !!empData.id && !empData.isNew;
     const status = empData.status || 'Active';
 
+    // Helper: wraps any Supabase promise with a 12-second timeout
+    const withTimeout = (promise, label) => Promise.race([
+      promise,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`${label} timed out after 12s`)), 12000)
+      )
+    ]);
+
     try {
       if (isExisting) {
-        // UPDATE existing employee — use upsert with the known id
+        // UPDATE existing employee — upsert with known id
+        const fullData = { ...empData, id: empData.id, status };
         const row = {
           id: empData.id,
           name: empData.name || '',
@@ -436,19 +445,18 @@ export const dataService = {
           joining_date: empData.joiningDate || empData.joining_date || empData.joinDate || null,
           status,
           role: empData.role || 'employee',
-          data: { ...empData, id: empData.id, status }
+          data: fullData
         };
-        const { error } = await supabase
-          .from('employees')
-          .upsert(row, { onConflict: 'id' });
-        if (error) {
-          console.error('Error updating employee in Supabase:', error);
-          throw error;
-        }
-        return row.data;
+        const { error } = await withTimeout(
+          supabase.from('employees').upsert(row, { onConflict: 'id' }),
+          'updateEmployee'
+        );
+        if (error) throw error;
+        return fullData;
       } else {
-        // INSERT new employee — let Supabase auto-generate the BIGSERIAL id
-        const row = {
+        // INSERT new employee — Supabase auto-generates BIGSERIAL id
+        // We embed a temp data object first, then patch with real id after INSERT
+        const tempRow = {
           name: empData.name || '',
           email: empData.email || '',
           emp_code: empData.empCode || empData.emp_code || '',
@@ -458,25 +466,23 @@ export const dataService = {
           joining_date: empData.joiningDate || empData.joining_date || empData.joinDate || null,
           status,
           role: empData.role || 'employee',
-          data: {} // placeholder; updated below after we get the real id
+          data: { ...empData, status }
         };
-        const { data: inserted, error } = await supabase
-          .from('employees')
-          .insert(row)
-          .select()
-          .single();
+        const { data: inserted, error } = await withTimeout(
+          supabase.from('employees').insert(tempRow).select('id').single(),
+          'insertEmployee'
+        );
         if (error) {
           console.error('Error inserting employee in Supabase:', error);
           throw error;
         }
-        // Patch the data JSONB with the real auto-generated id
+        // Patch the data JSONB with the real auto-generated id (fire & forget)
         const realId = inserted.id;
         const fullData = { ...empData, id: realId, status };
-        const { error: patchErr } = await supabase
-          .from('employees')
-          .update({ data: fullData })
-          .eq('id', realId);
-        if (patchErr) console.warn('saveEmployee: data patch failed (non-blocking)', patchErr.message);
+        supabase.from('employees').update({ data: fullData }).eq('id', realId)
+          .then(({ error: patchErr }) => {
+            if (patchErr) console.warn('saveEmployee: data JSONB patch failed:', patchErr.message);
+          });
         return fullData;
       }
     } catch (err) {
