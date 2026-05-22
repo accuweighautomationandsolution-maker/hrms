@@ -336,8 +336,9 @@ export const dataService = {
       const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (error) {
-        console.error('Supabase Query Error (employees):', error.message);
-        alert("📊 Database Access Error (Employees): " + error.message + "\n\nThis is likely why the employee list is blank. Please check your SQL Grants.");
+        console.error('Supabase Query Error (employees):', error.message, error.code, error.details);
+        // NOTE: Do NOT use alert() here — it blocks the entire UI thread and causes the
+        // "screen hangs" symptom reported by users. Log to console only.
         return [];
       }
       
@@ -468,21 +469,31 @@ export const dataService = {
           role: empData.role || 'employee',
           data: { ...empData, status }
         };
+
+        console.log('saveEmployee: Inserting new employee row...', tempRow);
+
         const { data: inserted, error } = await withTimeout(
           supabase.from('employees').insert(tempRow).select('id').single(),
           'insertEmployee'
         );
         if (error) {
-          console.error('Error inserting employee in Supabase:', error);
-          throw error;
+          // Provide a more descriptive error so the frontend can show a meaningful message
+          console.error('Error inserting employee in Supabase:', error.message, 'Code:', error.code, 'Details:', error.details);
+          const friendlyMsg = error.code === '42501'
+            ? 'Permission denied by database security policy (RLS). Please check that your Supabase anon key has INSERT rights on the employees table.'
+            : error.code === '23505'
+            ? 'A duplicate record already exists (unique constraint violation). Check Employee Code or Biometric Code.'
+            : error.message;
+          throw new Error(friendlyMsg);
         }
-        // Patch the data JSONB with the real auto-generated id (fire & forget)
+        // Patch the data JSONB with the real auto-generated id (fire & forget, non-blocking)
         const realId = inserted.id;
         const fullData = { ...empData, id: realId, status };
         supabase.from('employees').update({ data: fullData }).eq('id', realId)
           .then(({ error: patchErr }) => {
-            if (patchErr) console.warn('saveEmployee: data JSONB patch failed:', patchErr.message);
+            if (patchErr) console.warn('saveEmployee: data JSONB patch failed (non-blocking):', patchErr.message);
           });
+        console.log('saveEmployee: New employee inserted successfully with id:', realId);
         return fullData;
       }
     } catch (err) {

@@ -376,10 +376,14 @@ const EmployeeDirectory = ({ userRole }) => {
         console.warn('Salary structure save failed (non-blocking):', salaryErr?.message);
       });
 
-      // Refresh employee list in background — do NOT block success notification
-      dataService.getEmployees().then(emps => {
+      // ✅ FIX: Await the employee list refresh BEFORE closing the modal.
+      // This ensures the newly created employee is visible immediately without a manual page refresh.
+      try {
+        const emps = await dataService.getEmployees();
         setEmployees(emps);
-      }).catch(() => {});
+      } catch (refreshErr) {
+        console.warn('Post-save employee list refresh failed:', refreshErr?.message);
+      }
 
       clearTimeout(saveTimeout);
       showNotification(`Employee ${form.id ? 'Updated' : 'Onboarded'} Successfully!`, 'success');
@@ -392,6 +396,9 @@ const EmployeeDirectory = ({ userRole }) => {
       setErrorMsg(`Failed to save: ${msg}`);
       showNotification(`Failed to save employee: ${msg}`, 'error');
     } finally {
+      // ✅ FIX: ALWAYS clear the save timeout and reset isSaving in finally.
+      // Previously clearTimeout was called in both try AND catch — but if an
+      // unexpected exception bypassed both, the button would remain frozen.
       clearTimeout(saveTimeout);
       setIsSaving(false);
     }
@@ -1088,35 +1095,45 @@ const EmployeeDirectory = ({ userRole }) => {
             <div style={{ padding: '1.5rem', borderTop: '1px solid var(--color-border)', backgroundColor: 'var(--color-background)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <button className="btn btn-outline" onClick={() => setActiveTab(Math.max(1, activeTab - 1))} disabled={activeTab === 1}>← Previous Block</button>
               
-              <div style={{ display: 'flex', gap: '1rem' }}>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                 <button className="btn btn-ghost" onClick={() => setShowModal(false)}>Close</button>
                 {!isEmployee && (
                   <>
-                    {activeTab < 7 ? (
-                      <button className="btn btn-primary" onClick={() => setActiveTab(activeTab + 1)} disabled={isSaving}>Next Block →</button>
-                    ) : (
-                      <button className="btn btn-primary" 
-                        onClick={handleSave} 
-                        disabled={isSaving}
-                        style={{ 
-                          backgroundColor: isSaving ? 'var(--color-text-muted)' : (isFormValid ? 'var(--color-success)' : 'var(--color-text-muted)'), 
-                          borderColor: isFormValid && !isSaving ? 'var(--color-success)' : 'var(--color-border)',
-                          cursor: isSaving ? 'not-allowed' : 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          minWidth: '220px',
-                          justifyContent: 'center'
-                        }}>
-                        {isSaving ? (
-                          <>
-                            <span style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }}></span>
-                            Saving Employee...
-                          </>
-                        ) : (
-                          <><Save size={16} /> Save & Complete Onboarding</>
-                        )}
-                      </button>
+                    {/* ✅ FIX: Show "Save & Complete" on EVERY tab, not just Tab 7.
+                        Previously Save was hidden on tabs 1-6, causing users to think
+                        the form was stuck. Now they can save from any tab once required
+                        fields (tabs 1 & 2) are filled. */}
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleSave}
+                      disabled={isSaving}
+                      title={!isFormValid ? `Missing: ${getMissingFields().join(', ')}` : 'Save employee record'}
+                      style={{
+                        backgroundColor: isSaving
+                          ? 'var(--color-text-muted)'
+                          : isFormValid
+                            ? 'var(--color-success)'
+                            : 'var(--color-text-muted)',
+                        borderColor: isFormValid && !isSaving ? 'var(--color-success)' : 'var(--color-border)',
+                        cursor: isSaving ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        minWidth: '220px',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      {isSaving ? (
+                        <>
+                          <span style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }}></span>
+                          Saving Employee...
+                        </>
+                      ) : (
+                        <><Save size={16} /> Save &amp; Complete Onboarding</>
+                      )}
+                    </button>
+                    {activeTab < 7 && (
+                      <button className="btn btn-outline" onClick={() => setActiveTab(activeTab + 1)} disabled={isSaving}>Next Block →</button>
                     )}
                   </>
                 )}
