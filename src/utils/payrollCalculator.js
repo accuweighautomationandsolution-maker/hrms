@@ -126,8 +126,9 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
   const pfDeduction = hasPF ? Math.max(0, Math.round(pfEligibleAmount * PF_PERCENTAGE)) : 0;
 
   // ESIC Calculation
-  // Base: Basic + DA + HRA + Washing Allowance + Performance Allowance + Other Allowance + OT
-  const esicWages = basic + da + hra + washingAllowance + performance + otherManual + otAmount;
+  // Base: Basic + DA + HRA + Washing Allowance + Special Allowance + Performance Allowance + Other Allowance + OT
+  // NOTE: Conveyance & Fuel is EXCLUDED from ESIC wages (not a part of ESIC gross).
+  const esicWages = basic + da + hra + washingAllowance + specialManual + performance + otherManual + otAmount;
 
   let esicDeduction = 0;
   let esicEmployerContribution = 0;
