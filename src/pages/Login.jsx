@@ -111,7 +111,7 @@ const Login = ({ onLoginSuccess }) => {
         {/* Brand Header */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '2rem' }}>
           <div className="login-brand-icon">
-            <ShieldCheck size={32} />
+            <Accuweigh size={32} />
           </div>
           <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0 }}>
             {view === 'login' && 'Accuweigh Hrms System'}
@@ -121,7 +121,7 @@ const Login = ({ onLoginSuccess }) => {
             {view === 'success' && 'Ready to Connect'}
           </h1>
           <p style={{ textAlign: 'center', fontSize: '0.875rem', marginTop: '0.5rem' }}>
-            {view === 'login' && 'Enter your credentials to access the internal HRMS.'}
+            {view === 'login' && 'Enter your credentials to access the HRMS.'}
             {view === 'forgot' && 'Provide your work email to receive a recovery token.'}
             {view === 'reset-code' && `A 6-digit code has been sent to ${email}.`}
             {view === 'force-reset' && 'Management requires a password update on first access.'}
