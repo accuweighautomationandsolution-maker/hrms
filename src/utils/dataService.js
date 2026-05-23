@@ -1429,18 +1429,25 @@ export const dataService = {
       const localKey = `vault_${empId}`;
       
       // 1. Try dedicated employee_docs table first
+      // Use both numeric and string forms of empId to avoid type mismatch issues
       try {
         if (supabase) {
+          const numId = Number(empId);
+          const strId = String(empId);
           const { data: dbDocs, error: dbErr } = await supabase
             .from('employee_docs')
             .select('data')
-            .eq('emp_id', Number(empId));
+            .or(`emp_id.eq.${numId},emp_id.eq.${strId}`);
           
-          if (!dbErr && Array.isArray(dbDocs)) {
-            const remoteDocs = dbDocs.map(row => row.data);
+          if (!dbErr && Array.isArray(dbDocs) && dbDocs.length > 0) {
+            const remoteDocs = dbDocs.map(row => row.data).filter(Boolean);
             localWrite(localKey, remoteDocs);
             console.log(`Vault: Loaded ${remoteDocs.length} documents from employee_docs table for ${empId}`);
             return remoteDocs;
+          }
+          // If query succeeded but returned 0 rows, skip to config fallback
+          if (!dbErr && Array.isArray(dbDocs) && dbDocs.length === 0) {
+            console.log(`Vault: No documents in employee_docs table for ${empId}, checking config fallback.`);
           }
         }
       } catch (err) {
@@ -1538,13 +1545,14 @@ export const dataService = {
         // 1. Try dedicated employee_docs table
         let savedToDocsTable = false;
         try {
+          const empIdNum = Number(finalDoc.empId);
           const { error: dbErr } = await supabase
             .from('employee_docs')
             .upsert({
               id: finalDoc.id,
-              emp_id: Number(finalDoc.empId),
+              emp_id: isNaN(empIdNum) ? finalDoc.empId : empIdNum,
               data: finalDoc
-            });
+            }, { onConflict: 'id' });
           if (!dbErr) {
             savedToDocsTable = true;
             console.log(`Vault: ${finalDoc.id} persisted to employee_docs table successfully.`);
