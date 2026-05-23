@@ -51,7 +51,7 @@ const Sidebar = ({ userRole }) => {
           <span>Growth & Training</span>
         </Link>
         <Link to="/compliance" className={`nav-item ${location.pathname === '/compliance' ? 'active' : ''}`}>
-          <ShieldCheck size={24 color="var(--color-primary)" />
+          <ShieldCheck size={24} color="var(--color-primary)" />
           <span>Compliance Hub</span>
         </Link>
         <Link to="/policies" className={`nav-item ${location.pathname === '/policies' ? 'active' : ''}`}>
