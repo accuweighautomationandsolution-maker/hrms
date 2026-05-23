@@ -8,7 +8,6 @@ import {
   EyeOff, 
   Loader2, 
   AlertCircle,
-  ShieldCheck,
   Briefcase,
   Key
 } from 'lucide-react';
@@ -110,8 +109,8 @@ const Login = ({ onLoginSuccess }) => {
         
         {/* Brand Header */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '2rem' }}>
-          <div className="login-brand-icon">
-            <ShieldCheck size={32} />
+          <div style={{ marginBottom: '1rem' }}>
+            <img src="/Accuweigh.svg" alt="Accuweigh Logo" style={{ width: '180px', height: 'auto', display: 'block' }} />
           </div>
           <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0 }}>
             {view === 'login' && 'Accuweigh Hrms System'}
