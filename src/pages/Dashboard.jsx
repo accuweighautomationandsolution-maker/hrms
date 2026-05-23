@@ -14,7 +14,7 @@ import { alertEngine } from '../utils/alertEngine';
 import { authService } from '../utils/authService';
 import { generateBoardReport } from '../utils/exportUtils';
 
-const ATTENDANCE_DATA = [];
+// ATTENDANCE_DATA is now computed dynamically from real DB data (see useEffect)
 
 const FINANCE_DATA = [];
 
@@ -45,6 +45,7 @@ const Dashboard = ({ userRole }) => {
   const [todayStatus, setTodayStatus] = useState({ punchIn: null, status: 'Not Marked' });
   const [personalLeaveBalance, setPersonalLeaveBalance] = useState(0);
   const [personalTrajectory, setPersonalTrajectory] = useState([]);
+  const [adminAttendanceData, setAdminAttendanceData] = useState([]);
   const [notices, setNotices] = useState([]);
   const [probations, setProbations] = useState([]);
   const [dashboardStats, setDashboardStats] = useState({ totalEmployees: 0, presentToday: 0, onLeave: 0 });
@@ -91,14 +92,21 @@ const Dashboard = ({ userRole }) => {
       
       try {
         setLoading(true);
-        
-        // Initial Fetch
+
+        // ── Helper: format a Date as YYYY-MM-DD ──
+        const toDateStr = (d) => d.toISOString().split('T')[0];
+
+        // ── Helper: short day label like "Mon 19" ──
+        const shortDay = (d) => d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric' });
+
+        const nowLocal = new Date();
+
+        // Fetch holidays + notices in parallel
         const [holidays, noticesList] = await Promise.all([
           dataService.getCustomHolidays().catch(() => []),
           dataService.getNotices().catch(() => [])
         ]);
 
-        const nowLocal = new Date();
         const upcomingHolidays = (holidays || [])
           .filter(h => new Date(h.fromDate) >= nowLocal)
           .map(h => ({
@@ -112,13 +120,113 @@ const Dashboard = ({ userRole }) => {
 
         setNotices([...upcomingHolidays, ...noticesList].sort((a, b) => new Date(b.date) - new Date(a.date)));
 
-        // Setup Real-time Subscription
+        // ── Real-time Notice Subscription ──
         const subscription = dataService.subscribeToNotices((freshNotices) => {
           setNotices(prev => {
             const hols = prev.filter(n => n.isSystem);
             return [...hols, ...freshNotices].sort((a, b) => new Date(b.date) - new Date(a.date));
           });
         });
+
+        if (isEmployee) {
+          // ── EMPLOYEE: personal attendance trend (last 30 days) ──
+          const myProfile = await dataService.getMyEmployeeProfile(currentUser).catch(() => null);
+          if (myProfile) {
+            const attMap = await dataService.getAttendanceForEmployee(myProfile.id).catch(() => ({}));
+
+            // Build last 30-day trajectory
+            const trajectory = [];
+            for (let i = 29; i >= 0; i--) {
+              const d = new Date(nowLocal);
+              d.setDate(d.getDate() - i);
+              const dateStr = toDateStr(d);
+              const key = `${String(myProfile.id)}_${dateStr}`;
+              const rec = attMap[key];
+              const isPresent = rec && (rec.status === 'Present' || rec.punchIn);
+              trajectory.push({
+                day: shortDay(d),
+                present: isPresent ? 1 : 0,
+              });
+            }
+            setPersonalTrajectory(trajectory);
+
+            // Today's punch-in
+            const todayStr = toDateStr(nowLocal);
+            const todayKey = `${String(myProfile.id)}_${todayStr}`;
+            const todayRec = attMap[todayKey];
+            setTodayStatus({
+              punchIn: todayRec?.punchIn || null,
+              status: todayRec?.status || 'Not Marked'
+            });
+
+            // Days present this month
+            const monthStr = todayStr.slice(0, 7); // "YYYY-MM"
+            const presentCount = Object.entries(attMap).filter(([k, v]) =>
+              k.startsWith(`${myProfile.id}_${monthStr}`) && (v.status === 'Present' || v.punchIn)
+            ).length;
+            setPersonalAttendance({ present: presentCount });
+
+            // Leave balance from leave_requests (approved leaves consumed this year)
+            const leaveRequests = await dataService.getLeaveRequests().catch(() => []);
+            const yearStr = String(nowLocal.getFullYear());
+            const myLeavesTaken = leaveRequests.filter(l =>
+              String(l.empId) === String(myProfile.id) &&
+              l.status === 'Approved' &&
+              (l.startDate || '').startsWith(yearStr)
+            ).reduce((sum, l) => sum + (Number(l.days) || 1), 0);
+            // Standard: 12 days earned leave per year → remaining
+            setPersonalLeaveBalance(Math.max(0, 12 - myLeavesTaken));
+          }
+        } else {
+          // ── ADMIN: company-wide attendance trend (last 7 days) ──
+          const [employees, attMap, leaveRequests] = await Promise.all([
+            dataService.getEmployees().catch(() => []),
+            dataService.getAttendance().catch(() => ({})),
+            dataService.getLeaveRequests().catch(() => [])
+          ]);
+
+          const activeEmps = employees.filter(e => e.status !== 'Inactive');
+          const totalEmployees = activeEmps.length;
+
+          // Today's stats
+          const todayStr = toDateStr(nowLocal);
+          const presentToday = activeEmps.filter(e => {
+            const key = `${String(e.id)}_${todayStr}`;
+            const rec = attMap[key];
+            return rec && (rec.status === 'Present' || rec.punchIn);
+          }).length;
+
+          const onLeave = leaveRequests.filter(l =>
+            l.status === 'Approved' &&
+            l.startDate <= todayStr && l.endDate >= todayStr
+          ).length;
+
+          setDashboardStats({ totalEmployees, presentToday, onLeave });
+
+          // Build last 7-day trajectory
+          const trajectory = [];
+          for (let i = 6; i >= 0; i--) {
+            const d = new Date(nowLocal);
+            d.setDate(d.getDate() - i);
+            const dateStr = toDateStr(d);
+            let present = 0, absent = 0;
+            activeEmps.forEach(e => {
+              const key = `${String(e.id)}_${dateStr}`;
+              const rec = attMap[key];
+              if (rec && (rec.status === 'Present' || rec.punchIn)) {
+                present++;
+              } else {
+                absent++;
+              }
+            });
+            trajectory.push({ day: shortDay(d), present, absent });
+          }
+          setAdminAttendanceData(trajectory);
+        }
+
+        // Statutory updates (both roles)
+        const statUpdates = await dataService.getStatutoryUpdates().catch(() => []);
+        setStatutoryUpdates(statUpdates);
 
         return () => {
           if (subscription) subscription.unsubscribe();
@@ -131,7 +239,7 @@ const Dashboard = ({ userRole }) => {
       }
     };
     fetchData();
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isEmployee]);
 
   const [noticeModal, setNoticeModal] = useState(null); // { title, content } for editing
   const [viewingNotice, setViewingNotice] = useState(null);
@@ -366,10 +474,10 @@ const Dashboard = ({ userRole }) => {
           </div>
 
           <div className="card">
-            <h2 style={{ fontSize: '1.125rem', marginBottom: '1.5rem' }}>{isEmployee ? 'My Attendance Trend' : 'Attendance Trajectory (Past 5 Days)'}</h2>
+            <h2 style={{ fontSize: '1.125rem', marginBottom: '1.5rem' }}>{isEmployee ? 'My Attendance Trend (Last 30 Days)' : 'Attendance Trajectory (Past 7 Days)'}</h2>
             <div style={{ width: '100%', height: '300px' }}>
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={isEmployee ? personalTrajectory : ATTENDANCE_DATA} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                <LineChart data={isEmployee ? personalTrajectory : adminAttendanceData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
                   <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: 'var(--color-text-muted)', fontSize: 12 }} dy={10} />
                   <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--color-text-muted)', fontSize: 12 }} />
@@ -380,6 +488,11 @@ const Dashboard = ({ userRole }) => {
                 </LineChart>
               </ResponsiveContainer>
             </div>
+            {(isEmployee ? personalTrajectory : adminAttendanceData).every(d => (d.present || 0) === 0 && (d.absent || 0) === 0) && (
+              <div style={{ textAlign: 'center', padding: '0.75rem 1rem 0', fontSize: '0.82rem', color: 'var(--color-text-muted)', opacity: 0.7 }}>
+                No attendance records found for this period. Data will appear once attendance has been recorded.
+              </div>
+            )}
           </div>
 
         </div>
