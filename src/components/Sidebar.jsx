@@ -9,8 +9,8 @@ const Sidebar = ({ userRole }) => {
 
   return (
     <aside className="sidebar hide-on-print">
-      <div className="sidebar-logo">
-        <h2 style={{ letterSpacing: '2px', fontWeight: '800' }}>Accuweigh<span style={{ color: 'var(--color-primary)' }}>HRMS</span></h2>
+      <div className="sidebar-logo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem 1.5rem' }}>
+        <img src="/Accuweigh.svg" alt="Accuweigh Logo" style={{ width: '100%', maxWidth: '160px', height: 'auto', display: 'block' }} />
       </div>
 
       <nav className="sidebar-nav">
