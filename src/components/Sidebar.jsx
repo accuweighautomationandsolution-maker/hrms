@@ -35,7 +35,7 @@ const Sidebar = ({ userRole }) => {
           <span>Attendance (Biometric)</span>
         </Link>
         <Link to="/advances" className={`nav-item ${location.pathname === '/advances' ? 'active' : ''}`}>
-          <IndianRupee size={24 />
+          <IndianRupee size={24} />
           <span>Advances & Loans</span>
         </Link>
         <Link to="/expenses" className={`nav-item ${location.pathname === '/expenses' ? 'active' : ''}`}>
