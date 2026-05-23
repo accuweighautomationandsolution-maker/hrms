@@ -111,7 +111,7 @@ const Login = ({ onLoginSuccess }) => {
         {/* Brand Header */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '2rem' }}>
           <div className="login-brand-icon">
-            <Accuweigh size={32} />
+            <ShieldCheck size={32} />
           </div>
           <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0 }}>
             {view === 'login' && 'Accuweigh Hrms System'}
