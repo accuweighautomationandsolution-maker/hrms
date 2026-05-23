@@ -145,19 +145,19 @@ const Sidebar = ({ userRole }) => {
               <span>Hiring Requests</span>
             </Link>
             <Link to="/recruitment" className={`nav-item ${location.pathname === '/recruitment' ? 'active' : ''}`}>
-              <Briefcase size={24 />
+              <Briefcase size={24} />
               <span>Recruitment</span>
             </Link>
             <Link to="/document-hub" className={`nav-item ${location.pathname === '/document-hub' ? 'active' : ''}`}>
-              <FileCheck size={24 />
+              <FileCheck size={24} />
               <span>Document Hub</span>
             </Link>
             <Link to="/letter-templates" className={`nav-item ${location.pathname === '/letter-templates' ? 'active' : ''}`}>
-              <FileText size={24 />
+              <FileText size={24} />
               <span>Letter Templates</span>
             </Link>
             <Link to="/compensation" className={`nav-item ${location.pathname === '/compensation' ? 'active' : ''}`}>
-              <FileSignature size={24 />
+              <FileSignature size={24} />
               <span>Compensation & Offers</span>
             </Link>
             <Link to="/performance" className={`nav-item ${location.pathname === '/performance' ? 'active' : ''}`}>
@@ -165,21 +165,21 @@ const Sidebar = ({ userRole }) => {
               <span>Performance Config</span>
             </Link>
             <Link to="/departments" className={`nav-item ${location.pathname === '/departments' ? 'active' : ''}`}>
-              <Building2 size={24 />
+              <Building2 size={24} />
               <span>Department Master</span>
             </Link>
             <Link to="/user-management" className={`nav-item ${location.pathname === '/user-management' ? 'active' : ''}`}>
-              <ShieldCheck size={24 />
+              <ShieldCheck size={24} />
               <span>Identity & Access</span>
             </Link>
 
             <div style={{ marginTop: '2rem', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '1px', paddingLeft: '1rem' }}>Lifecycle & Offboarding</div>
             <Link to="/exit-management" className={`nav-item ${location.pathname === '/exit-management' ? 'active' : ''}`}>
-              <Users size={24 />
+              <Users size={24} />
               <span>Exit & FnF Settlement</span>
             </Link>
             <Link to="/bonus-management" className={`nav-item ${location.pathname === '/bonus-management' ? 'active' : ''}`}>
-              <Coins size={24 />
+              <Coins size={24} />
               <span>Statutory Bonus</span>
             </Link>
           </>
