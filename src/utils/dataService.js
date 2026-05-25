@@ -912,9 +912,11 @@ export const dataService = {
         status: req.status || 'Pending',
       };
       // Try upsert, ignore errors (table may have RLS or missing columns)
-      await supabase.from('leave_requests').upsert(mirrorRow, { onConflict: 'id' }).catch(e =>
-        console.warn('saveLeaveRequest: leave_requests mirror failed (non-fatal):', e.message)
-      );
+      try {
+        await supabase.from('leave_requests').upsert(mirrorRow, { onConflict: 'id' });
+      } catch (mirrorErr) {
+        console.warn('saveLeaveRequest: leave_requests mirror failed (non-fatal):', mirrorErr.message);
+      }
 
       console.log(`saveLeaveRequest: saved ${ltId} successfully.`);
       return { ...fullRecord, id: ltId };
@@ -1949,9 +1951,11 @@ export const dataService = {
       if (updateErr) throw updateErr;
 
       // Mirror status to leave_requests (non-fatal)
-      await supabase.from('leave_requests').update({ status }).eq('id', rawId).catch(e =>
-        console.warn('updateRequestStatusWithHistory mirror failed (non-fatal):', e.message)
-      );
+      try {
+        await supabase.from('leave_requests').update({ status }).eq('id', rawId);
+      } catch (mirrorErr) {
+        console.warn('updateRequestStatusWithHistory mirror failed (non-fatal):', mirrorErr.message);
+      }
 
       return updatedRecord;
     } catch (e) {
@@ -2041,9 +2045,11 @@ export const dataService = {
       if (updateErr) throw updateErr;
 
       // Mirror status update to leave_requests (non-fatal)
-      await supabase.from('leave_requests').update({ status: actionDetails.status }).eq('id', ltId).catch(e =>
-        console.warn('updateRequestWorkflowAction: mirror to leave_requests failed (non-fatal):', e.message)
-      );
+      try {
+        await supabase.from('leave_requests').update({ status: actionDetails.status }).eq('id', rawId);
+      } catch (mirrorErr) {
+        console.warn('updateRequestWorkflowAction mirror failed (non-fatal):', mirrorErr.message);
+      }
 
       // Log intervention in audit trail
       const auditTrail = await getConfig('approval_audit_trail', []);
