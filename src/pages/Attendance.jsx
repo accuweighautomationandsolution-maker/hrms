@@ -130,6 +130,11 @@ const Attendance = () => {
   const currentUser = authService.getCurrentUser();
   const userRole = authService.getUserRole();
   const isEmployee = userRole === 'employee';
+  
+  const [isManager, setIsManager] = useState(false);
+  const [myEmployeeProfile, setMyEmployeeProfile] = useState(null);
+  const isEmployeeOnly = isEmployee && !isManager;
+  const isAdmin = userRole === 'management' || userRole === 'admin';
 
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -178,20 +183,23 @@ const Attendance = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // For employee role: resolve their own employee record FIRST via email/name (server-side),
-        // before any data scrubbing happens. This prevents cross-employee data leakage.
         const myProfile = isEmployee
           ? await dataService.getMyEmployeeProfile(currentUser).catch(() => null)
           : null;
+        setMyEmployeeProfile(myProfile);
 
-        // For employee role: fetch only their own attendance records (much faster, avoids RLS issues)
-        // For admin/management: fetch all records
-        const attFetch = (isEmployee && myProfile)
+        const emps = await dataService.getEmployees().catch(() => []);
+        
+        const hasReportees = myProfile ? emps.some(e => e.managerIds && e.managerIds.map(String).includes(String(myProfile.id))) : false;
+        setIsManager(hasReportees);
+
+        const isEmpOnly = isEmployee && !hasReportees;
+
+        const attFetch = (isEmpOnly && myProfile)
           ? dataService.getAttendanceForEmployee(myProfile.id).catch(() => ({}))
           : dataService.getAttendance().catch(() => ({}));
 
-        const [emps, att, hol, bConf, lSync] = await Promise.all([
-          dataService.getEmployees().catch(() => []),
+        const [att, hol, bConf, lSync] = await Promise.all([
           attFetch,
           dataService.getCustomHolidays().catch(() => []),
           dataService.getBiometricConfig().catch(() => null),
@@ -204,7 +212,8 @@ const Attendance = () => {
             att: Object.keys(att || {}).length,
             userRole,
             myProfile: myProfile?.name,
-            myProfileId: myProfile?.id
+            myProfileId: myProfile?.id,
+            isManager: hasReportees
           });
           setEmployeesList(emps);
           setRecords(att);
@@ -212,23 +221,26 @@ const Attendance = () => {
           if (bConf) setBioConfig(bConf);
           if (lSync) setLastSync(lSync);
 
-          if (isEmployee) {
-            // SECURITY: Use the pre-resolved profile from getMyEmployeeProfile.
-            // NEVER fall back to emps[0] — that shows another employee's data.
+          if (isEmpOnly) {
             if (myProfile) {
-              // Find the matching entry in the scrubbed emps list (for display consistency),
-              // but always fall back to myProfile itself since it has the verified employee ID.
               const empInList = emps.find(e => String(e.id) === String(myProfile.id));
               setSelectedEmp(empInList || myProfile);
               console.log(`Attendance: Employee resolved → ${myProfile.name} (ID: ${myProfile.id})`);
             } else {
-              // Genuine "no employee record linked to this account" — show error UI, not wrong data
               setSelectedEmp(null);
               console.warn('Attendance: Could not resolve employee record for current user.');
             }
-          } else if (emps.length > 0) {
-            setSelectedEmp(emps[0]);
+          } else {
+            // Admin or Manager
+            const myReportees = hasReportees 
+              ? emps.filter(e => e.managerIds && e.managerIds.map(String).includes(String(myProfile.id)))
+              : emps;
+            
+            if (myReportees.length > 0) {
+              setSelectedEmp(myReportees[0]);
+            }
           }
+          
           // Check overdue movement requests on page load
           dataService.checkOverdueMovements().catch(console.error);
         }
@@ -596,9 +608,15 @@ const Attendance = () => {
     'future': { bg: 'transparent', border: 'var(--color-border)', color: 'var(--color-text-muted)' },
   };
 
-  const filteredEmps = (employeesList || []).filter(e =>
-    (e.name || '').toLowerCase().includes((searchQ || '').toLowerCase())
-  );
+  const filteredEmps = useMemo(() => {
+    let list = employeesList || [];
+    if (isManager && !isAdmin) {
+      list = list.filter(e => e.managerIds && e.managerIds.map(String).includes(String(myEmployeeProfile?.id)));
+    }
+    return list.filter(e =>
+      (e.name || '').toLowerCase().includes((searchQ || '').toLowerCase())
+    );
+  }, [employeesList, isManager, isAdmin, myEmployeeProfile, searchQ]);
 
   // Summary stats for selected employee
   const presentDays = selectedEmp ? calDays.filter(({ day }) => ['present', 'punch-in-only', 'holiday-worked'].includes(dayStatus(selectedEmp.id, day, new Date(year, month, day).getDay()))).length : 0;
@@ -863,10 +881,10 @@ const Attendance = () => {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: isEmployee ? '1fr' : '220px 1fr', gap: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isEmployeeOnly ? '1fr' : '220px 1fr', gap: '1.5rem' }}>
 
         {/* Employee sidebar */}
-        {!isEmployee && (
+        {!isEmployeeOnly && (
           <div className="card" style={{ padding: '1rem', alignSelf: 'start' }}>
             <div style={{ marginBottom: '1rem' }}>
               <div className="header-search" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>

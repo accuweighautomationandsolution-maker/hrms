@@ -53,6 +53,33 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [initStatus, setInitStatus] = useState('Checking connectivity...');
+  const [isManager, setIsManager] = useState(false);
+  const [myEmployeeProfile, setMyEmployeeProfile] = useState(null);
+
+  useEffect(() => {
+    const checkManagerStatus = async () => {
+      if (!currentUser) {
+        setIsManager(false);
+        setMyEmployeeProfile(null);
+        return;
+      }
+      try {
+        const myProfile = await dataService.getMyEmployeeProfile(currentUser).catch(() => null);
+        setMyEmployeeProfile(myProfile);
+        if (myProfile) {
+          const emps = await dataService.getEmployees().catch(() => []);
+          const hasReportees = emps.some(e => e.managerIds && e.managerIds.map(String).includes(String(myProfile.id)));
+          setIsManager(hasReportees);
+        } else {
+          setIsManager(false);
+        }
+      } catch (err) {
+        console.error("Error checking manager status in App.jsx:", err);
+        setIsManager(false);
+      }
+    };
+    checkManagerStatus();
+  }, [currentUser]);
 
   // Logout handler
   const handleLogout = useCallback(async () => {
@@ -211,7 +238,7 @@ function App() {
       <Router>
         <Toast />
         <div className="app-layout">
-          <Sidebar userRole={userRole} />
+          <Sidebar userRole={userRole} isManager={isManager} />
           <div className="main-content">
             <Header onLogout={handleLogout} userRole={userRole} userName={currentUser.name} />
             <main className="page-content">
@@ -229,6 +256,14 @@ function App() {
                 <Route path="/my-documents" element={<MyDocuments />} />
                 <Route path="/out-duty" element={<OutDuty />} />
                 <Route path="/out-pass" element={<OutPass />} />
+
+                {/* Manager / Admin Shared Routes */}
+                {(isAdmin || isManager) && (
+                  <>
+                    <Route path="/approvals" element={<Approvals />} />
+                    <Route path="/movement-reports" element={<MovementReports />} />
+                  </>
+                )}
                 
                 {/* Management-Strict Routes */}
                 {isAdmin && (
@@ -240,7 +275,6 @@ function App() {
                     <Route path="/advance-report" element={<AdvanceReport />} />
                     <Route path="/payroll-report" element={<PayrollReport />} />
                     <Route path="/site-expenses" element={<SiteExpenseReport />} />
-                    <Route path="/approvals" element={<Approvals />} />
                     <Route path="/recruitment" element={<Recruitment />} />
                     <Route path="/document-hub" element={<DocumentHub />} />
                     <Route path="/letter-templates" element={<LetterTemplates />} />
@@ -251,7 +285,6 @@ function App() {
                     <Route path="/bonus-management" element={<BonusManagement />} />
                     <Route path="/user-management" element={<UserManagement />} />
                     <Route path="/departments" element={<DepartmentManagement />} />
-                    <Route path="/movement-reports" element={<MovementReports />} />
                     <Route path="/movement-policies" element={<MovementPolicySettings />} />
                   </>
                 )}

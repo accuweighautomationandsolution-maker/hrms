@@ -8,22 +8,31 @@ const MovementPolicySettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
-  // Policy State
+  // Policy State and Employees List
+  const [employees, setEmployees] = useState([]);
   const [policy, setPolicy] = useState({
     option: 'B', // 'A' | 'B' | 'C'
     maxHoursPerMonth: 8,
-    approvalHierarchy: 'Direct Manager'
+    approvalHierarchy: 'Direct Manager',
+    workflowType: 'parallel', // 'parallel' | 'sequential'
+    finalAuthorityId: '' // selected employee ID
   });
 
   useEffect(() => {
     const fetchPolicies = async () => {
       setLoading(true);
       try {
-        const activePolicy = await dataService.getMovementPolicies();
+        const [activePolicy, emps] = await Promise.all([
+          dataService.getMovementPolicies(),
+          dataService.getEmployees().catch(() => [])
+        ]);
+        setEmployees(emps);
         setPolicy(activePolicy || {
           option: 'B',
           maxHoursPerMonth: 8,
-          approvalHierarchy: 'Direct Manager'
+          approvalHierarchy: 'Direct Manager',
+          workflowType: 'parallel',
+          finalAuthorityId: ''
         });
       } catch (err) {
         console.error("Failed to load movement policies:", err);
@@ -224,18 +233,65 @@ const MovementPolicySettings = () => {
             <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', marginBottom: '1.25rem' }}>
               Define which roles must authorize Out Duty and Out Pass requests.
             </p>
-            <div className="form-group" style={{ maxWidth: '350px', marginBottom: 0 }}>
-              <label className="form-label">Approval Authority</label>
-              <select 
-                className="form-input" 
-                style={{ width: '100%' }}
-                value={policy.approvalHierarchy}
-                onChange={(e) => setPolicy({ ...policy, approvalHierarchy: e.target.value })}
-              >
-                <option value="Direct Manager">Direct Reporting Manager</option>
-                <option value="Admin Only">Admin/Management Only</option>
-                <option value="Auto-Approve">Auto-Approve (Skip Manager Review)</option>
-              </select>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div className="form-group" style={{ maxWidth: '350px', marginBottom: 0 }}>
+                <label className="form-label">Approval Authority</label>
+                <select 
+                  className="form-input" 
+                  style={{ width: '100%' }}
+                  value={policy.approvalHierarchy}
+                  onChange={(e) => setPolicy({ ...policy, approvalHierarchy: e.target.value })}
+                >
+                  <option value="Direct Manager">Direct Reporting Manager</option>
+                  <option value="Admin Only">Admin/Management Only</option>
+                  <option value="Auto-Approve">Auto-Approve (Skip Manager Review)</option>
+                </select>
+              </div>
+
+              {policy.approvalHierarchy === 'Direct Manager' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '0.5rem' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Routing Workflow Type</label>
+                    <select 
+                      className="form-input" 
+                      style={{ width: '100%' }}
+                      value={policy.workflowType || 'parallel'}
+                      onChange={(e) => setPolicy({ ...policy, workflowType: e.target.value })}
+                    >
+                      <option value="parallel">Parallel Approval (Any assigned manager can approve)</option>
+                      <option value="sequential">Sequential Approval (Flows primary → secondary)</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Final Authority Manager</label>
+                    <select 
+                      className="form-input" 
+                      style={{ width: '100%' }}
+                      value={policy.finalAuthorityId || ''}
+                      onChange={(e) => setPolicy({ ...policy, finalAuthorityId: e.target.value })}
+                    >
+                      <option value="">None (Standard Hierarchy)</option>
+                      {employees.filter(e => e.status === 'Active').map(e => (
+                        <option key={e.id} value={e.id}>{e.name} ({e.role || 'Employee'})</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <div className="form-group" style={{ maxWidth: '350px', marginTop: '1rem' }}>
+                <label className="form-label">Admin Approval Monitoring Mode</label>
+                <select 
+                  className="form-input" 
+                  style={{ width: '100%' }}
+                  value={policy.adminVisibility || 'read-write'}
+                  onChange={(e) => setPolicy({ ...policy, adminVisibility: e.target.value })}
+                >
+                  <option value="read-write">Read & Write (Full override, reassign, escalate)</option>
+                  <option value="read-only">Read-Only (Monitoring & tracking only)</option>
+                </select>
+              </div>
             </div>
           </div>
 

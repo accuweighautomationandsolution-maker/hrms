@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Calendar as CalendarIcon, Clock, MapPin, Search, Download, AlertTriangle, UserCheck, ShieldAlert, FileText, Filter } from 'lucide-react';
 import { dataService } from '../utils/dataService';
+import { authService } from '../utils/authService';
 import { useNotification } from '../context/NotificationContext';
 import * as XLSX from 'xlsx';
 
@@ -12,6 +13,25 @@ const MovementReports = () => {
 
   const [activeTab, setActiveTab] = useState(initialTab); // 'duty' | 'pass' | 'exits' | 'overdue'
   const [loading, setLoading] = useState(true);
+
+  const currentUser = authService.getCurrentUser();
+  const userRole = authService.getUserRole();
+  const isAdmin = userRole === 'management' || userRole === 'admin';
+  const [myEmpId, setMyEmpId] = useState(null);
+
+  useEffect(() => {
+    const fetchManagerProfile = async () => {
+      try {
+        const myProfile = await dataService.getMyEmployeeProfile(currentUser).catch(() => null);
+        if (myProfile) {
+          setMyEmpId(myProfile.id);
+        }
+      } catch (err) {
+        console.error("Failed to load manager profile:", err);
+      }
+    };
+    fetchManagerProfile();
+  }, [currentUser]);
 
   // Data State
   const [requests, setRequests] = useState([]);
@@ -64,10 +84,21 @@ const MovementReports = () => {
     return emp ? emp.department : 'Unknown';
   };
 
+  // Resolve reportees for non-admin managers
+  const reporteeIds = useMemo(() => {
+    if (isAdmin || !myEmpId) return [];
+    return employees
+      .filter(e => e.managerIds && e.managerIds.map(String).includes(String(myEmpId)))
+      .map(e => String(e.id));
+  }, [employees, isAdmin, myEmpId]);
+
   // 1. Filtered Out Duty Requests
   const outDutyData = useMemo(() => {
     return requests.filter(l => {
       if (l.type !== 'Out Duty Request') return false;
+      const targetEmpId = String(l.emp_id || l.empId);
+      if (!isAdmin && !reporteeIds.includes(targetEmpId)) return false;
+
       const dept = getEmployeeDept(l.emp_id || l.empId) || '';
       const empName = l.employees?.name || l.data?.name || l.data?.empName || l.name || '';
       
@@ -83,12 +114,15 @@ const MovementReports = () => {
 
       return matchesSearch && matchesDept && matchesStart && matchesEnd;
     });
-  }, [requests, employees, searchQuery, selectedDept, startDate, endDate]);
+  }, [requests, employees, searchQuery, selectedDept, startDate, endDate, isAdmin, reporteeIds]);
 
   // 2. Filtered Out Pass Requests
   const outPassData = useMemo(() => {
     return requests.filter(l => {
       if (l.type !== 'Out Pass Request') return false;
+      const targetEmpId = String(l.emp_id || l.empId);
+      if (!isAdmin && !reporteeIds.includes(targetEmpId)) return false;
+
       const dept = getEmployeeDept(l.emp_id || l.empId) || '';
       const empName = l.employees?.name || l.data?.name || l.data?.empName || l.name || '';
       
@@ -104,11 +138,14 @@ const MovementReports = () => {
 
       return matchesSearch && matchesDept && matchesStart && matchesEnd;
     });
-  }, [requests, employees, searchQuery, selectedDept, startDate, endDate]);
+  }, [requests, employees, searchQuery, selectedDept, startDate, endDate, isAdmin, reporteeIds]);
 
   // 3. Filtered Unauthorized Exits
   const exitsData = useMemo(() => {
     return exits.filter(e => {
+      const targetEmpId = String(e.empId || e.emp_id);
+      if (!isAdmin && !reporteeIds.includes(targetEmpId)) return false;
+
       const matchesSearch = (e.empName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
                             (e.punchOutTime || '').toLowerCase().includes(searchQuery.toLowerCase());
       
@@ -119,13 +156,15 @@ const MovementReports = () => {
 
       return matchesSearch && matchesDept && matchesStart && matchesEnd;
     });
-  }, [exits, searchQuery, selectedDept, startDate, endDate]);
+  }, [exits, searchQuery, selectedDept, startDate, endDate, isAdmin, reporteeIds]);
 
   // 4. Filtered Overdue Returns
   const overdueData = useMemo(() => {
     return requests.filter(l => {
       const isMovement = l.type === 'Out Duty Request' || l.type === 'Out Pass Request';
       if (!isMovement || l.status !== 'Overdue') return false;
+      const targetEmpId = String(l.emp_id || l.empId);
+      if (!isAdmin && !reporteeIds.includes(targetEmpId)) return false;
 
       const dept = getEmployeeDept(l.emp_id || l.empId) || '';
       const empName = l.employees?.name || l.data?.name || l.data?.empName || l.name || '';
@@ -141,7 +180,7 @@ const MovementReports = () => {
 
       return matchesSearch && matchesDept && matchesStart && matchesEnd;
     });
-  }, [requests, employees, searchQuery, selectedDept, startDate, endDate]);
+  }, [requests, employees, searchQuery, selectedDept, startDate, endDate, isAdmin, reporteeIds]);
 
   // Active dataset depending on activeTab
   const activeDataset = useMemo(() => {

@@ -1819,6 +1819,88 @@ export const dataService = {
     }
   },
 
+  updateRequestWorkflowAction: async (requestId, actionDetails) => {
+    if (!supabase) return null;
+    try {
+      const { data: request, error: fetchErr } = await supabase
+        .from('leave_requests')
+        .select('*')
+        .eq('id', String(requestId))
+        .maybeSingle();
+      
+      if (fetchErr || !request) {
+        throw new Error(fetchErr ? fetchErr.message : 'Request not found');
+      }
+
+      const prevData = request.data || {};
+      const approvalHistory = prevData.approvalHistory || [];
+      
+      const newHistoryEntry = {
+        managerId: actionDetails.managerId || null,
+        managerName: actionDetails.managerName || 'System',
+        dateTime: new Date().toISOString(),
+        status: actionDetails.status,
+        remarks: actionDetails.remarks || '',
+        actionType: actionDetails.actionType || 'Approve'
+      };
+
+      const updatedData = {
+        ...prevData,
+        status: actionDetails.status,
+        approvalHistory: [...approvalHistory, newHistoryEntry]
+      };
+
+      // Handle custom workflow parameters
+      if (actionDetails.reassignedTo !== undefined) {
+        updatedData.reassignedTo = actionDetails.reassignedTo;
+      }
+      if (actionDetails.escalatedTo !== undefined) {
+        updatedData.escalatedTo = actionDetails.escalatedTo;
+      }
+      if (actionDetails.escalationTime !== undefined) {
+        updatedData.escalationTime = actionDetails.escalationTime;
+      }
+
+      const { error: updateErr } = await supabase
+        .from('leave_requests')
+        .update({
+          status: actionDetails.status,
+          data: updatedData
+        })
+        .eq('id', String(requestId));
+
+      if (updateErr) throw updateErr;
+
+      // Log intervention in audit trail
+      const auditTrail = await getConfig('approval_audit_trail', []);
+      const newAuditLog = {
+        id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        timestamp: new Date().toISOString(),
+        requestId,
+        requestType: request.type,
+        actionType: actionDetails.actionType,
+        actionBy: actionDetails.managerName,
+        remarks: actionDetails.remarks || '',
+        status: actionDetails.status,
+        details: actionDetails
+      };
+      await saveConfig('approval_audit_trail', [...auditTrail, newAuditLog]);
+
+      return updatedData;
+    } catch (e) {
+      console.error('updateRequestWorkflowAction failed:', e);
+      throw e;
+    }
+  },
+
+  getApprovalAuditTrail: async () => {
+    return await getConfig('approval_audit_trail', []);
+  },
+
+  clearApprovalAuditTrail: async () => {
+    return await saveConfig('approval_audit_trail', []);
+  },
+
   getMovementPolicies: async () => {
     return await getConfig('movement_policy_settings', {
       option: 'B', // Option A: Deduct time, Option B: Limited hours, Option C: Mark paid/unpaid

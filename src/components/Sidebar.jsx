@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Users, CalendarDays, Clock, Calculator, IndianRupee, Receipt, CheckSquare, LineChart, FileSignature, FileSpreadsheet, ShieldCheck, ChevronDown, ChevronUp, BarChart, Building2, UserPlus, MapPin, Coins, GraduationCap, Briefcase, FileText, FileCheck, Zap, Smartphone } from 'lucide-react';
 
-const Sidebar = ({ userRole }) => {
+const Sidebar = ({ userRole, isManager }) => {
   const location = useLocation();
   const isAdmin = userRole === 'management' || userRole === 'admin';
   const [reportsOpen, setReportsOpen] = useState(isAdmin || location.pathname.includes('report'));
@@ -234,6 +234,20 @@ const Sidebar = ({ userRole }) => {
             <Link to="/bonus-management" className={`nav-item ${location.pathname === '/bonus-management' ? 'active' : ''}`}>
               <Coins size={24} />
               <span>Statutory Bonus</span>
+            </Link>
+          </>
+        )}
+
+        {!isAdmin && isManager && (
+          <>
+            <div style={{ marginTop: '2rem', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '1px', paddingLeft: '1rem' }}>Manager Suite</div>
+            <Link to="/approvals" className={`nav-item ${location.pathname === '/approvals' ? 'active' : ''}`}>
+              <CheckSquare size={24} />
+              <span>Manager Approvals</span>
+            </Link>
+            <Link to="/movement-reports" className={`nav-item ${location.pathname === '/movement-reports' ? 'active' : ''}`}>
+              <FileSpreadsheet size={24} />
+              <span>Movement Reports</span>
             </Link>
           </>
         )}

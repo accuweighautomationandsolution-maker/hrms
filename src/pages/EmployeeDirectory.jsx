@@ -14,6 +14,9 @@ const EmployeeDirectory = ({ userRole }) => {
   const isAdmin = !isEmployee;
   
   const [employees, setEmployees] = useState([]);
+  const [currentUserProfile, setCurrentUserProfile] = useState(null);
+  const [isManager, setIsManager] = useState(false);
+  const currentUser = authService.getCurrentUser();
   const [departments, setDepartments] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -60,7 +63,7 @@ const EmployeeDirectory = ({ userRole }) => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [emps, depts, desList] = await Promise.all([
+        const [emps, depts, desList, myProfile] = await Promise.all([
           dataService.getEmployees().catch(err => {
             console.warn("Directory: Employees fetch failed:", err);
             return [];
@@ -72,12 +75,18 @@ const EmployeeDirectory = ({ userRole }) => {
           dataService.getDesignations().catch(err => {
             console.warn("Directory: Designations fetch failed:", err);
             return [];
-          })
+          }),
+          dataService.getMyEmployeeProfile(currentUser).catch(() => null)
         ]);
         
         if (isMounted) {
           setEmployees(emps);
           setDepartments(depts);
+          setCurrentUserProfile(myProfile);
+          if (myProfile) {
+            const hasReportees = emps.some(e => e.managerIds && e.managerIds.map(String).includes(String(myProfile.id)));
+            setIsManager(hasReportees);
+          }
           const normalizedDes = (desList || []).map((item, index) => {
             if (typeof item === 'string') {
               return { id: `des_${index}_${item.replace(/\s+/g, '_')}`, name: item, active: true };
@@ -557,14 +566,22 @@ const EmployeeDirectory = ({ userRole }) => {
                   </td>
                 </tr>
               ) : (
-                (employees || []).filter(e => {
-                  const term = searchTerm.toLowerCase();
-                  return (e.name || '').toLowerCase().includes(term) || 
-                         (e.empCode || '').toLowerCase().includes(term) ||
-                         (e.biometricCode || '').toLowerCase().includes(term) ||
-                         (e.role || '').toLowerCase().includes(term) ||
-                         (e.department || '').toLowerCase().includes(term);
-                }).map((emp) => (
+                (employees || [])
+                  .filter(e => {
+                    // Reporting Hierarchy Visibility check: Managers only see assigned reportees
+                    if (isManager && !isAdmin) {
+                      return e.managerIds && e.managerIds.map(String).includes(String(currentUserProfile?.id));
+                    }
+                    return true;
+                  })
+                  .filter(e => {
+                    const term = searchTerm.toLowerCase();
+                    return (e.name || '').toLowerCase().includes(term) || 
+                           (e.empCode || '').toLowerCase().includes(term) ||
+                           (e.biometricCode || '').toLowerCase().includes(term) ||
+                           (e.role || '').toLowerCase().includes(term) ||
+                           (e.department || '').toLowerCase().includes(term);
+                  }).map((emp) => (
                   <tr key={emp.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background var(--transition-fast)' }}>
                   <td style={{ padding: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -877,7 +894,7 @@ const EmployeeDirectory = ({ userRole }) => {
                     
                     {/* Display List of Assigned Managers */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
-                      {(form.managerIds || []).map(mId => {
+                      {(form.managerIds || []).map((mId, index) => {
                         const manager = employees.find(e => String(e.id) === String(mId));
                         return (
                           <div 
@@ -886,8 +903,8 @@ const EmployeeDirectory = ({ userRole }) => {
                               display: 'flex', 
                               alignItems: 'center', 
                               gap: '0.5rem', 
-                              backgroundColor: 'rgba(37,99,235,0.05)', 
-                              border: '1px solid rgba(37,99,235,0.2)', 
+                              backgroundColor: index === 0 ? 'rgba(16, 185, 129, 0.05)' : 'rgba(37,99,235,0.05)', 
+                              border: index === 0 ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(37,99,235,0.2)', 
                               padding: '0.4rem 0.75rem', 
                               borderRadius: '20px',
                               fontSize: '0.875rem',
@@ -895,6 +912,9 @@ const EmployeeDirectory = ({ userRole }) => {
                             }}
                           >
                             <span>{manager ? manager.name : `Manager (ID: ${mId})`}</span>
+                            <span style={{ fontSize: '0.7rem', opacity: 0.8, backgroundColor: index === 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(37, 99, 235, 0.1)', padding: '2px 6px', borderRadius: '10px', color: index === 0 ? 'var(--color-success)' : 'var(--color-primary)' }}>
+                              {index === 0 ? 'Primary' : 'Secondary'}
+                            </span>
                             {isAdmin && (
                               <button 
                                 type="button" 
