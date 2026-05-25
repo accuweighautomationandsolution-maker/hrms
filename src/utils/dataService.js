@@ -829,43 +829,50 @@ export const dataService = {
   getLeaveRequests: async () => {
     if (!supabase) return [];
     try {
-      // Primary source: letter_templates table (has full JSONB data)
-      const { data: ltRows, error: ltErr } = await supabase
+      // ── Source 1: letter_templates (new JSONB store, prefix LR_) ──
+      const { data: ltRows } = await supabase
         .from('letter_templates')
         .select('id, data')
         .like('id', 'LR_%');
 
-      if (!ltErr && ltRows && ltRows.length > 0) {
-        // Return the fully-shaped objects stored in data JSONB
-        return ltRows
-          .map(r => r.data)
-          .filter(Boolean)
-          .sort((a, b) => String(b.appliedDate || b.id || '').localeCompare(String(a.appliedDate || a.id || '')));
-      }
+      const ltMap = {};
+      (ltRows || []).forEach(r => {
+        if (r.data) ltMap[String(r.id)] = r.data;
+      });
 
-      // Fallback: read from leave_requests (returns minimal flat rows)
-      const { data, error } = await supabase.from('leave_requests').select('*');
-      if (error) {
-        console.error('getLeaveRequests fallback error:', error);
-        return [];
-      }
-      // Shape flat rows into the JS format expected by the app
-      return (data || []).map(r => ({
-        id: r.id,
-        empId: r.emp_id,
-        emp_id: r.emp_id,
-        type: r.type,
-        startDate: r.start_date,
-        endDate: r.end_date,
-        start_date: r.start_date,
-        end_date: r.end_date,
-        reason: r.reason,
-        status: r.status,
-        appliedDate: r.created_at ? r.created_at.split('T')[0] : '',
-        name: '',
-        duration: `${r.start_date} - ${r.end_date}`,
-        days: 0,
-      }));
+      // ── Source 2: legacy leave_requests table (flat columns, numeric IDs) ──
+      const { data: lrRows } = await supabase.from('leave_requests').select('*');
+
+      const merged = { ...ltMap };
+      (lrRows || []).forEach(r => {
+        const key = `LR_${r.id}`;
+        // Only add from leave_requests if NOT already in letter_templates
+        if (!merged[key] && !merged[String(r.id)]) {
+          merged[String(r.id)] = {
+            id: String(r.id),
+            empId: r.emp_id,
+            emp_id: r.emp_id,
+            type: r.type,
+            startDate: r.start_date,
+            endDate: r.end_date,
+            start_date: r.start_date,
+            end_date: r.end_date,
+            reason: r.reason,
+            status: r.status,
+            appliedDate: r.created_at ? r.created_at.split('T')[0] : '',
+            name: '',
+            duration: `${r.start_date} - ${r.end_date}`,
+            days: 0,
+            data: {}
+          };
+        }
+      });
+
+      const result = Object.values(merged)
+        .sort((a, b) => String(b.appliedDate || b.id || '').localeCompare(String(a.appliedDate || a.id || '')));
+
+      console.log(`getLeaveRequests: ${result.length} total records (${(ltRows||[]).length} from LT store, ${(lrRows||[]).length} from leave_requests).`);
+      return result;
     } catch (e) {
       console.error('getLeaveRequests exception:', e);
       return [];
@@ -1872,21 +1879,49 @@ export const dataService = {
   updateRequestStatusWithHistory: async (requestId, status, managerName, remarks) => {
     if (!supabase) return null;
     try {
-      // Ensure we use the LR_ prefixed id for letter_templates lookup
       const ltId = String(requestId).startsWith('LR_') ? String(requestId) : `LR_${requestId}`;
+      const rawId = String(requestId).replace(/^LR_/, '');
 
-      // Fetch the full record from letter_templates (primary store)
-      const { data: ltRow, error: fetchErr } = await supabase
+      // ── Step 1: Fetch from letter_templates (new store) ──
+      let prevData = null;
+      const { data: ltRow } = await supabase
         .from('letter_templates')
         .select('data')
         .eq('id', ltId)
         .maybeSingle();
-      
-      if (fetchErr || !ltRow) {
-        throw new Error(fetchErr ? fetchErr.message : `Request not found in store (id: ${ltId})`);
+
+      if (ltRow && ltRow.data) {
+        prevData = ltRow.data;
+      } else {
+        // ── Step 2: Fallback to leave_requests (legacy) ──
+        const { data: lrRow } = await supabase
+          .from('leave_requests')
+          .select('*')
+          .eq('id', rawId)
+          .maybeSingle();
+        if (lrRow) {
+          prevData = {
+            id: ltId,
+            empId: lrRow.emp_id,
+            emp_id: lrRow.emp_id,
+            type: lrRow.type,
+            startDate: lrRow.start_date,
+            endDate: lrRow.end_date,
+            start_date: lrRow.start_date,
+            end_date: lrRow.end_date,
+            reason: lrRow.reason,
+            status: lrRow.status,
+            appliedDate: lrRow.created_at ? lrRow.created_at.split('T')[0] : '',
+            name: '',
+            data: {}
+          };
+        }
       }
 
-      const prevData = ltRow.data || {};
+      if (!prevData) {
+        throw new Error(`Request not found in any store (tried: ${ltId}, ${rawId})`);
+      }
+
       const approvalHistory = prevData.approvalHistory || prevData.data?.approvalHistory || [];
       const newHistoryEntry = {
         managerName,
@@ -1897,6 +1932,7 @@ export const dataService = {
 
       const updatedRecord = {
         ...prevData,
+        id: ltId,
         status,
         approvalHistory: [...approvalHistory, newHistoryEntry],
         data: {
@@ -1906,16 +1942,15 @@ export const dataService = {
         }
       };
 
-      // Update in letter_templates
+      // Write to letter_templates (upsert so it works for both new and migrated)
       const { error: updateErr } = await supabase
         .from('letter_templates')
-        .update({ data: updatedRecord })
-        .eq('id', ltId);
+        .upsert({ id: ltId, data: updatedRecord }, { onConflict: 'id' });
       if (updateErr) throw updateErr;
 
-      // Mirror status update to leave_requests (non-fatal)
-      await supabase.from('leave_requests').update({ status }).eq('id', ltId).catch(e =>
-        console.warn('updateRequestStatusWithHistory: mirror to leave_requests failed (non-fatal):', e.message)
+      // Mirror status to leave_requests (non-fatal)
+      await supabase.from('leave_requests').update({ status }).eq('id', rawId).catch(e =>
+        console.warn('updateRequestStatusWithHistory mirror failed (non-fatal):', e.message)
       );
 
       return updatedRecord;
@@ -1928,23 +1963,50 @@ export const dataService = {
   updateRequestWorkflowAction: async (requestId, actionDetails) => {
     if (!supabase) return null;
     try {
-      // Ensure we use the LR_ prefixed id for letter_templates lookup
       const ltId = String(requestId).startsWith('LR_') ? String(requestId) : `LR_${requestId}`;
+      const rawId = String(requestId).replace(/^LR_/, '');
 
-      // Fetch the full record from letter_templates (primary store)
-      const { data: ltRow, error: fetchErr } = await supabase
+      // ── Step 1: Fetch from letter_templates (new store) ──
+      let prevData = null;
+      const { data: ltRow } = await supabase
         .from('letter_templates')
         .select('data')
         .eq('id', ltId)
         .maybeSingle();
-      
-      if (fetchErr || !ltRow) {
-        throw new Error(fetchErr ? fetchErr.message : `Request not found in store (id: ${ltId})`);
+
+      if (ltRow && ltRow.data) {
+        prevData = ltRow.data;
+      } else {
+        // ── Step 2: Fallback to leave_requests (legacy) ──
+        const { data: lrRow } = await supabase
+          .from('leave_requests')
+          .select('*')
+          .eq('id', rawId)
+          .maybeSingle();
+        if (lrRow) {
+          prevData = {
+            id: ltId,
+            empId: lrRow.emp_id,
+            emp_id: lrRow.emp_id,
+            type: lrRow.type,
+            startDate: lrRow.start_date,
+            endDate: lrRow.end_date,
+            start_date: lrRow.start_date,
+            end_date: lrRow.end_date,
+            reason: lrRow.reason,
+            status: lrRow.status,
+            appliedDate: lrRow.created_at ? lrRow.created_at.split('T')[0] : '',
+            name: '',
+            data: {}
+          };
+        }
       }
 
-      const prevData = ltRow.data || {};
+      if (!prevData) {
+        throw new Error(`Request not found in any store (tried: ${ltId}, ${rawId})`);
+      }
+
       const approvalHistory = prevData.approvalHistory || prevData.data?.approvalHistory || [];
-      
       const newHistoryEntry = {
         managerId: actionDetails.managerId || null,
         managerName: actionDetails.managerName || 'System',
@@ -1956,6 +2018,7 @@ export const dataService = {
 
       const updatedRecord = {
         ...prevData,
+        id: ltId,
         status: actionDetails.status,
         approvalHistory: [...approvalHistory, newHistoryEntry],
         data: {
