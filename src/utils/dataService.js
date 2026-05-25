@@ -815,33 +815,123 @@ export const dataService = {
   },
 
   // ── Leave Management ──────────────────────────────────────────────────────
+  //
+  // ARCHITECTURE NOTE:
+  // The live `leave_requests` table only has flat columns (id, emp_id, type,
+  // start_date, end_date, reason, status) — no JSONB data column.
+  // We use `letter_templates` (which has id TEXT + data JSONB) as the
+  // primary persistent store for full leave/movement request objects,
+  // using the prefix "LR_" to distinguish them.
+  // A minimal mirror row is also upserted into `leave_requests` so that
+  // dashboard stats queries (which filter by status/date) continue to work.
+  //
+
   getLeaveRequests: async () => {
     if (!supabase) return [];
-    const { data, error } = await supabase.from('leave_requests').select('*');
-    if (error) {
-      console.error("Error fetching leave requests:", error);
-      return [];
-    }
-    return data || [];
-  },
+    try {
+      // Primary source: letter_templates table (has full JSONB data)
+      const { data: ltRows, error: ltErr } = await supabase
+        .from('letter_templates')
+        .select('id, data')
+        .like('id', 'LR_%');
 
-  saveLeaveRequests: async (reqs) => {
-    if (!supabase) return reqs;
-    const rows = reqs.map(r => {
-      const id = r.id || `LV_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-      return {
-        id,
-        emp_id: String(r.emp_id || r.empId),
+      if (!ltErr && ltRows && ltRows.length > 0) {
+        // Return the fully-shaped objects stored in data JSONB
+        return ltRows
+          .map(r => r.data)
+          .filter(Boolean)
+          .sort((a, b) => String(b.appliedDate || b.id || '').localeCompare(String(a.appliedDate || a.id || '')));
+      }
+
+      // Fallback: read from leave_requests (returns minimal flat rows)
+      const { data, error } = await supabase.from('leave_requests').select('*');
+      if (error) {
+        console.error('getLeaveRequests fallback error:', error);
+        return [];
+      }
+      // Shape flat rows into the JS format expected by the app
+      return (data || []).map(r => ({
+        id: r.id,
+        empId: r.emp_id,
+        emp_id: r.emp_id,
         type: r.type,
-        start_date: r.start_date || r.startDate,
-        end_date: r.end_date || r.endDate,
+        startDate: r.start_date,
+        endDate: r.end_date,
+        start_date: r.start_date,
+        end_date: r.end_date,
         reason: r.reason,
         status: r.status,
-        data: { ...r, id } // Ensure data field also has the stable ID
+        appliedDate: r.created_at ? r.created_at.split('T')[0] : '',
+        name: '',
+        duration: `${r.start_date} - ${r.end_date}`,
+        days: 0,
+      }));
+    } catch (e) {
+      console.error('getLeaveRequests exception:', e);
+      return [];
+    }
+  },
+
+  /**
+   * Save / update a single leave or movement request.
+   * Persists the full object to letter_templates (JSONB) and a minimal
+   * mirror row to leave_requests for dashboard stats.
+   */
+  saveLeaveRequest: async (req) => {
+    if (!supabase || !req) return req;
+    try {
+      // Generate a stable string ID if not present
+      const id = req.id ? String(req.id) : `LR_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      const fullRecord = { ...req, id };
+
+      // ── 1. Write full object to letter_templates (JSONB store) ──
+      const ltId = id.startsWith('LR_') ? id : `LR_${id}`;
+      const { error: ltErr } = await supabase
+        .from('letter_templates')
+        .upsert({ id: ltId, data: { ...fullRecord, id: ltId } }, { onConflict: 'id' });
+      if (ltErr) {
+        console.error('saveLeaveRequest: letter_templates upsert failed:', ltErr.message);
+        throw new Error(ltErr.message);
+      }
+
+      // ── 2. Mirror minimal row to leave_requests for dashboard stats ──
+      const mirrorRow = {
+        id: ltId,
+        emp_id: String(req.empId || req.emp_id || ''),
+        type: req.type || '',
+        start_date: req.startDate || req.start_date || null,
+        end_date: req.endDate || req.end_date || null,
+        reason: req.reason || '',
+        status: req.status || 'Pending',
       };
-    });
-    await supabase.from('leave_requests').upsert(rows, { onConflict: 'id' });
-    return reqs;
+      // Try upsert, ignore errors (table may have RLS or missing columns)
+      await supabase.from('leave_requests').upsert(mirrorRow, { onConflict: 'id' }).catch(e =>
+        console.warn('saveLeaveRequest: leave_requests mirror failed (non-fatal):', e.message)
+      );
+
+      console.log(`saveLeaveRequest: saved ${ltId} successfully.`);
+      return { ...fullRecord, id: ltId };
+    } catch (e) {
+      console.error('saveLeaveRequest exception:', e);
+      throw e;
+    }
+  },
+
+  /**
+   * Bulk save — replaces entire list. Used by OutDuty / OutPass.
+   * For each request: upsert to letter_templates + mirror to leave_requests.
+   */
+  saveLeaveRequests: async (reqs) => {
+    if (!supabase || !reqs) return reqs;
+    const results = [];
+    for (const req of reqs) {
+      const saved = await dataService.saveLeaveRequest(req).catch(e => {
+        console.error('saveLeaveRequests: failed for req', req.id, e.message);
+        return req; // keep local version on failure
+      });
+      results.push(saved);
+    }
+    return results;
   },
 
   getLeaveBalances: async () => {
@@ -1782,19 +1872,22 @@ export const dataService = {
   updateRequestStatusWithHistory: async (requestId, status, managerName, remarks) => {
     if (!supabase) return null;
     try {
-      // Find by id or try by matching the data id field if standard id search fails
-      const { data: request, error: fetchErr } = await supabase
-        .from('leave_requests')
-        .select('*')
-        .eq('id', String(requestId))
+      // Ensure we use the LR_ prefixed id for letter_templates lookup
+      const ltId = String(requestId).startsWith('LR_') ? String(requestId) : `LR_${requestId}`;
+
+      // Fetch the full record from letter_templates (primary store)
+      const { data: ltRow, error: fetchErr } = await supabase
+        .from('letter_templates')
+        .select('data')
+        .eq('id', ltId)
         .maybeSingle();
       
-      if (fetchErr || !request) {
-        throw new Error(fetchErr ? fetchErr.message : 'Request not found');
+      if (fetchErr || !ltRow) {
+        throw new Error(fetchErr ? fetchErr.message : `Request not found in store (id: ${ltId})`);
       }
 
-      const prevData = request.data || {};
-      const approvalHistory = prevData.approvalHistory || [];
+      const prevData = ltRow.data || {};
+      const approvalHistory = prevData.approvalHistory || prevData.data?.approvalHistory || [];
       const newHistoryEntry = {
         managerName,
         dateTime: new Date().toISOString(),
@@ -1802,22 +1895,30 @@ export const dataService = {
         remarks: remarks || ''
       };
 
-      const updatedData = {
+      const updatedRecord = {
         ...prevData,
         status,
-        approvalHistory: [...approvalHistory, newHistoryEntry]
+        approvalHistory: [...approvalHistory, newHistoryEntry],
+        data: {
+          ...(prevData.data || {}),
+          status,
+          approvalHistory: [...approvalHistory, newHistoryEntry]
+        }
       };
 
+      // Update in letter_templates
       const { error: updateErr } = await supabase
-        .from('leave_requests')
-        .update({
-          status,
-          data: updatedData
-        })
-        .eq('id', String(requestId));
-
+        .from('letter_templates')
+        .update({ data: updatedRecord })
+        .eq('id', ltId);
       if (updateErr) throw updateErr;
-      return updatedData;
+
+      // Mirror status update to leave_requests (non-fatal)
+      await supabase.from('leave_requests').update({ status }).eq('id', ltId).catch(e =>
+        console.warn('updateRequestStatusWithHistory: mirror to leave_requests failed (non-fatal):', e.message)
+      );
+
+      return updatedRecord;
     } catch (e) {
       console.error('updateRequestStatusWithHistory failed:', e);
       throw e;
@@ -1827,18 +1928,22 @@ export const dataService = {
   updateRequestWorkflowAction: async (requestId, actionDetails) => {
     if (!supabase) return null;
     try {
-      const { data: request, error: fetchErr } = await supabase
-        .from('leave_requests')
-        .select('*')
-        .eq('id', String(requestId))
+      // Ensure we use the LR_ prefixed id for letter_templates lookup
+      const ltId = String(requestId).startsWith('LR_') ? String(requestId) : `LR_${requestId}`;
+
+      // Fetch the full record from letter_templates (primary store)
+      const { data: ltRow, error: fetchErr } = await supabase
+        .from('letter_templates')
+        .select('data')
+        .eq('id', ltId)
         .maybeSingle();
       
-      if (fetchErr || !request) {
-        throw new Error(fetchErr ? fetchErr.message : 'Request not found');
+      if (fetchErr || !ltRow) {
+        throw new Error(fetchErr ? fetchErr.message : `Request not found in store (id: ${ltId})`);
       }
 
-      const prevData = request.data || {};
-      const approvalHistory = prevData.approvalHistory || [];
+      const prevData = ltRow.data || {};
+      const approvalHistory = prevData.approvalHistory || prevData.data?.approvalHistory || [];
       
       const newHistoryEntry = {
         managerId: actionDetails.managerId || null,
@@ -1849,40 +1954,41 @@ export const dataService = {
         actionType: actionDetails.actionType || 'Approve'
       };
 
-      const updatedData = {
+      const updatedRecord = {
         ...prevData,
         status: actionDetails.status,
-        approvalHistory: [...approvalHistory, newHistoryEntry]
+        approvalHistory: [...approvalHistory, newHistoryEntry],
+        data: {
+          ...(prevData.data || {}),
+          status: actionDetails.status,
+          approvalHistory: [...approvalHistory, newHistoryEntry]
+        }
       };
 
       // Handle custom workflow parameters
-      if (actionDetails.reassignedTo !== undefined) {
-        updatedData.reassignedTo = actionDetails.reassignedTo;
-      }
-      if (actionDetails.escalatedTo !== undefined) {
-        updatedData.escalatedTo = actionDetails.escalatedTo;
-      }
-      if (actionDetails.escalationTime !== undefined) {
-        updatedData.escalationTime = actionDetails.escalationTime;
-      }
+      if (actionDetails.reassignedTo !== undefined) updatedRecord.reassignedTo = actionDetails.reassignedTo;
+      if (actionDetails.escalatedTo !== undefined) updatedRecord.escalatedTo = actionDetails.escalatedTo;
+      if (actionDetails.escalationTime !== undefined) updatedRecord.escalationTime = actionDetails.escalationTime;
 
+      // Update in letter_templates
       const { error: updateErr } = await supabase
-        .from('leave_requests')
-        .update({
-          status: actionDetails.status,
-          data: updatedData
-        })
-        .eq('id', String(requestId));
-
+        .from('letter_templates')
+        .update({ data: updatedRecord })
+        .eq('id', ltId);
       if (updateErr) throw updateErr;
+
+      // Mirror status update to leave_requests (non-fatal)
+      await supabase.from('leave_requests').update({ status: actionDetails.status }).eq('id', ltId).catch(e =>
+        console.warn('updateRequestWorkflowAction: mirror to leave_requests failed (non-fatal):', e.message)
+      );
 
       // Log intervention in audit trail
       const auditTrail = await getConfig('approval_audit_trail', []);
       const newAuditLog = {
         id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
         timestamp: new Date().toISOString(),
-        requestId,
-        requestType: request.type,
+        requestId: ltId,
+        requestType: prevData.type,
         actionType: actionDetails.actionType,
         actionBy: actionDetails.managerName,
         remarks: actionDetails.remarks || '',
@@ -1891,7 +1997,7 @@ export const dataService = {
       };
       await saveConfig('approval_audit_trail', [...auditTrail, newAuditLog]);
 
-      return updatedData;
+      return updatedRecord;
     } catch (e) {
       console.error('updateRequestWorkflowAction failed:', e);
       throw e;

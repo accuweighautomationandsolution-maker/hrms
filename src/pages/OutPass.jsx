@@ -187,16 +187,21 @@ const OutPass = () => {
       const durationStr = `${date} (${outTime} - ${expectedInTime})`;
 
       const requestPayload = {
-        id: editId || Date.now(),
+        // For edits: reuse existing id so the record is updated in place.
+        // For new records: omit id — saveLeaveRequest will generate LR_ prefixed id.
+        ...(isEditing && editId ? { id: editId } : {}),
         empId,
+        emp_id: String(empId),
         name: employeeProfile ? employeeProfile.name : (currentUser.name || 'Employee'),
         type: 'Out Pass Request',
         startDate: date,
         endDate: date,
+        start_date: date,
+        end_date: date,
         duration: durationStr,
         days: 0,
         reason: purposeDetails,
-        status: 'Pending',
+        status: isEditing ? (requests.find(r => r.id === editId)?.status || 'Pending') : 'Pending',
         appliedDate: new Date().toISOString().split('T')[0],
         data: {
           date,
@@ -204,20 +209,40 @@ const OutPass = () => {
           expectedInTime,
           purpose: finalPurpose,
           purposeDetails,
-          status: 'Pending',
+          status: isEditing ? (requests.find(r => r.id === editId)?.status || 'Pending') : 'Pending',
           approvalHistory: isEditing ? (requests.find(r => r.id === editId)?.approvalHistory || []) : []
         }
       };
 
-      let updatedList;
+      // Save single record to letter_templates JSONB store
+      const savedRecord = await dataService.saveLeaveRequest(requestPayload);
+
+      // Update local UI state immediately
       if (isEditing) {
-        updatedList = allRequests.map(r => r.id === editId ? requestPayload : r);
+        setRequests(prev => prev.map(r => r.id === editId ? {
+          ...r,
+          date,
+          outTime,
+          expectedInTime,
+          purpose: finalPurpose,
+          purposeDetails,
+        } : r));
       } else {
-        updatedList = [...allRequests, requestPayload];
+        setRequests(prev => [...prev, {
+          id: savedRecord.id,
+          empId: savedRecord.empId || savedRecord.emp_id,
+          name: savedRecord.name,
+          date,
+          outTime,
+          expectedInTime,
+          purpose: finalPurpose,
+          purposeDetails,
+          status: savedRecord.status || 'Pending',
+          approvalHistory: []
+        }]);
       }
 
-      await dataService.saveLeaveRequests(updatedList);
-      alert(isEditing ? 'Out Pass request updated successfully!' : 'Out Pass request submitted successfully!');
+      alert(isEditing ? '✅ Out Pass request updated successfully!' : '✅ Out Pass request submitted successfully!');
       
       // Reset state
       setShowModal(false);
@@ -229,11 +254,9 @@ const OutPass = () => {
       setPurpose('Personal work');
       setOtherPurpose('');
       setPurposeDetails('');
-
-      setReloads(r => r + 1);
     } catch (e) {
       console.error(e);
-      alert('Failed to save Out Pass request.');
+      alert('❌ Failed to save Out Pass request: ' + (e.message || e));
     }
   };
 

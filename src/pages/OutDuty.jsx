@@ -199,18 +199,23 @@ const OutDuty = () => {
       const durationStr = `${date} (${outTime} - ${expectedInTime})`;
 
       const requestPayload = {
-        id: editId || Date.now(),
+        // For edits: reuse existing id so the record is updated in place.
+        // For new records: omit id — saveLeaveRequest will generate LR_ prefixed id.
+        ...(isEditing && editId ? { id: editId } : {}),
         empId,
+        emp_id: String(empId),
         name: employeeProfile ? employeeProfile.name : (currentUser.name || 'Employee'),
         type: 'Out Duty Request',
         startDate: date,
         endDate: date,
+        start_date: date,
+        end_date: date,
         duration: durationStr,
-        days: 0, // Does not affect leave balances
+        days: 0,
         reason: purposeDetails,
-        status: 'Pending',
+        status: isEditing ? (requests.find(r => r.id === editId)?.status || 'Pending') : 'Pending',
         appliedDate: new Date().toISOString().split('T')[0],
-        // All custom parameters inside data column
+        // Custom fields stored at top level (also accessible as data.* via JSONB)
         data: {
           date,
           outTime,
@@ -220,20 +225,47 @@ const OutDuty = () => {
           destination,
           attachment,
           attachmentName,
-          status: 'Pending',
+          status: isEditing ? (requests.find(r => r.id === editId)?.status || 'Pending') : 'Pending',
           approvalHistory: isEditing ? (requests.find(r => r.id === editId)?.approvalHistory || []) : []
         }
       };
 
-      let updatedList;
+      // Save single record to letter_templates JSONB store
+      const savedRecord = await dataService.saveLeaveRequest(requestPayload);
+
+      // Update local UI state immediately (no need to re-fetch all)
       if (isEditing) {
-        updatedList = allRequests.map(r => r.id === editId ? requestPayload : r);
+        setRequests(prev => prev.map(r => r.id === editId ? {
+          ...r,
+          date,
+          outTime,
+          expectedInTime,
+          purpose: finalPurpose,
+          purposeDetails,
+          destination,
+          attachment,
+          attachmentName,
+        } : r));
       } else {
-        updatedList = [...allRequests, requestPayload];
+        // Add the newly saved record mapped to the display format
+        setRequests(prev => [...prev, {
+          id: savedRecord.id,
+          empId: savedRecord.empId || savedRecord.emp_id,
+          name: savedRecord.name,
+          date,
+          outTime,
+          expectedInTime,
+          purpose: finalPurpose,
+          purposeDetails,
+          destination,
+          attachment,
+          attachmentName,
+          status: savedRecord.status || 'Pending',
+          approvalHistory: []
+        }]);
       }
 
-      await dataService.saveLeaveRequests(updatedList);
-      alert(isEditing ? 'Out Duty request updated successfully!' : 'Out Duty request submitted successfully!');
+      alert(isEditing ? '✅ Out Duty request updated successfully!' : '✅ Out Duty request submitted successfully!');
       
       // Reset state
       setShowModal(false);
@@ -248,11 +280,9 @@ const OutDuty = () => {
       setDestination('');
       setAttachment(null);
       setAttachmentName('');
-
-      setReloads(r => r + 1);
     } catch (e) {
       console.error(e);
-      alert('Failed to save Out Duty request.');
+      alert('❌ Failed to save Out Duty request: ' + (e.message || e));
     }
   };
 

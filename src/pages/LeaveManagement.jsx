@@ -296,7 +296,7 @@ const LeaveManagement = () => {
                     calcDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
                     durationStr = `${startDate} - ${endDate}`;
                   }
-                                   try {
+                  try {
                     let finalEmpId = resolvedMyEmpId;
                     const emps = await dataService.getEmployees().catch(() => []);
                     
@@ -325,12 +325,14 @@ const LeaveManagement = () => {
                     }
 
                     const newRequest = {
-                      id: Date.now(),
                       empId: finalEmpId,
+                      emp_id: String(finalEmpId),
                       name: currentUser.name,
                       type: leaveType,
                       startDate: isOutPass ? requestDate : startDate,
                       endDate: isOutPass ? requestDate : endDate,
+                      start_date: isOutPass ? requestDate : startDate,
+                      end_date: isOutPass ? requestDate : endDate,
                       duration: durationStr,
                       days: calcDays,
                       reason,
@@ -340,17 +342,18 @@ const LeaveManagement = () => {
                       endTime: isOutPass ? endTime : ''
                     };
                     
-                    const existing = await dataService.getLeaveRequests();
-                    await dataService.saveLeaveRequests([...existing, newRequest]);
+                    // Use the new single-record save (persists to letter_templates JSONB store)
+                    const savedRecord = await dataService.saveLeaveRequest(newRequest);
                     
-                    setRequests(prev => [...prev, newRequest]);
-                    alert('Request submitted successfully!');
+                    // Update local UI state with the saved record (which has the real LR_ prefixed ID)
+                    setRequests(prev => [...prev, savedRecord]);
+                    alert('✅ Request submitted and saved successfully!');
                     setShowModal(false);
                     setStartDate(''); setEndDate(''); setReason('');
                     setRequestDate(''); setStartTime(''); setEndTime('');
                   } catch (err) {
                     console.error("Failed to submit request:", err);
-                    alert("Database save failed: " + err.message);
+                    alert("❌ Database save failed: " + err.message);
                   }
                 }}>Submit Request</button>
             </div>
