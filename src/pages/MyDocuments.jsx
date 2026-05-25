@@ -73,15 +73,81 @@ const MyDocuments = () => {
                 const w = window.open('', '_blank');
                 w.document.write(doc.content);
                 w.document.close();
+            } else if (doc.content.startsWith('data:')) {
+                // base64 data URL — convert to Blob URL and view in new tab
+                const base64Parts = doc.content.split(',');
+                const mimeType = base64Parts[0].match(/:(.*?);/)[1];
+                const base64Data = base64Parts[1];
+                const byteCharacters = atob(base64Data);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: mimeType });
+                const blobUrl = URL.createObjectURL(blob);
+                window.open(blobUrl, '_blank');
             } else {
-                // base64 data URL — trigger download/view
+                // General content fallback — open in new tab
+                const w = window.open('', '_blank');
+                w.document.write(doc.content);
+                w.document.close();
+            }
+        } catch (e) {
+            console.error("Failed to view document:", e);
+            alert("Failed to open document for viewing.");
+        }
+    };
+
+    const handleDownload = (doc) => {
+        try {
+            if (!doc.content) {
+                alert("Document content is not available for download.");
+                return;
+            }
+            if (doc.content.startsWith('http')) {
+                // Signed URL from Supabase Storage
+                fetch(doc.content)
+                    .then(response => response.blob())
+                    .then(blob => {
+                        const blobUrl = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = blobUrl;
+                        a.download = doc.name || 'document';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(blobUrl);
+                    })
+                    .catch(() => {
+                        const a = document.createElement('a');
+                        a.href = doc.content;
+                        a.download = doc.name;
+                        a.target = '_blank';
+                        a.click();
+                    });
+            } else if (doc.content.startsWith('data:')) {
+                // base64 data URL
                 const a = document.createElement('a');
                 a.href = doc.content;
                 a.download = doc.name;
+                document.body.appendChild(a);
                 a.click();
+                document.body.removeChild(a);
+            } else {
+                const a = document.createElement('a');
+                const blob = new Blob([doc.content], { type: doc.type || 'text/plain' });
+                const blobUrl = URL.createObjectURL(blob);
+                a.href = blobUrl;
+                a.download = doc.name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(blobUrl);
             }
         } catch (e) {
-            alert("Failed to open document.");
+            console.error("Failed to download document:", e);
+            alert("Failed to download document.");
         }
     };
 
@@ -203,14 +269,24 @@ const MyDocuments = () => {
                                             {d.uploadedBy || 'HR Admin'}
                                         </td>
                                         <td style={{ padding: '1.25rem 1rem', textAlign: 'right' }}>
-                                            <button
-                                                className="btn btn-primary"
-                                                style={{ padding: '0.4rem 0.85rem', fontSize: '0.82rem', gap: '0.4rem', display: 'inline-flex', alignItems: 'center' }}
-                                                onClick={() => handleView(d)}
-                                                title="View / Download"
-                                            >
-                                                <Eye size={15} /> View
-                                            </button>
+                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                                                <button
+                                                    className="btn btn-primary"
+                                                    style={{ padding: '0.4rem 0.85rem', fontSize: '0.82rem', gap: '0.4rem', display: 'inline-flex', alignItems: 'center' }}
+                                                    onClick={() => handleView(d)}
+                                                    title="View Online"
+                                                >
+                                                    <Eye size={15} /> View
+                                                </button>
+                                                <button
+                                                    className="btn btn-outline"
+                                                    style={{ padding: '0.4rem 0.85rem', fontSize: '0.82rem', gap: '0.4rem', display: 'inline-flex', alignItems: 'center' }}
+                                                    onClick={() => handleDownload(d)}
+                                                    title="Download"
+                                                >
+                                                    <Download size={15} /> Download
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
