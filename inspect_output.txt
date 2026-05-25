@@ -1,0 +1,19 @@
+=== EMPLOYEES ===
+ID: 17 | Name: Admin User | Email: admin@accuweigh.com | managerIds: undefined
+ID: 1779101235079 | Name: Milind Sopan Chavan | Email: milind.chavan@accuweigh.org | managerIds: undefined
+ID: 18 | Name: Sateesh Mithailal Barman | Email: sateesh.barman@accuweigh.org | managerIds: undefined
+ID: 16 | Name: Pooja Govind Masalage | Email: hr@accuweigh.org | managerIds: ["1779101235079"]
+
+=== USER PROFILES ===
+ID: f7b964a0-d6d8-41cc-9775-139dddebeaf5 | Name: Saurabh Bhagwat | Email: saurabh@accuweigh.org | emp_id: null
+ID: 8270746c-7b0a-4672-bbc9-bc2be0763d9e | Name: Pooja Masalage | Email: hr@accuweigh.org | emp_id: null
+ID: dd6db7b4-9b96-4993-b974-11dd98969ee0 | Name: Bob Johnson | Email: bob@company.com | emp_id: null
+ID: f8257101-7d4a-4111-a8b6-eceee6af5d78 | Name: Admin | Email: admin@accuweigh.com | emp_id: null
+ID: 3a9140ed-14b7-49e8-8b92-03c20d36715c | Name: Milind Chavan | Email: milind.chavan@accuweigh.org | emp_id: QWRtaW5AMTIz
+ID: 17fe4be4-d98d-453d-9ca8-af1e97a56ef1 | Name: Sateesh Barman | Email: sateesh.barman@accuweigh.org | emp_id: QWRtaW5AMTIz
+
+=== LEAVE REQUESTS ===
+ID: 1779699790936 | Emp ID: 16 | Type: Personal Leave | Status: Pending | Start: 2026-05-26 | End: 2026-05-26
+ID: 1779704266975 | Emp ID: 16 | Type: Personal Leave | Status: Pending | Start: 2026-05-26 | End: 2026-05-26
+ID: 1779704869303 | Emp ID: 16 | Type: Personal Leave | Status: Pending | Start: 2026-05-26 | End: 2026-05-26
+ID: 1779704897231 | Emp ID: 16 | Type: Personal Leave | Status: Pending | Start: 2026-05-26 | End: 2026-05-26
