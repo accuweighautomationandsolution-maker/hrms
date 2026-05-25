@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Calendar as CalendarIcon, Clock, CheckCircle, XCircle, AlertCircle, FileText, UserPlus, ShieldAlert } from 'lucide-react';
 import { dataService } from '../utils/dataService';
+import { authService } from '../utils/authService';
 
 const formatCurrency = (i) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(i);
 
@@ -41,35 +42,110 @@ const INITIAL_REQUESTS = [
 ];
 
 const Approvals = () => {
-  const [requests, setRequests] = useState([]);
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [actionedRequests, setActionedRequests] = useState([]);
   const [manpowerReqs, setManpowerReqs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [reloads, setReloads] = useState(0);
+
+  const [managerProfile, setManagerProfile] = useState(null);
+  const [actionModal, setActionModal] = useState({
+    isOpen: false,
+    requestId: null,
+    status: '', // 'Approved' or 'Rejected'
+    remarks: ''
+  });
+
+  const currentUser = authService.getCurrentUser();
+  const userRole = authService.getUserRole();
+  const isAdmin = userRole === 'management';
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [hiring, leaves] = await Promise.all([
+        // SECURITY: Resolve manager's actual employee profile to get their employee ID
+        const myEmpProfile = await dataService.getMyEmployeeProfile(currentUser).catch(() => null);
+        const myEmpId = myEmpProfile ? myEmpProfile.id : null;
+
+        if (myEmpProfile) {
+          setManagerProfile(myEmpProfile);
+        } else {
+          setManagerProfile({
+            id: currentUser?.id,
+            name: currentUser?.name || 'Administrator'
+          });
+        }
+
+        const [hiring, leaves, emps] = await Promise.all([
           dataService.getManpowerRequests(),
-          dataService.getLeaveRequests()
+          dataService.getLeaveRequests(),
+          dataService.getEmployees()
         ]);
         setManpowerReqs(hiring);
-        
-        // Filter pending leaves for manager view
-        const pendingLeaves = leaves.filter(l => l.status === 'Pending').map(l => ({
+
+        // Map and Filter pending requests for this manager
+        const pendingLeaves = leaves.filter(l => {
+          if (l.status !== 'Pending') return false;
+
+          // Find employee record
+          const employee = emps.find(e => String(e.id) === String(l.empId) || String(e.id) === String(l.emp_id));
+          if (!employee) return isAdmin;
+
+          // Check if current user is an assigned manager for this employee
+          const managerIds = employee.managerIds || [];
+          const isAssignedManager = myEmpId && managerIds.map(String).includes(String(myEmpId));
+
+          return isAdmin || isAssignedManager;
+        }).map(l => {
+          const employee = emps.find(e => String(e.id) === String(l.empId) || String(e.id) === String(l.emp_id));
+          return {
             id: l.id,
             empName: l.name,
             empId: l.empId,
-            role: 'Employee', 
+            role: employee ? employee.role : 'Employee', 
             type: l.type,
-            duration: `${l.startDate} - ${l.endDate}`,
+            duration: l.duration || `${l.startDate} - ${l.endDate}`,
             days: l.days,
             reason: l.reason,
             balanceRemaining: 0, 
-            status: l.status
-        }));
-        setRequests(pendingLeaves);
+            status: l.status,
+            approvalHistory: l.data?.approvalHistory || []
+          };
+        });
+
+        // Map and Filter actioned requests for this manager
+        const actionedLeaves = leaves.filter(l => {
+          if (l.status === 'Pending') return false;
+
+          // Find employee record
+          const employee = emps.find(e => String(e.id) === String(l.empId) || String(e.id) === String(l.emp_id));
+          if (!employee) return isAdmin;
+
+          // Check if current user is an assigned manager for this employee
+          const managerIds = employee.managerIds || [];
+          const isAssignedManager = myEmpId && managerIds.map(String).includes(String(myEmpId));
+
+          return isAdmin || isAssignedManager;
+        }).map(l => {
+          const employee = emps.find(e => String(e.id) === String(l.empId) || String(e.id) === String(l.emp_id));
+          return {
+            id: l.id,
+            empName: l.name,
+            empId: l.empId,
+            role: employee ? employee.role : 'Employee', 
+            type: l.type,
+            duration: l.duration || `${l.startDate} - ${l.endDate}`,
+            days: l.days,
+            reason: l.reason,
+            balanceRemaining: 0, 
+            status: l.status,
+            approvalHistory: l.data?.approvalHistory || []
+          };
+        });
+
+        setPendingRequests(pendingLeaves);
+        setActionedRequests(actionedLeaves);
       } catch (err) {
         console.error("Failed to load approvals data:", err);
       } finally {
@@ -79,12 +155,29 @@ const Approvals = () => {
     fetchData();
   }, [reloads]);
 
-  const handleAction = async (id, action) => {
-    // In a real app, this would update the leave status in Supabase
-    // For now, we update local state or call a service if it exists
-    setRequests(prev => prev.map(req => 
-      req.id === id ? { ...req, status: action } : req
-    ));
+  const handleAction = (id, action) => {
+    setActionModal({
+      isOpen: true,
+      requestId: id,
+      status: action,
+      remarks: ''
+    });
+  };
+
+  const handleConfirmAction = async () => {
+    const { requestId, status, remarks } = actionModal;
+    const managerName = managerProfile ? managerProfile.name : (currentUser?.name || 'Manager');
+
+    try {
+      setLoading(true);
+      await dataService.updateRequestStatusWithHistory(requestId, status, managerName, remarks);
+      setActionModal({ isOpen: false, requestId: null, status: '', remarks: '' });
+      setReloads(r => r + 1);
+    } catch (err) {
+      alert("Failed to update status: " + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleHiringAction = async (id, action) => {
@@ -94,8 +187,6 @@ const Approvals = () => {
     setReloads(r => r+1);
   };
 
-  const pendingRequests = requests.filter(r => r.status === 'Pending');
-  const actionedRequests = requests.filter(r => r.status !== 'Pending');
   const pendingHires = manpowerReqs.filter(r => r.status === 'Pending Approval');
 
   if (loading) {
@@ -216,13 +307,20 @@ const Approvals = () => {
                       <span style={{ fontWeight: '400', fontStyle: 'italic', color: 'var(--color-text-main)' }}>"{req.reason}"</span>
                     </div>
                   </div>
-
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>Current Balance for {req.type}:</span>
-                      <span className={`badge ${req.balanceRemaining - req.days >= 0 ? 'badge-blue' : 'badge-danger'}`} style={{ fontWeight: '600' }}>
-                        {req.balanceRemaining} days
-                      </span>
+                      {req.type.includes('Leave') ? (
+                        <>
+                          <span style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>Current Balance for {req.type}:</span>
+                          <span className={`badge ${req.balanceRemaining - req.days >= 0 ? 'badge-blue' : 'badge-danger'}`} style={{ fontWeight: '600' }}>
+                            {req.balanceRemaining} days
+                          </span>
+                        </>
+                      ) : (
+                        <span style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', fontWeight: '600' }}>
+                          Out Duty / Out Pass Request
+                        </span>
+                      )}
                     </div>
                     <div style={{ display: 'flex', gap: '0.75rem' }}>
                       <button 
@@ -239,7 +337,7 @@ const Approvals = () => {
                         onClick={() => handleAction(req.id, 'Approved')}
                       >
                         <CheckCircle size={18} />
-                        Approve Leave
+                        Approve
                       </button>
                     </div>
                   </div>
@@ -262,14 +360,22 @@ const Approvals = () => {
             ) : (
               <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                 {actionedRequests.map(req => (
-                  <li key={req.id} style={{ padding: '1rem', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <h4 style={{ fontSize: '0.875rem', fontWeight: '500' }}>{req.empName}</h4>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{req.type} ({req.days} days)</p>
+                  <li key={req.id} style={{ padding: '1rem', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                      <div>
+                        <h4 style={{ fontSize: '0.875rem', fontWeight: '500' }}>{req.empName}</h4>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{req.type} ({req.days} days)</p>
+                      </div>
+                      <span className={`badge ${req.status === 'Approved' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.7rem' }}>
+                        {req.status}
+                      </span>
                     </div>
-                    <span className={`badge ${req.status === 'Approved' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.7rem' }}>
-                      {req.status}
-                    </span>
+                    {req.approvalHistory && req.approvalHistory.map((h, idx) => (
+                      <div key={idx} style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', width: '100%', borderTop: '1px dashed var(--color-border)', paddingTop: '0.4rem', marginTop: '0.2rem' }}>
+                        <div>By: <strong>{h.managerName}</strong> on {new Date(h.dateTime).toLocaleString()}</div>
+                        {h.remarks && <div style={{ fontStyle: 'italic', marginTop: '0.1rem', color: 'var(--color-text-main)' }}>Remarks: "{h.remarks}"</div>}
+                      </div>
+                    ))}
                   </li>
                 ))}
               </ul>
@@ -277,6 +383,49 @@ const Approvals = () => {
           </div>
         </div>
       </div>
+
+      {/* Action Dialog for Remarks */}
+      {actionModal.isOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', padding: '1rem' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '450px', padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--color-border)', backgroundColor: actionModal.status === 'Approved' ? 'rgba(16, 185, 129, 0.05)' : 'rgba(239, 68, 68, 0.05)' }}>
+              <h3 style={{ fontSize: '1.25rem', margin: 0, color: actionModal.status === 'Approved' ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                Confirm {actionModal.status}
+              </h3>
+              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                Please provide comments/remarks for this action.
+              </p>
+            </div>
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Remarks</label>
+                <textarea
+                  className="form-input"
+                  rows="3"
+                  style={{ width: '100%', resize: 'vertical' }}
+                  placeholder="e.g. Approved as discussed. / Rejected due to project dependencies."
+                  value={actionModal.remarks}
+                  onChange={(e) => setActionModal({ ...actionModal, remarks: e.target.value })}
+                />
+              </div>
+            </div>
+            <div style={{ padding: '1.25rem 1.5rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+              <button className="btn btn-ghost" onClick={() => setActionModal({ isOpen: false, requestId: null, status: '', remarks: '' })}>Cancel</button>
+              <button 
+                className="btn btn-primary" 
+                style={{ 
+                  backgroundColor: actionModal.status === 'Approved' ? 'var(--color-success)' : 'var(--color-danger)', 
+                  borderColor: actionModal.status === 'Approved' ? 'var(--color-success)' : 'var(--color-danger)',
+                  color: 'white'
+                }}
+                onClick={handleConfirmAction}
+              >
+                Confirm {actionModal.status}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

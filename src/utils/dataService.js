@@ -1435,7 +1435,7 @@ export const dataService = {
           const numId = Number(empId);
           const strId = String(empId);
           const { data: dbDocs, error: dbErr } = await supabase
-            .from('employee_docs')
+            .from('employee_documents')
             .select('data')
             .or(`emp_id.eq.${numId},emp_id.eq.${strId}`);
           
@@ -1476,7 +1476,7 @@ export const dataService = {
     try {
       if (supabase) {
         const { data: dbDocs, error: dbErr } = await supabase
-          .from('employee_docs')
+          .from('employee_documents')
           .select('data');
         if (!dbErr && Array.isArray(dbDocs)) {
           const allRemote = dbDocs.map(row => row.data);
@@ -1547,7 +1547,7 @@ export const dataService = {
         try {
           const empIdNum = Number(finalDoc.empId);
           const { error: dbErr } = await supabase
-            .from('employee_docs')
+            .from('employee_documents')
             .upsert({
               id: finalDoc.id,
               emp_id: isNaN(empIdNum) ? finalDoc.empId : empIdNum,
@@ -1591,14 +1591,14 @@ export const dataService = {
       // 1. Try deleting from employee_docs table first
       try {
         const { error: dbErr } = await supabase
-          .from('employee_docs')
+          .from('employee_documents')
           .delete()
           .eq('id', String(docId));
         if (!dbErr) {
-          console.log(`Vault: Deleted ${docId} from employee_docs table.`);
+          console.log(`Vault: Deleted ${docId} from employee_documents table.`);
         }
       } catch (e) {
-        console.warn('Vault: employee_docs delete failed, attempting config sync.');
+        console.warn('Vault: employee_documents delete failed, attempting config sync.');
       }
       
       // 2. Sync updated list to app_config / letter_templates config fallback
@@ -1756,5 +1756,66 @@ export const dataService = {
 
 
   getBiometricConfig: async () => dataService.getBiometricConfig(),
-  saveBiometricConfig: async (config) => dataService.saveBiometricConfig(config)
+  saveBiometricConfig: async (config) => dataService.saveBiometricConfig(config),
+
+  getDesignations: async () => {
+    return await getConfig('designations', [
+      'Software Engineer',
+      'Senior Engineer',
+      'Manager',
+      'HR Executive',
+      'Helper',
+      'Operator',
+      'Supervisor'
+    ]);
+  },
+
+  saveDesignationList: async (list) => {
+    return await saveConfig('designations', list);
+  },
+
+  updateRequestStatusWithHistory: async (requestId, status, managerName, remarks) => {
+    if (!supabase) return null;
+    try {
+      // Find by id or try by matching the data id field if standard id search fails
+      const { data: request, error: fetchErr } = await supabase
+        .from('leave_requests')
+        .select('*')
+        .eq('id', String(requestId))
+        .maybeSingle();
+      
+      if (fetchErr || !request) {
+        throw new Error(fetchErr ? fetchErr.message : 'Request not found');
+      }
+
+      const prevData = request.data || {};
+      const approvalHistory = prevData.approvalHistory || [];
+      const newHistoryEntry = {
+        managerName,
+        dateTime: new Date().toISOString(),
+        status,
+        remarks: remarks || ''
+      };
+
+      const updatedData = {
+        ...prevData,
+        status,
+        approvalHistory: [...approvalHistory, newHistoryEntry]
+      };
+
+      const { error: updateErr } = await supabase
+        .from('leave_requests')
+        .update({
+          status,
+          data: updatedData
+        })
+        .eq('id', String(requestId));
+
+      if (updateErr) throw updateErr;
+      return updatedData;
+    } catch (e) {
+      console.error('updateRequestStatusWithHistory failed:', e);
+      throw e;
+    }
+  }
 };

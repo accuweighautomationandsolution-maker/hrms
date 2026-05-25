@@ -15,7 +15,11 @@ import {
   Loader2,
   Eye,
   EyeOff,
-  Link2
+  Link2,
+  Briefcase,
+  Plus,
+  Edit2,
+  Trash2
 } from "lucide-react";
 import { authService } from "../utils/authService";
 import { dataService } from "../utils/dataService";
@@ -46,6 +50,12 @@ const UserManagement = () => {
   const [linkLoading, setLinkLoading] = useState(false);
   const [linkError, setLinkError] = useState('');
 
+  // Designations State
+  const [designations, setDesignations] = useState([]);
+  const [newDesignationName, setNewDesignationName] = useState("");
+  const [editingDesignationId, setEditingDesignationId] = useState(null);
+  const [editingDesignationName, setEditingDesignationName] = useState("");
+
   const togglePasswordVisibility = (userId) => {
     setVisiblePasswords(prev => ({
       ...prev,
@@ -56,12 +66,21 @@ const UserManagement = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-        const [uList, lList] = await Promise.all([
+        const [uList, lList, dList] = await Promise.all([
             authService.getUsers(),
-            authService.getLogs()
+            authService.getLogs(),
+            dataService.getDesignations()
         ]);
         setUsers(uList);
         setLogs(lList);
+        // Normalize designations list (string list -> object list)
+        const normalizedDes = (dList || []).map((item, index) => {
+          if (typeof item === 'string') {
+            return { id: `des_${index}_${item.replace(/\s+/g, '_')}`, name: item, active: true };
+          }
+          return item;
+        });
+        setDesignations(normalizedDes);
     } catch (err) {
         console.error("Failed to load user management data:", err);
     } finally {
@@ -72,6 +91,95 @@ const UserManagement = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleAddDesignation = async (e) => {
+    e.preventDefault();
+    if (!newDesignationName.trim()) return;
+    
+    // Check for duplicate names (case-insensitive)
+    const exists = designations.some(d => d.name.toLowerCase() === newDesignationName.trim().toLowerCase());
+    if (exists) {
+      alert("Designation already exists.");
+      return;
+    }
+
+    const updated = [
+      ...designations,
+      {
+        id: `des_${Date.now()}`,
+        name: newDesignationName.trim(),
+        active: true
+      }
+    ];
+
+    try {
+      await dataService.saveDesignationList(updated);
+      setDesignations(updated);
+      setNewDesignationName("");
+    } catch (err) {
+      alert("Failed to save designation: " + err.message);
+    }
+  };
+
+  const handleToggleDesignationActive = async (id) => {
+    const updated = designations.map(d => {
+      if (d.id === id) {
+        return { ...d, active: !d.active };
+      }
+      return d;
+    });
+
+    try {
+      await dataService.saveDesignationList(updated);
+      setDesignations(updated);
+    } catch (err) {
+      alert("Failed to update status: " + err.message);
+    }
+  };
+
+  const handleStartEditDesignation = (d) => {
+    setEditingDesignationId(d.id);
+    setEditingDesignationName(d.name);
+  };
+
+  const handleSaveEditDesignation = async (id) => {
+    if (!editingDesignationName.trim()) return;
+
+    // Check duplicate
+    const exists = designations.some(d => d.id !== id && d.name.toLowerCase() === editingDesignationName.trim().toLowerCase());
+    if (exists) {
+      alert("Another designation with this name already exists.");
+      return;
+    }
+
+    const updated = designations.map(d => {
+      if (d.id === id) {
+        return { ...d, name: editingDesignationName.trim() };
+      }
+      return d;
+    });
+
+    try {
+      await dataService.saveDesignationList(updated);
+      setDesignations(updated);
+      setEditingDesignationId(null);
+      setEditingDesignationName("");
+    } catch (err) {
+      alert("Failed to update designation: " + err.message);
+    }
+  };
+
+  const handleDeleteDesignation = async (id) => {
+    if (window.confirm("Are you sure you want to delete this designation?")) {
+      const updated = designations.filter(d => d.id !== id);
+      try {
+        await dataService.saveDesignationList(updated);
+        setDesignations(updated);
+      } catch (err) {
+        alert("Failed to delete designation: " + err.message);
+      }
+    }
+  };
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
@@ -212,6 +320,12 @@ const UserManagement = () => {
               style={{ padding: '1rem 0', fontSize: '0.875rem', fontWeight: '700', borderBottom: activeTab === 'logs' ? '3px solid var(--color-primary)' : '3px solid transparent', color: activeTab === 'logs' ? 'var(--color-primary)' : 'var(--color-text-muted)' }}
             >
               Audit Trail
+            </button>
+            <button 
+              onClick={() => setActiveTab("designations")}
+              style={{ padding: '1rem 0', fontSize: '0.875rem', fontWeight: '700', borderBottom: activeTab === 'designations' ? '3px solid var(--color-primary)' : '3px solid transparent', color: activeTab === 'designations' ? 'var(--color-primary)' : 'var(--color-text-muted)' }}
+            >
+              Positions & Designations
             </button>
           </div>
           
@@ -379,6 +493,135 @@ const UserManagement = () => {
                   {logs.length === 0 && (
                       <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>No logs available in current history.</div>
                   )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "designations" && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem', marginTop: '1rem' }}>
+            {/* Add Designation form */}
+            <div className="card" style={{ height: 'fit-content' }}>
+              <h3 style={{ fontSize: '1.1rem', margin: '0 0 1rem 0', color: 'var(--color-primary)' }}>Add Position / Designation</h3>
+              <form onSubmit={handleAddDesignation} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Designation Name</label>
+                  <input
+                    required
+                    placeholder="e.g. Lead Engineer"
+                    className="form-input"
+                    value={newDesignationName}
+                    onChange={(e) => setNewDesignationName(e.target.value)}
+                  />
+                </div>
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: '0.5rem', alignSelf: 'stretch' }}>
+                  <Plus size={16} /> Add Position
+                </button>
+              </form>
+            </div>
+
+            {/* Designations List */}
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: '800', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Position Registry</span>
+                <span className="badge badge-primary">{designations.length} total</span>
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead style={{ backgroundColor: 'var(--color-background)', color: 'var(--color-text-muted)', fontSize: '0.75rem', textTransform: 'uppercase' }}>
+                    <tr>
+                      <th style={{ padding: '1rem 1.5rem' }}>Designation</th>
+                      <th style={{ padding: '1rem 1.5rem' }}>Status</th>
+                      <th style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody style={{ color: 'var(--color-text-main)' }}>
+                    {designations.map((d) => (
+                      <tr key={d.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                        <td style={{ padding: '1rem 1.5rem' }}>
+                          {editingDesignationId === d.id ? (
+                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                              <input
+                                className="form-input"
+                                style={{ padding: '0.3rem 0.5rem', height: 'auto', fontSize: '0.875rem' }}
+                                value={editingDesignationName}
+                                onChange={(e) => setEditingDesignationName(e.target.value)}
+                              />
+                              <button
+                                type="button"
+                                className="btn btn-primary"
+                                style={{ padding: '0.3rem 0.6rem', height: 'auto', fontSize: '0.75rem' }}
+                                onClick={() => handleSaveEditDesignation(d.id)}
+                              >
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-ghost"
+                                style={{ padding: '0.3rem 0.6rem', height: 'auto', fontSize: '0.75rem' }}
+                                onClick={() => setEditingDesignationId(null)}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ fontWeight: '600' }}>{d.name}</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '1rem 1.5rem' }}>
+                          {d.active ? (
+                            <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <div style={{ height: '8px', width: '8px', borderRadius: '50%', backgroundColor: 'var(--color-success)' }} /> ACTIVE
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <div style={{ height: '8px', width: '8px', borderRadius: '50%', backgroundColor: 'var(--color-text-muted)' }} /> DISABLED
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                            <button
+                              type="button"
+                              className="btn btn-ghost"
+                              style={{ padding: '0.4rem', color: 'var(--color-primary)' }}
+                              onClick={() => handleStartEditDesignation(d)}
+                              disabled={editingDesignationId !== null}
+                              title="Edit Name"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-ghost"
+                              style={{ padding: '0.4rem', color: d.active ? 'var(--color-warning)' : 'var(--color-success)' }}
+                              onClick={() => handleToggleDesignationActive(d.id)}
+                              title={d.active ? "Disable" : "Enable"}
+                            >
+                              <Power size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-ghost"
+                              style={{ padding: '0.4rem', color: 'var(--color-danger)' }}
+                              onClick={() => handleDeleteDesignation(d.id)}
+                              title="Delete"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {designations.length === 0 && (
+                      <tr>
+                        <td colSpan="3" style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                          No designations registered.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}

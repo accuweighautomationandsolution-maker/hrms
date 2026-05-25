@@ -57,11 +57,15 @@ const LeaveManagement = () => {
         ]);
         
         // Find current user's employee record to get real status
-        if (myEmpProfile) {
-          setActiveEmp(myEmpProfile);
-        } else {
-          const myRecord = emps.find(e => e.id === currentUser.id || e.empCode === currentUser.empCode);
-          if (myRecord) setActiveEmp(myRecord);
+        let matchedEmp = myEmpProfile;
+        if (!matchedEmp) {
+          matchedEmp = emps.find(e => e.id === currentUser.id || e.empCode === currentUser.empCode);
+        }
+        if (matchedEmp) {
+          setActiveEmp(matchedEmp);
+          if (matchedEmp.empType === 'Probation') {
+            setLeaveType('Unpaid Leave');
+          }
         }
 
         if (isEmployee) {
@@ -88,6 +92,9 @@ const LeaveManagement = () => {
   const [startDate,   setStartDate]   = useState('');
   const [endDate,     setEndDate]     = useState('');
   const [reason,      setReason]      = useState('');
+  const [requestDate, setRequestDate] = useState('');
+  const [startTime,   setStartTime]   = useState('');
+  const [endTime,     setEndTime]     = useState('');
 
   const [showExportMenu, setShowExportMenu] = useState(false);
 
@@ -196,14 +203,14 @@ const LeaveManagement = () => {
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div className="card" style={{ width: '100%', maxWidth: '500px', display: 'flex', flexDirection: 'column', gap: '1.5rem', margin: '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem' }}>
-              <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Submit Leave Request</h2>
+              <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Submit Request</h2>
               <button className="btn btn-ghost" onClick={() => setShowModal(false)} style={{ padding: '0.25rem' }}>✕</button>
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div className="form-group">
                 <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  Leave Type
+                  Request Type
                   <span style={{ fontSize: '0.75rem', color: isProbation ? 'var(--color-warning)' : 'var(--color-success)', fontWeight: '600' }}>
                     Status: {isProbation ? 'PROBATION' : 'PERMANENT'}
                   </span>
@@ -213,26 +220,50 @@ const LeaveManagement = () => {
                   {!isProbation && <option value="Sick Leave">Sick Leave</option>}
                   {!isProbation && <option value="Personal Leave">Personal Leave</option>}
                   <option value="Unpaid Leave">Unpaid Leave</option>
+                  <option value="Out Duty Request">Out Duty Request</option>
+                  <option value="Out Pass Request">Out Pass Request</option>
                 </select>
-                {isProbation && (
+                {isProbation && (leaveType === 'Annual Leave' || leaveType === 'Sick Leave' || leaveType === 'Personal Leave') && (
                   <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: 'var(--color-warning)', fontWeight: '600' }}>
-                    Policy Enforced: Employees currently under probation are restricted strictly to Unpaid Leave.
+                    Policy Enforced: Employees currently under probation are restricted strictly to Unpaid, Out Duty, or Out Pass Requests.
                   </p>
                 )}
               </div>
               
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div className="form-group" style={{ flex: 1 }}>
-                  <label className="form-label">Start Date *</label>
-                  <input type="date" className="form-input" style={{ width: '100%', borderColor: !startDate ? 'var(--color-danger)' : 'var(--color-border)' }}
-                    value={startDate} onChange={e => setStartDate(e.target.value)} />
+              {leaveType === 'Out Pass Request' ? (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">Request Date *</label>
+                    <input type="date" className="form-input" style={{ width: '100%', borderColor: !requestDate ? 'var(--color-danger)' : 'var(--color-border)' }}
+                      value={requestDate} onChange={e => setRequestDate(e.target.value)} />
+                  </div>
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label className="form-label">Start Time *</label>
+                      <input type="time" className="form-input" style={{ width: '100%', borderColor: !startTime ? 'var(--color-danger)' : 'var(--color-border)' }}
+                        value={startTime} onChange={e => setStartTime(e.target.value)} />
+                    </div>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label className="form-label">End Time *</label>
+                      <input type="time" className="form-input" style={{ width: '100%', borderColor: !endTime ? 'var(--color-danger)' : 'var(--color-border)' }}
+                        value={endTime} onChange={e => setEndTime(e.target.value)} />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label className="form-label">Start Date *</label>
+                    <input type="date" className="form-input" style={{ width: '100%', borderColor: !startDate ? 'var(--color-danger)' : 'var(--color-border)' }}
+                      value={startDate} onChange={e => setStartDate(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label className="form-label">End Date *</label>
+                    <input type="date" className="form-input" style={{ width: '100%', borderColor: !endDate ? 'var(--color-danger)' : 'var(--color-border)' }}
+                      value={endDate} onChange={e => setEndDate(e.target.value)} />
+                  </div>
                 </div>
-                <div className="form-group" style={{ flex: 1 }}>
-                  <label className="form-label">End Date *</label>
-                  <input type="date" className="form-input" style={{ width: '100%', borderColor: !endDate ? 'var(--color-danger)' : 'var(--color-border)' }}
-                    value={endDate} onChange={e => setEndDate(e.target.value)} />
-                </div>
-              </div>
+              )}
 
               <div className="form-group">
                 <label className="form-label">Reason *</label>
@@ -245,34 +276,51 @@ const LeaveManagement = () => {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
               <button className="btn btn-outline" onClick={() => setShowModal(false)}>Cancel</button>
               <button className="btn btn-primary" 
-                disabled={!startDate || !endDate || !reason.trim() || (new Date(startDate) > new Date(endDate))}
+                disabled={
+                  leaveType === 'Out Pass Request'
+                    ? !requestDate || !startTime || !endTime || !reason.trim()
+                    : !startDate || !endDate || !reason.trim() || (new Date(startDate) > new Date(endDate))
+                }
                 onClick={async () => {
-                  const start = new Date(startDate);
-                  const end = new Date(endDate);
-                  const diffTime = Math.abs(end - start);
-                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                  const isOutPass = leaveType === 'Out Pass Request';
+                  let durationStr = '';
+                  let calcDays = 0;
+                  
+                  if (isOutPass) {
+                    durationStr = `${requestDate} (${startTime} - ${endTime})`;
+                    calcDays = 0;
+                  } else {
+                    const start = new Date(startDate);
+                    const end = new Date(endDate);
+                    const diffTime = Math.abs(end - start);
+                    calcDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                    durationStr = `${startDate} - ${endDate}`;
+                  }
                   
                   const newRequest = {
                     id: Date.now(),
                     empId: resolvedMyEmpId || currentUser.id,
                     name: currentUser.name,
                     type: leaveType,
-                    startDate,
-                    endDate,
-                    duration: `${startDate} - ${endDate}`,
-                    days: diffDays,
+                    startDate: isOutPass ? requestDate : startDate,
+                    endDate: isOutPass ? requestDate : endDate,
+                    duration: durationStr,
+                    days: calcDays,
                     reason,
                     status: 'Pending',
-                    appliedDate: new Date().toISOString().split('T')[0]
+                    appliedDate: new Date().toISOString().split('T')[0],
+                    startTime: isOutPass ? startTime : '',
+                    endTime: isOutPass ? endTime : ''
                   };
                   
                   const existing = await dataService.getLeaveRequests();
                   await dataService.saveLeaveRequests([...existing, newRequest]);
                   
                   setRequests(prev => [...prev, newRequest]);
-                  alert('Leave request submitted successfully!');
+                  alert('Request submitted successfully!');
                   setShowModal(false);
                   setStartDate(''); setEndDate(''); setReason('');
+                  setRequestDate(''); setStartTime(''); setEndTime('');
                 }}>Submit Request</button>
             </div>
           </div>

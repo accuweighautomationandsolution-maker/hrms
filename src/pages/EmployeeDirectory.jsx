@@ -39,9 +39,11 @@ const EmployeeDirectory = ({ userRole }) => {
     presAddress: '', permAddress: '', sameAsPresent: false,
     hasPF: false, uan: '', pfMemberId: '',
     hasESIC: false, esicIp: '',
-    salaryConfig: null
+    salaryConfig: null,
+    managerIds: []
   });
 
+  const [designations, setDesignations] = useState([]);
   const [loading, setLoading] = useState(true);       // page-level initial load
   const [isSaving, setIsSaving] = useState(false);     // save-button spinner only
   const [uploadedFiles, setUploadedFiles] = useState([]);
@@ -58,7 +60,7 @@ const EmployeeDirectory = ({ userRole }) => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [emps, depts] = await Promise.all([
+        const [emps, depts, desList] = await Promise.all([
           dataService.getEmployees().catch(err => {
             console.warn("Directory: Employees fetch failed:", err);
             return [];
@@ -66,12 +68,23 @@ const EmployeeDirectory = ({ userRole }) => {
           dataService.getDepartments().catch(err => {
             console.warn("Directory: Departments fetch failed:", err);
             return [];
+          }),
+          dataService.getDesignations().catch(err => {
+            console.warn("Directory: Designations fetch failed:", err);
+            return [];
           })
         ]);
         
         if (isMounted) {
           setEmployees(emps);
           setDepartments(depts);
+          const normalizedDes = (desList || []).map((item, index) => {
+            if (typeof item === 'string') {
+              return { id: `des_${index}_${item.replace(/\s+/g, '_')}`, name: item, active: true };
+            }
+            return item;
+          });
+          setDesignations(normalizedDes);
         }
       } catch (err) {
         console.error("Failed to load directory data:", err);
@@ -144,7 +157,8 @@ const EmployeeDirectory = ({ userRole }) => {
       presAddress: '', permAddress: '', sameAsPresent: false,
       hasPF: false, uan: '', pfMemberId: '',
       hasESIC: false, esicIp: '',
-      salaryConfig: null
+      salaryConfig: null,
+      managerIds: []
     });
     setUploadedFiles([]);
     setErrorMsg('');
@@ -198,7 +212,8 @@ const EmployeeDirectory = ({ userRole }) => {
       mediclaimPolicies: (emp.mediclaimPolicies && emp.mediclaimPolicies.length > 0) ? emp.mediclaimPolicies : [{ policyNo: '', amount: '', company: '' }],
       hasTermInsurance: !!emp.hasTermInsurance,
       termInsurancePolicies: (emp.termInsurancePolicies && emp.termInsurancePolicies.length > 0) ? emp.termInsurancePolicies : [{ policyNo: '', amount: '', company: '' }],
-      salaryConfig: salary || null
+      salaryConfig: salary || null,
+      managerIds: emp.managerIds || []
     }));
     setUploadedFiles([]);
     setActiveTab(1);
@@ -357,7 +372,8 @@ const EmployeeDirectory = ({ userRole }) => {
         documents: uploadedFiles,
         salaryConfig: form.salaryConfig,
         grossSalary: form.salaryConfig?.targetSalary || 0,
-        grade: form.grade
+        grade: form.grade,
+        managerIds: form.managerIds || []
       };
 
       const savedEmp = await dataService.saveEmployee(empData);
@@ -822,7 +838,24 @@ const EmployeeDirectory = ({ userRole }) => {
                       {departments.map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
                   </div>
-                  <div className="form-group"><label className="form-label">Designation</label><input type="text" className="form-input" style={{width:'100%'}} value={form.role || ''} onChange={e => handleInput('role', e.target.value)} disabled={isEmployee} /></div>
+                  <div className="form-group">
+                    <label className="form-label">Designation</label>
+                    <select
+                      className="form-input"
+                      style={{ width: '100%' }}
+                      value={form.role || ''}
+                      onChange={e => handleInput('role', e.target.value)}
+                      disabled={isEmployee}
+                    >
+                      <option value="">Select Designation...</option>
+                      {designations.filter(d => d.active).map(d => (
+                        <option key={d.id} value={d.name}>{d.name}</option>
+                      ))}
+                      {form.role && !designations.some(d => d.active && d.name === form.role) && (
+                        <option value={form.role}>{form.role} (Inactive)</option>
+                      )}
+                    </select>
+                  </div>
                   {isAdmin && (
                     <>
                       <div className="form-group"><label className="form-label">Employment Status</label><select className="form-input" style={{width:'100%'}} value={form.probType || ''} onChange={e => handleInput('probType', e.target.value)}><option>Select...</option><option>Temporary</option><option>Probation</option><option>Permanent</option></select></div>
@@ -838,6 +871,103 @@ const EmployeeDirectory = ({ userRole }) => {
                       </div>
                     </>
                   )}
+
+                  <div style={{ gridColumn: 'span 2', borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem', marginTop: '0.5rem' }}>
+                    <h3 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '1rem', color: 'var(--color-primary)' }}>Assigned Managers</h3>
+                    
+                    {/* Display List of Assigned Managers */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+                      {(form.managerIds || []).map(mId => {
+                        const manager = employees.find(e => String(e.id) === String(mId));
+                        return (
+                          <div 
+                            key={mId} 
+                            style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '0.5rem', 
+                              backgroundColor: 'rgba(37,99,235,0.05)', 
+                              border: '1px solid rgba(37,99,235,0.2)', 
+                              padding: '0.4rem 0.75rem', 
+                              borderRadius: '20px',
+                              fontSize: '0.875rem',
+                              fontWeight: '600'
+                            }}
+                          >
+                            <span>{manager ? manager.name : `Manager (ID: ${mId})`}</span>
+                            {isAdmin && (
+                              <button 
+                                type="button" 
+                                style={{ 
+                                  border: 'none', 
+                                  background: 'transparent', 
+                                  color: 'var(--color-danger)', 
+                                  cursor: 'pointer',
+                                  fontSize: '0.85rem',
+                                  padding: '0 2px',
+                                  fontWeight: 'bold'
+                                }}
+                                onClick={() => {
+                                  const updated = (form.managerIds || []).filter(id => String(id) !== String(mId));
+                                  handleInput('managerIds', updated);
+                                }}
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {(!form.managerIds || form.managerIds.length === 0) && (
+                        <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>No managers assigned to this employee.</p>
+                      )}
+                    </div>
+
+                    {/* Admin Add Manager Form */}
+                    {isAdmin && (
+                      <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', maxWidth: '400px' }}>
+                        <div style={{ flexGrow: 1 }}>
+                          <label className="form-label" style={{ fontSize: '0.75rem' }}>Assign New Manager</label>
+                          <select 
+                            className="form-input"
+                            style={{ width: '100%' }}
+                            value=""
+                            onChange={(e) => {
+                              const selectedId = e.target.value;
+                              if (!selectedId) return;
+                              
+                              // Check if trying to assign self as manager
+                              if (form.id && String(selectedId) === String(form.id)) {
+                                alert("An employee cannot be assigned as their own manager.");
+                                return;
+                              }
+
+                              const currentManagers = form.managerIds || [];
+                              if (currentManagers.includes(selectedId)) {
+                                alert("This manager is already assigned.");
+                                return;
+                              }
+
+                              const updated = [...currentManagers, selectedId];
+                              handleInput('managerIds', updated);
+                            }}
+                          >
+                            <option value="">-- Choose employee to assign --</option>
+                            {employees
+                              .filter(e => e.status === 'Active') // only active employees
+                              .filter(e => !form.id || String(e.id) !== String(form.id)) // not self
+                              .filter(e => !(form.managerIds || []).includes(String(e.id))) // not already assigned
+                              .map(e => (
+                                <option key={e.id} value={e.id}>
+                                  {e.name} {e.empCode ? `(${e.empCode})` : ''}
+                                </option>
+                              ))
+                            }
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
