@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import { MoreVertical, Search, Filter, UserPlus, FileText, MapPin, Briefcase, ShieldCheck, UploadCloud, AlertCircle, IndianRupee, Lock, Save, Download, FileSpreadsheet, Printer, MessageSquareShare, Trash2, CreditCard, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import SalaryStructure from './SalaryStructure';
 import { dataService } from '../utils/dataService';
+import { authService } from '../utils/authService';
 import FeedbackPortal from '../components/FeedbackPortal';
 import EmployeeDocumentsTab from '../components/EmployeeDocumentsTab';
 import { useNotification } from '../context/NotificationContext';
