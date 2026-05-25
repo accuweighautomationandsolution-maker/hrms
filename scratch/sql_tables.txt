@@ -1,0 +1,1 @@
+RPC run_sql error: {"code":"PGRST202","details":"Searched for the function public.run_sql with parameter sql or with a single unnamed json/jsonb parameter, but no matches were found in the schema cache.","hint":null,"message":"Could not find the function public.run_sql(sql) in the schema cache"}
