@@ -817,7 +817,11 @@ export const dataService = {
   // ── Leave Management ──────────────────────────────────────────────────────
   getLeaveRequests: async () => {
     if (!supabase) return [];
-    const { data } = await supabase.from('leave_requests').select('*, employees(name)');
+    const { data, error } = await supabase.from('leave_requests').select('*');
+    if (error) {
+      console.error("Error fetching leave requests:", error);
+      return [];
+    }
     return data || [];
   },
 

@@ -296,31 +296,62 @@ const LeaveManagement = () => {
                     calcDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
                     durationStr = `${startDate} - ${endDate}`;
                   }
-                  
-                  const newRequest = {
-                    id: Date.now(),
-                    empId: resolvedMyEmpId || currentUser.id,
-                    name: currentUser.name,
-                    type: leaveType,
-                    startDate: isOutPass ? requestDate : startDate,
-                    endDate: isOutPass ? requestDate : endDate,
-                    duration: durationStr,
-                    days: calcDays,
-                    reason,
-                    status: 'Pending',
-                    appliedDate: new Date().toISOString().split('T')[0],
-                    startTime: isOutPass ? startTime : '',
-                    endTime: isOutPass ? endTime : ''
-                  };
-                  
-                  const existing = await dataService.getLeaveRequests();
-                  await dataService.saveLeaveRequests([...existing, newRequest]);
-                  
-                  setRequests(prev => [...prev, newRequest]);
-                  alert('Request submitted successfully!');
-                  setShowModal(false);
-                  setStartDate(''); setEndDate(''); setReason('');
-                  setRequestDate(''); setStartTime(''); setEndTime('');
+                                   try {
+                    let finalEmpId = resolvedMyEmpId;
+                    const emps = await dataService.getEmployees().catch(() => []);
+                    
+                    if (!finalEmpId) {
+                      const matched = emps.find(e => 
+                        (e.email && e.email.trim().toLowerCase() === currentUser.email?.trim().toLowerCase()) ||
+                        (e.name && e.name.trim().toLowerCase() === currentUser.name?.trim().toLowerCase())
+                      );
+                      if (matched) {
+                        finalEmpId = matched.id;
+                      }
+                    }
+
+                    if (!finalEmpId) {
+                      alert("Failed to submit request: Your user account is not linked to any employee profile. Please contact HR.");
+                      return;
+                    }
+
+                    // Check if manager is assigned
+                    let status = 'Pending';
+                    const empProfile = emps.find(e => String(e.id) === String(finalEmpId));
+                    const hasManager = empProfile && empProfile.managerIds && empProfile.managerIds.length > 0;
+                    if (!hasManager) {
+                      status = 'Pending Manager Assignment';
+                      console.warn(`Leave request raised by employee ${currentUser.name} (ID: ${finalEmpId}) has no assigned reporting manager.`);
+                    }
+
+                    const newRequest = {
+                      id: Date.now(),
+                      empId: finalEmpId,
+                      name: currentUser.name,
+                      type: leaveType,
+                      startDate: isOutPass ? requestDate : startDate,
+                      endDate: isOutPass ? requestDate : endDate,
+                      duration: durationStr,
+                      days: calcDays,
+                      reason,
+                      status: status,
+                      appliedDate: new Date().toISOString().split('T')[0],
+                      startTime: isOutPass ? startTime : '',
+                      endTime: isOutPass ? endTime : ''
+                    };
+                    
+                    const existing = await dataService.getLeaveRequests();
+                    await dataService.saveLeaveRequests([...existing, newRequest]);
+                    
+                    setRequests(prev => [...prev, newRequest]);
+                    alert('Request submitted successfully!');
+                    setShowModal(false);
+                    setStartDate(''); setEndDate(''); setReason('');
+                    setRequestDate(''); setStartTime(''); setEndTime('');
+                  } catch (err) {
+                    console.error("Failed to submit request:", err);
+                    alert("Database save failed: " + err.message);
+                  });
                 }}>Submit Request</button>
             </div>
           </div>
