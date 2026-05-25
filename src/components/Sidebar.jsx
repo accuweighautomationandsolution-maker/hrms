@@ -6,6 +6,12 @@ const Sidebar = ({ userRole }) => {
   const location = useLocation();
   const isAdmin = userRole === 'management' || userRole === 'admin';
   const [reportsOpen, setReportsOpen] = useState(isAdmin || location.pathname.includes('report'));
+  const [attendanceOpen, setAttendanceOpen] = useState(
+    location.pathname === '/attendance' ||
+    location.pathname === '/leaves' ||
+    location.pathname === '/out-duty' ||
+    location.pathname === '/out-pass'
+  );
 
   return (
     <aside className="sidebar hide-on-print">
@@ -26,14 +32,53 @@ const Sidebar = ({ userRole }) => {
           <Users size={24} />
           <span>Employee Directory</span>
         </Link>
-        <Link to="/leaves" className={`nav-item ${location.pathname === '/leaves' ? 'active' : ''}`}>
-          <CalendarDays size={24} />
-          <span>Leave Management</span>
-        </Link>
-        <Link to="/attendance" className={`nav-item ${location.pathname === '/attendance' ? 'active' : ''}`}>
-          <Clock size={24} />
-          <span>Attendance (Biometric)</span>
-        </Link>
+        {/* Collapsible Attendance Group */}
+        <div style={{ marginBottom: '0.25rem' }}>
+          <div 
+            onClick={() => setAttendanceOpen(!attendanceOpen)}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              padding: '0.75rem 1rem', 
+              fontSize: '0.875rem', 
+              color: attendanceOpen ? 'var(--color-primary)' : 'var(--color-text-muted)', 
+              fontWeight: '600',
+              cursor: 'pointer',
+              borderRadius: '8px',
+              transition: 'all 0.2s ease',
+              backgroundColor: attendanceOpen ? 'rgba(37, 99, 235, 0.04)' : 'transparent'
+            }}
+            className="nav-item-group-header"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <Clock size={24} />
+              <span>Attendance & Movement</span>
+            </div>
+            {attendanceOpen ? <ChevronUp size={21} /> : <ChevronDown size={21} />}
+          </div>
+          
+          {attendanceOpen && (
+            <div style={{ paddingLeft: '0.5rem', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', overflow: 'hidden' }}>
+              <Link to="/attendance" className={`nav-item ${location.pathname === '/attendance' ? 'active' : ''}`} style={{ paddingLeft: '2.5rem' }}>
+                <Clock size={21} />
+                <span>Regular Attendance</span>
+              </Link>
+              <Link to="/leaves" className={`nav-item ${location.pathname === '/leaves' ? 'active' : ''}`} style={{ paddingLeft: '2.5rem' }}>
+                <CalendarDays size={21} />
+                <span>Leave Management</span>
+              </Link>
+              <Link to="/out-duty" className={`nav-item ${location.pathname === '/out-duty' ? 'active' : ''}`} style={{ paddingLeft: '2.5rem' }}>
+                <MapPin size={21} />
+                <span>Out Duty Request</span>
+              </Link>
+              <Link to="/out-pass" className={`nav-item ${location.pathname === '/out-pass' ? 'active' : ''}`} style={{ paddingLeft: '2.5rem' }}>
+                <Clock size={21} />
+                <span>Out Pass Request</span>
+              </Link>
+            </div>
+          )}
+        </div>
         <Link to="/advances" className={`nav-item ${location.pathname === '/advances' ? 'active' : ''}`}>
           <IndianRupee size={24} />
           <span>Advances & Loans</span>
@@ -128,6 +173,10 @@ const Sidebar = ({ userRole }) => {
                     <ShieldCheck size={21} />
                     <span>ESIC Report</span>
                   </Link>
+                  <Link to="/movement-reports" className={`nav-item ${location.pathname === '/movement-reports' ? 'active' : ''}`} style={{ paddingLeft: '2.5rem' }}>
+                    <FileSpreadsheet size={21} />
+                    <span>Movement Reports</span>
+                  </Link>
                 </div>
               )}
             </div>
@@ -135,6 +184,10 @@ const Sidebar = ({ userRole }) => {
             <Link to="/approvals" className={`nav-item ${location.pathname === '/approvals' ? 'active' : ''}`}>
               <CheckSquare size={24} />
               <span>Manager Approvals</span>
+            </Link>
+            <Link to="/movement-policies" className={`nav-item ${location.pathname === '/movement-policies' ? 'active' : ''}`}>
+              <ShieldCheck size={24} />
+              <span>Movement Policy Config</span>
             </Link>
             <Link to="/budget-control" className={`nav-item ${location.pathname === '/budget-control' ? 'active' : ''}`}>
               <Building2 size={24} />

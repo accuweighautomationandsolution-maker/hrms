@@ -1817,5 +1817,190 @@ export const dataService = {
       console.error('updateRequestStatusWithHistory failed:', e);
       throw e;
     }
+  },
+
+  getMovementPolicies: async () => {
+    return await getConfig('movement_policy_settings', {
+      option: 'B', // Option A: Deduct time, Option B: Limited hours, Option C: Mark paid/unpaid
+      maxHoursPerMonth: 8,
+      approvalHierarchy: 'Direct Manager'
+    });
+  },
+
+  saveMovementPolicies: async (policies) => {
+    return await saveConfig('movement_policy_settings', policies);
+  },
+
+  getUnauthorizedExits: async () => {
+    return await getConfig('unauthorized_exits', []);
+  },
+
+  addUnauthorizedExitLog: async (log) => {
+    const existing = await getConfig('unauthorized_exits', []);
+    const newLog = {
+      id: `exit_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      timestamp: new Date().toISOString(),
+      ...log
+    };
+    await saveConfig('unauthorized_exits', [...existing, newLog]);
+    return newLog;
+  },
+
+  clearUnauthorizedExitLogs: async () => {
+    return await saveConfig('unauthorized_exits', []);
+  },
+
+  checkMovementException: async (empId, dateStr, punchOutTimeStr) => {
+    if (!supabase) return { allowed: true };
+    try {
+      const { data: leaves } = await supabase
+        .from('leave_requests')
+        .select('*')
+        .eq('emp_id', String(empId))
+        .eq('status', 'Approved');
+
+      // Filter for Out Duty or Out Pass on this date
+      const activeApprovals = (leaves || []).filter(l => {
+        const isMatchDate = l.start_date === dateStr || l.end_date === dateStr || 
+                            (l.data && (l.data.startDate === dateStr || l.data.requestDate === dateStr));
+        const isMovement = l.type === 'Out Duty Request' || l.type === 'Out Pass Request';
+        return isMatchDate && isMovement;
+      });
+
+      if (activeApprovals.length > 0) {
+        return { allowed: true, request: activeApprovals[0] };
+      }
+
+      // No approval exists - log unauthorized exit!
+      const { data: employees } = await supabase.from('employees').select('name, department').eq('id', empId).maybeSingle();
+      const empName = employees ? employees.name : 'Unknown';
+      const dept = employees ? employees.department : 'Unknown';
+
+      const exitLog = {
+        empId,
+        empName,
+        department: dept,
+        date: dateStr,
+        punchOutTime: punchOutTimeStr,
+        status: 'Unauthorized'
+      };
+
+      await dataService.addUnauthorizedExitLog(exitLog);
+      return { allowed: false, error: 'Unauthorized Exit', log: exitLog };
+    } catch (e) {
+      console.error('checkMovementException failed:', e);
+      return { allowed: true };
+    }
+  },
+
+  autoCloseMovementRequest: async (empId, dateStr, punchInTimeStr) => {
+    if (!supabase) return null;
+    try {
+      const { data: leaves } = await supabase
+        .from('leave_requests')
+        .select('*')
+        .eq('emp_id', String(empId))
+        .eq('status', 'Approved');
+
+      const activeMovements = (leaves || []).filter(l => {
+        const isMatchDate = l.start_date === dateStr || l.end_date === dateStr || 
+                            (l.data && (l.data.startDate === dateStr || l.data.requestDate === dateStr));
+        const isMovement = l.type === 'Out Duty Request' || l.type === 'Out Pass Request';
+        const notReturnedYet = l.data?.status !== 'Returned' && l.status !== 'Returned';
+        return isMatchDate && isMovement && notReturnedYet;
+      });
+
+      if (activeMovements.length > 0) {
+        const target = activeMovements[0];
+        const prevData = target.data || {};
+        
+        let isLate = false;
+        const expectedIn = prevData.expectedInTime || prevData.endTime;
+        if (expectedIn && punchInTimeStr) {
+          const [expH, expM] = expectedIn.split(':').map(Number);
+          const [punH, punM] = punchInTimeStr.split(':').map(Number);
+          if (punH > expH || (punH === expH && punM > expM)) {
+            isLate = true;
+          }
+        }
+
+        const updatedData = {
+          ...prevData,
+          status: 'Returned',
+          actualInTime: punchInTimeStr,
+          isLateReturn: isLate,
+          returnTimestamp: new Date().toISOString()
+        };
+
+        await supabase
+          .from('leave_requests')
+          .update({
+            status: 'Returned',
+            data: updatedData
+          })
+          .eq('id', target.id);
+
+        return { closed: true, request: target, isLate };
+      }
+      return { closed: false };
+    } catch (e) {
+      console.error('autoCloseMovementRequest failed:', e);
+      return { closed: false };
+    }
+  },
+
+  checkOverdueMovements: async () => {
+    if (!supabase) return [];
+    try {
+      const { data: leaves } = await supabase
+        .from('leave_requests')
+        .select('*')
+        .eq('status', 'Approved');
+
+      const todayStr = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const currentHours = now.getHours();
+      const currentMinutes = now.getMinutes();
+
+      const overdueRequests = [];
+
+      for (const l of (leaves || [])) {
+        const isMovement = l.type === 'Out Duty Request' || l.type === 'Out Pass Request';
+        if (!isMovement) continue;
+
+        const reqDate = l.start_date || l.data?.startDate || l.data?.requestDate;
+        if (!reqDate) continue;
+
+        const expectedIn = l.data?.expectedInTime || l.data?.endTime;
+        if (!expectedIn) continue;
+
+        const [expH, expM] = expectedIn.split(':').map(Number);
+
+        const isPastDate = reqDate < todayStr;
+        const isTodayOverdue = reqDate === todayStr && (currentHours > expH || (currentHours === expH && currentMinutes > expM));
+
+        if (isPastDate || isTodayOverdue) {
+          if (l.data?.status !== 'Overdue') {
+            const updatedData = {
+              ...l.data,
+              status: 'Overdue',
+              overdueDetectedAt: new Date().toISOString()
+            };
+            await supabase
+              .from('leave_requests')
+              .update({
+                data: updatedData
+              })
+              .eq('id', l.id);
+            l.data = updatedData;
+          }
+          overdueRequests.push(l);
+        }
+      }
+      return overdueRequests;
+    } catch (e) {
+      console.error('checkOverdueMovements failed:', e);
+      return [];
+    }
   }
 };

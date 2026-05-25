@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Calendar as CalendarIcon, Clock, CheckCircle, XCircle, AlertCircle, FileText, UserPlus, ShieldAlert } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, CheckCircle, XCircle, AlertCircle, FileText, UserPlus, ShieldAlert, MapPin } from 'lucide-react';
 import { dataService } from '../utils/dataService';
 import { authService } from '../utils/authService';
 
@@ -101,16 +101,18 @@ const Approvals = () => {
           const employee = emps.find(e => String(e.id) === String(l.empId) || String(e.id) === String(l.emp_id));
           return {
             id: l.id,
-            empName: l.name,
-            empId: l.empId,
+            empName: l.employees?.name || l.data?.name || l.data?.empName || l.name || 'Unknown Employee',
+            empId: l.emp_id || l.empId || l.data?.empId || l.data?.emp_id,
             role: employee ? employee.role : 'Employee', 
             type: l.type,
-            duration: l.duration || `${l.startDate} - ${l.endDate}`,
+            duration: l.data?.duration || l.duration || (l.start_date && l.end_date ? `${l.start_date} - ${l.end_date}` : ''),
             days: l.days,
             reason: l.reason,
             balanceRemaining: 0, 
             status: l.status,
-            approvalHistory: l.data?.approvalHistory || []
+            approvalHistory: l.data?.approvalHistory || [],
+            destination: l.data?.destination || '',
+            purpose: l.data?.purpose || ''
           };
         });
 
@@ -131,16 +133,18 @@ const Approvals = () => {
           const employee = emps.find(e => String(e.id) === String(l.empId) || String(e.id) === String(l.emp_id));
           return {
             id: l.id,
-            empName: l.name,
-            empId: l.empId,
+            empName: l.employees?.name || l.data?.name || l.data?.empName || l.name || 'Unknown Employee',
+            empId: l.emp_id || l.empId || l.data?.empId || l.data?.emp_id,
             role: employee ? employee.role : 'Employee', 
             type: l.type,
-            duration: l.duration || `${l.startDate} - ${l.endDate}`,
+            duration: l.data?.duration || l.duration || (l.start_date && l.end_date ? `${l.start_date} - ${l.end_date}` : ''),
             days: l.days,
             reason: l.reason,
             balanceRemaining: 0, 
             status: l.status,
-            approvalHistory: l.data?.approvalHistory || []
+            approvalHistory: l.data?.approvalHistory || [],
+            destination: l.data?.destination || '',
+            purpose: l.data?.purpose || ''
           };
         });
 
@@ -166,6 +170,13 @@ const Approvals = () => {
 
   const handleConfirmAction = async () => {
     const { requestId, status, remarks } = actionModal;
+    
+    // Remarks validation: mandatory for Rejected and Correction Needed (Send Back)
+    if ((status === 'Rejected' || status === 'Correction Needed') && (!remarks || !remarks.trim())) {
+      alert("Remarks are mandatory when rejecting a request or sending it back for correction.");
+      return;
+    }
+
     const managerName = managerProfile ? managerProfile.name : (currentUser?.name || 'Manager');
 
     try {
@@ -291,19 +302,29 @@ const Approvals = () => {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', backgroundColor: 'var(--color-background)', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
                     <div>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'block', marginBottom: '0.25rem' }}>Leave Type</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'block', marginBottom: '0.25rem' }}>Request Type</span>
                       <span style={{ fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                         <FileText size={14} color="var(--color-primary)" /> {req.type}
+                        {req.purpose && <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>({req.purpose})</span>}
                       </span>
                     </div>
                     <div>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'block', marginBottom: '0.25rem' }}>Requested Duration</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'block', marginBottom: '0.25rem' }}>Requested Duration / Time</span>
                       <span style={{ fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        <CalendarIcon size={14} color="var(--color-primary)" /> {req.duration} ({req.days} days)
+                        <CalendarIcon size={14} color="var(--color-primary)" />
+                        {req.type.includes('Request') ? req.duration : `${req.duration} (${req.days} days)`}
                       </span>
                     </div>
+                    {req.destination && (
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'block', marginBottom: '0.25rem' }}>Destination / Location</span>
+                        <span style={{ fontWeight: '600', color: 'var(--color-text-main)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <MapPin size={14} /> {req.destination}
+                        </span>
+                      </div>
+                    )}
                     <div style={{ gridColumn: 'span 2' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'block', marginBottom: '0.25rem' }}>Reason</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'block', marginBottom: '0.25rem' }}>Reason / Purpose Details</span>
                       <span style={{ fontWeight: '400', fontStyle: 'italic', color: 'var(--color-text-main)' }}>"{req.reason}"</span>
                     </div>
                   </div>
@@ -323,6 +344,13 @@ const Approvals = () => {
                       )}
                     </div>
                     <div style={{ display: 'flex', gap: '0.75rem' }}>
+                      <button 
+                        className="btn btn-outline" 
+                        style={{ color: 'var(--color-primary)', borderColor: 'var(--color-primary)' }}
+                        onClick={() => handleAction(req.id, 'Correction Needed')}
+                      >
+                        Send Back
+                      </button>
                       <button 
                         className="btn btn-outline" 
                         style={{ color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}

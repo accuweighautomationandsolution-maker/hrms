@@ -229,6 +229,8 @@ const Attendance = () => {
           } else if (emps.length > 0) {
             setSelectedEmp(emps[0]);
           }
+          // Check overdue movement requests on page load
+          dataService.checkOverdueMovements().catch(console.error);
         }
       } catch (err) {
         console.error('Attendance: Critical Load Error:', err);
@@ -285,6 +287,13 @@ const Attendance = () => {
 
       if (updatedRecord) {
         dataService.saveAttendance({ [punchKey]: updatedRecord }).catch(console.error);
+        
+        // Trigger movement exceptions & auto-closures
+        if (punch.type === 'Punch Out' && punch.time) {
+          dataService.checkMovementException(internalId, dStr, punch.time).catch(console.error);
+        } else if (punch.type === 'Punch In' && punch.time) {
+          dataService.autoCloseMovementRequest(internalId, dStr, punch.time).catch(console.error);
+        }
       }
     });
 
@@ -398,6 +407,14 @@ const Attendance = () => {
           nextRecords[logKey] = entry;
           recordsToSave[logKey] = entry;
           addedCount++;
+
+          // Check movement exceptions & auto-closures for synced biometric logs
+          if (log.punchOut) {
+            dataService.checkMovementException(internalId, dStr, log.punchOut).catch(console.error);
+          }
+          if (log.punchIn) {
+            dataService.autoCloseMovementRequest(internalId, dStr, log.punchIn).catch(console.error);
+          }
         }
       });
 

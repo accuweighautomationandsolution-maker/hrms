@@ -37,6 +37,10 @@ import LetterTemplates from './pages/LetterTemplates';
 import DocumentHub from './pages/DocumentHub';
 import MyDocuments from './pages/MyDocuments';
 import MobilePreview from './pages/MobilePreview';
+import OutDuty from './pages/OutDuty';
+import OutPass from './pages/OutPass';
+import MovementReports from './pages/MovementReports';
+import MovementPolicySettings from './pages/MovementPolicySettings';
 import ErrorBoundary from './components/ErrorBoundary';
 import { authService } from './utils/authService';
 import './App.css'; 
@@ -221,8 +225,10 @@ function App() {
                 <Route path="/attendance-report" element={<AttendanceReport />} />
                 <Route path="/holidays"   element={<HolidayList userRole={userRole} />} />
                 <Route path="/advances"   element={<Advances />} />
-                <Route path="/expenses"   element={<Expenses />} />
+                 <Route path="/expenses"   element={<Expenses />} />
                 <Route path="/my-documents" element={<MyDocuments />} />
+                <Route path="/out-duty" element={<OutDuty />} />
+                <Route path="/out-pass" element={<OutPass />} />
                 
                 {/* Management-Strict Routes */}
                 {isAdmin && (
@@ -245,6 +251,8 @@ function App() {
                     <Route path="/bonus-management" element={<BonusManagement />} />
                     <Route path="/user-management" element={<UserManagement />} />
                     <Route path="/departments" element={<DepartmentManagement />} />
+                    <Route path="/movement-reports" element={<MovementReports />} />
+                    <Route path="/movement-policies" element={<MovementPolicySettings />} />
                   </>
                 )}
                 

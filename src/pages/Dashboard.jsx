@@ -50,6 +50,12 @@ const Dashboard = ({ userRole }) => {
   const [probations, setProbations] = useState([]);
   const [dashboardStats, setDashboardStats] = useState({ totalEmployees: 0, presentToday: 0, onLeave: 0 });
   const [statutoryUpdates, setStatutoryUpdates] = useState([]);
+  const [movementStats, setMovementStats] = useState({
+    pendingMovements: 0,
+    currentlyOut: 0,
+    overdueReturns: 0,
+    unauthorizedExitsToday: 0
+  });
   const [loading, setLoading] = useState(true);
 
   const isEmployee = userRole === 'employee';
@@ -224,6 +230,35 @@ const Dashboard = ({ userRole }) => {
           setAdminAttendanceData(trajectory);
         }
 
+        // Load movement stats
+        const [leavesList, exitsList] = await Promise.all([
+          dataService.getLeaveRequests().catch(() => []),
+          dataService.getUnauthorizedExits().catch(() => [])
+        ]);
+        const todayStr = toDateStr(nowLocal);
+        const pendingMovements = leavesList.filter(l => 
+          (l.type === 'Out Duty Request' || l.type === 'Out Pass Request') && 
+          l.status === 'Pending'
+        ).length;
+        const currentlyOut = leavesList.filter(l => 
+          (l.type === 'Out Duty Request' || l.type === 'Out Pass Request') && 
+          l.status === 'Approved' && 
+          (l.start_date === todayStr || l.data?.date === todayStr)
+        ).length;
+        const overdueReturns = leavesList.filter(l => 
+          (l.type === 'Out Duty Request' || l.type === 'Out Pass Request') && 
+          l.status === 'Overdue'
+        ).length;
+        const unauthorizedExitsToday = exitsList.filter(e => 
+          e.date === todayStr
+        ).length;
+        setMovementStats({
+          pendingMovements,
+          currentlyOut,
+          overdueReturns,
+          unauthorizedExitsToday
+        });
+
         // Statutory updates (both roles)
         const statUpdates = await dataService.getStatutoryUpdates().catch(() => []);
         setStatutoryUpdates(statUpdates);
@@ -381,6 +416,62 @@ const Dashboard = ({ userRole }) => {
           </>
         )}
       </div>
+
+      {/* Admin/Manager Movement Widgets */}
+      {!isEmployee && (
+        <div style={{ marginBottom: '2rem' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '1rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Movement & Exit Monitoring</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem' }}>
+            <Link to="/approvals" style={{ textDecoration: 'none', color: 'inherit' }} className="card hover-card">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                <div className="avatar bg-blue-500" style={{ width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                  <Clock size={22} />
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '1.75rem', fontWeight: '800', margin: 0 }}>{movementStats.pendingMovements}</h4>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', margin: 0, fontWeight: '600' }}>Pending OD/OP</p>
+                </div>
+              </div>
+            </Link>
+
+            <Link to="/movement-reports?tab=duty" style={{ textDecoration: 'none', color: 'inherit' }} className="card hover-card">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                <div className="avatar bg-emerald-500" style={{ width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                  <UserCheck size={22} />
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '1.75rem', fontWeight: '800', margin: 0 }}>{movementStats.currentlyOut}</h4>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', margin: 0, fontWeight: '600' }}>Currently Out Today</p>
+                </div>
+              </div>
+            </Link>
+
+            <Link to="/movement-reports?tab=overdue" style={{ textDecoration: 'none', color: 'inherit' }} className="card hover-card" style={{ borderLeft: movementStats.overdueReturns > 0 ? '4px solid var(--color-danger)' : '1px solid var(--color-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                <div className="avatar bg-amber-500" style={{ width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                  <AlertCircle size={22} />
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '1.75rem', fontWeight: '800', margin: 0, color: movementStats.overdueReturns > 0 ? 'var(--color-danger)' : 'var(--color-text-main)' }}>{movementStats.overdueReturns}</h4>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', margin: 0, fontWeight: '600' }}>Overdue Returns</p>
+                </div>
+              </div>
+            </Link>
+
+            <Link to="/movement-reports?tab=exits" style={{ textDecoration: 'none', color: 'inherit' }} className="card hover-card" style={{ borderLeft: movementStats.unauthorizedExitsToday > 0 ? '4px solid var(--color-danger)' : '1px solid var(--color-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                <div className="avatar bg-red-500" style={{ width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                  <AlertCircle size={22} />
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '1.75rem', fontWeight: '800', margin: 0, color: movementStats.unauthorizedExitsToday > 0 ? 'var(--color-danger)' : 'var(--color-text-main)' }}>{movementStats.unauthorizedExitsToday}</h4>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', margin: 0, fontWeight: '600' }}>Unauthorized Exits Today</p>
+                </div>
+              </div>
+            </Link>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr', gap: '2rem', alignItems: 'start' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
