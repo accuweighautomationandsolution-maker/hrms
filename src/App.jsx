@@ -256,11 +256,11 @@ function App() {
                 <Route path="/my-documents" element={<MyDocuments />} />
                 <Route path="/out-duty" element={<OutDuty />} />
                 <Route path="/out-pass" element={<OutPass />} />
+                <Route path="/approvals" element={<Approvals />} />
 
                 {/* Manager / Admin Shared Routes */}
                 {(isAdmin || isManager) && (
                   <>
-                    <Route path="/approvals" element={<Approvals />} />
                     <Route path="/movement-reports" element={<MovementReports />} />
                   </>
                 )}

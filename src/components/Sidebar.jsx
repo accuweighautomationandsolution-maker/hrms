@@ -107,6 +107,10 @@ const Sidebar = ({ userRole, isManager }) => {
           <FileText size={24} />
           <span>My Documents</span>
         </Link>
+        <Link to="/approvals" className={`nav-item ${location.pathname === '/approvals' ? 'active' : ''}`}>
+          <CheckSquare size={24} />
+          <span>Approvals</span>
+        </Link>
 
         {isAdmin && (
           <>
@@ -181,10 +185,7 @@ const Sidebar = ({ userRole, isManager }) => {
               )}
             </div>
 
-            <Link to="/approvals" className={`nav-item ${location.pathname === '/approvals' ? 'active' : ''}`}>
-              <CheckSquare size={24} />
-              <span>Manager Approvals</span>
-            </Link>
+
             <Link to="/movement-policies" className={`nav-item ${location.pathname === '/movement-policies' ? 'active' : ''}`}>
               <ShieldCheck size={24} />
               <span>Movement Policy Config</span>
@@ -241,10 +242,6 @@ const Sidebar = ({ userRole, isManager }) => {
         {!isAdmin && isManager && (
           <>
             <div style={{ marginTop: '2rem', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '1px', paddingLeft: '1rem' }}>Manager Suite</div>
-            <Link to="/approvals" className={`nav-item ${location.pathname === '/approvals' ? 'active' : ''}`}>
-              <CheckSquare size={24} />
-              <span>Manager Approvals</span>
-            </Link>
             <Link to="/movement-reports" className={`nav-item ${location.pathname === '/movement-reports' ? 'active' : ''}`}>
               <FileSpreadsheet size={24} />
               <span>Movement Reports</span>

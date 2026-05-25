@@ -274,6 +274,8 @@ const Approvals = () => {
         if (!['Approved', 'Auto Approved'].includes(req.status)) return false;
       } else if (activeTab === 'rejected') {
         if (req.status !== 'Rejected') return false;
+      } else if (activeTab === 'escalated') {
+        if (req.status !== 'Escalated') return false;
       } else if (activeTab === 'duty') {
         if (req.type !== 'Out Duty Request') return false;
       } else if (activeTab === 'pass') {
@@ -557,6 +559,66 @@ const Approvals = () => {
     );
   }
 
+  if (!loading && !isAdmin && reporteeIds.length === 0) {
+    return (
+      <div className="page-container" style={{ minHeight: '90vh', paddingBottom: '3rem' }}>
+        
+        {/* Page Header */}
+        <div className="page-header" style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+              <Shield size={32} color="var(--color-primary)" />
+              Approvals & Workflow Control
+            </h1>
+            <p className="page-subtitle" style={{ margin: '0.25rem 0 0 0' }}>
+              Self Service Suite — Review and take action on employee requests under your hierarchy.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <span className="badge badge-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.5rem 0.75rem', fontSize: '0.8rem' }}>
+              <UserCheck size={14} /> Workflow: {policy.workflowType === 'sequential' ? 'Sequential' : 'Parallel'}
+            </span>
+            <button className="btn btn-outline" onClick={() => setReloads(r => r + 1)} style={{ padding: '0.5rem' }}>
+              <RefreshCw size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Empty Counters Dashboard */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '2.5rem' }}>
+          <div className="card card-glass" style={{ padding: '1.25rem', borderLeft: '4px solid var(--color-border)' }}>
+            <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: '600' }}>Pending Leaves</span>
+            <h3 style={{ fontSize: '1.75rem', margin: '0.25rem 0 0 0', fontWeight: '800' }}>0</h3>
+          </div>
+          <div className="card card-glass" style={{ padding: '1.25rem', borderLeft: '4px solid var(--color-border)' }}>
+            <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: '600' }}>Pending Out Duty</span>
+            <h3 style={{ fontSize: '1.75rem', margin: '0.25rem 0 0 0', fontWeight: '800' }}>0</h3>
+          </div>
+          <div className="card card-glass" style={{ padding: '1.25rem', borderLeft: '4px solid var(--color-border)' }}>
+            <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: '600' }}>Pending Out Pass</span>
+            <h3 style={{ fontSize: '1.75rem', margin: '0.25rem 0 0 0', fontWeight: '800' }}>0</h3>
+          </div>
+          <div className="card card-glass" style={{ padding: '1.25rem', borderLeft: '4px solid var(--color-border)' }}>
+            <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: '600' }}>Total Pending Action</span>
+            <h3 style={{ fontSize: '1.75rem', margin: '0.25rem 0 0 0', fontWeight: '800' }}>0</h3>
+          </div>
+        </div>
+
+        {/* Empty State Card */}
+        <div className="card card-glass" style={{ padding: '4rem 2rem', textAlign: 'center', maxWidth: '600px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}>
+          <CheckCircle size={56} style={{ color: 'var(--color-success)', opacity: 0.8 }} />
+          <div>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: '800', margin: '0 0 0.5rem 0' }}>No Pending Approvals</h2>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', lineHeight: '1.5', margin: 0 }}>
+              You do not have any employees assigned under you at this time. If employees are mapped to you as their reporting manager or authority in the employee directory, their requests will appear here dynamically.
+            </p>
+          </div>
+        </div>
+
+      </div>
+    );
+  }
+
   return (
     <div className="page-container" style={{ minHeight: '90vh', paddingBottom: '3rem' }}>
       
@@ -634,7 +696,16 @@ const Approvals = () => {
       {/* ── TAB NAVIGATION ── */}
       <div className="card-glass" style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', padding: '0.5rem 1rem', marginBottom: '1.5rem', gap: '0.5rem', overflowX: 'auto', borderRadius: '12px' }}>
         <button className={`btn ${activeTab === 'pending' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setActiveTab('pending')} style={{ borderRadius: '8px', fontSize: '0.85rem' }}>
-          Pending Action ({scopedRequests.filter(r => ['Pending', 'Escalated', 'Awaiting Final Approval'].includes(r.status)).length})
+          Pending Approvals ({scopedRequests.filter(r => ['Pending', 'Escalated', 'Awaiting Final Approval'].includes(r.status)).length})
+        </button>
+        <button className={`btn ${activeTab === 'leaves' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setActiveTab('leaves')} style={{ borderRadius: '8px', fontSize: '0.85rem' }}>
+          Leave Requests ({scopedRequests.filter(r => r.type !== 'Out Duty Request' && r.type !== 'Out Pass Request').length})
+        </button>
+        <button className={`btn ${activeTab === 'duty' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setActiveTab('duty')} style={{ borderRadius: '8px', fontSize: '0.85rem' }}>
+          Out Duty Requests ({scopedRequests.filter(r => r.type === 'Out Duty Request').length})
+        </button>
+        <button className={`btn ${activeTab === 'pass' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setActiveTab('pass')} style={{ borderRadius: '8px', fontSize: '0.85rem' }}>
+          Out Pass Requests ({scopedRequests.filter(r => r.type === 'Out Pass Request').length})
         </button>
         <button className={`btn ${activeTab === 'approved' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setActiveTab('approved')} style={{ borderRadius: '8px', fontSize: '0.85rem' }}>
           Approved ({scopedRequests.filter(r => ['Approved', 'Auto Approved'].includes(r.status)).length})
@@ -642,17 +713,8 @@ const Approvals = () => {
         <button className={`btn ${activeTab === 'rejected' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setActiveTab('rejected')} style={{ borderRadius: '8px', fontSize: '0.85rem' }}>
           Rejected ({scopedRequests.filter(r => r.status === 'Rejected').length})
         </button>
-        <button className={`btn ${activeTab === 'duty' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setActiveTab('duty')} style={{ borderRadius: '8px', fontSize: '0.85rem' }}>
-          Out Duty ({scopedRequests.filter(r => r.type === 'Out Duty Request').length})
-        </button>
-        <button className={`btn ${activeTab === 'pass' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setActiveTab('pass')} style={{ borderRadius: '8px', fontSize: '0.85rem' }}>
-          Out Pass ({scopedRequests.filter(r => r.type === 'Out Pass Request').length})
-        </button>
-        <button className={`btn ${activeTab === 'leaves' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setActiveTab('leaves')} style={{ borderRadius: '8px', fontSize: '0.85rem' }}>
-          Leaves ({scopedRequests.filter(r => r.type !== 'Out Duty Request' && r.type !== 'Out Pass Request').length})
-        </button>
-        <button className={`btn ${activeTab === 'all' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setActiveTab('all')} style={{ borderRadius: '8px', fontSize: '0.85rem' }}>
-          All Requests ({scopedRequests.length})
+        <button className={`btn ${activeTab === 'escalated' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setActiveTab('escalated')} style={{ borderRadius: '8px', fontSize: '0.85rem' }}>
+          Escalated ({scopedRequests.filter(r => r.status === 'Escalated').length})
         </button>
       </div>
 
