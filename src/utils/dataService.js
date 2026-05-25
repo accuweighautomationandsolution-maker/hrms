@@ -377,6 +377,7 @@ export const dataService = {
             department: fullProfile.department,
             contact: fullProfile.contact || '', // Allowed per requirements
             biometricCode: fullProfile.biometricCode,
+            managerIds: fullProfile.managerIds || [], // Retain managerIds to check reporting hierarchy
             // Scrub everything else
             email: '', 
             empCode: '', 
