@@ -351,7 +351,7 @@ const LeaveManagement = () => {
                   } catch (err) {
                     console.error("Failed to submit request:", err);
                     alert("Database save failed: " + err.message);
-                  });
+                  }
                 }}>Submit Request</button>
             </div>
           </div>
