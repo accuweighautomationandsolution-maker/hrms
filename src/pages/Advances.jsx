@@ -139,20 +139,17 @@ const Advances = () => {
     }
     
     try {
-      // Update dataService employees
+      // Find employee
       const list = await dataService.getEmployees();
-      const updated = list.map(e => {
-        if (e.id === Number(selectedEmpId)) {
-          return { ...e, advanceLoanEMI: (e.advanceLoanEMI || 0) + emi };
-        }
-        return e;
-      });
-      await dataService.saveEmployees(updated);
+      const emp = list.find(e => e.id === Number(selectedEmpId)) || employeesList.find(e => e.id === Number(selectedEmpId));
+      if (!emp) {
+        alert("Employee not found.");
+        return;
+      }
 
       // Create Historical Record
       const history = await dataService.getAdvanceHistory();
-
-      const emp = employeesList.find(e => e.id === Number(selectedEmpId));
+      
       const totalAmount = advanceType === 'Personal Advance' ? Number(amount) : calculateSiteTotal();
 
       const newAdvance = {
@@ -165,7 +162,8 @@ const Advances = () => {
         emi: emi,
         date: new Date().toISOString().split('T')[0],
         issueDate: new Date().toLocaleDateString('en-GB'),
-        status: 'Active'
+        status: 'Pending',
+        approvals: { admin: false, director: false, finance: false }
       };
 
       if (advanceType === 'Official Site Advance') {
@@ -177,8 +175,8 @@ const Advances = () => {
       setAdvances(finalHistory);
       
       const msg = advanceType === 'Official Site Advance' 
-          ? `Official Site Advance of ₹${totalAmount} approved. This will be settled against expense submissions.`
-          : `Advance of ₹${totalAmount} approved. Monthly EMI of ₹${emi} will be deducted from salary.`;
+          ? `Official Site Advance of ₹${totalAmount} submitted for approval.`
+          : `Advance of ₹${totalAmount} submitted for approval. EMI will be deducted upon final finance approval.`;
       alert(msg);
       
       setShowModal(false);
@@ -189,6 +187,57 @@ const Advances = () => {
     } catch (err) {
       console.error("Error saving advance:", err);
       alert("Failed to save advance. Please try again.");
+    }
+  };
+
+  const handleApprove = async (id, role) => {
+    try {
+      const history = await dataService.getAdvanceHistory();
+      const advanceIndex = history.findIndex(h => h.id === id);
+      if (advanceIndex === -1) return;
+      
+      const advance = history[advanceIndex];
+      if (!advance.approvals) advance.approvals = { admin: false, director: false, finance: false };
+      
+      advance.approvals[role] = true;
+      
+      // Check if all approved
+      if (advance.approvals.admin && advance.approvals.director && advance.approvals.finance) {
+        advance.status = 'Active';
+        
+        // Apply the EMI to the employee
+        const allEmps = await dataService.getEmployees();
+        const updatedEmps = allEmps.map(e => {
+            if (e.id === advance.empId) {
+                return { ...e, advanceLoanEMI: (e.advanceLoanEMI || 0) + (advance.emi || 0) };
+            }
+            return e;
+        });
+        await dataService.saveEmployees(updatedEmps);
+      }
+      
+      history[advanceIndex] = advance;
+      await dataService.saveAdvanceHistory(history);
+      setAdvances(history);
+    } catch (err) {
+      console.error("Error approving advance:", err);
+      alert("Failed to approve. Please try again.");
+    }
+  };
+
+  const handleReject = async (id) => {
+    try {
+      const history = await dataService.getAdvanceHistory();
+      const advanceIndex = history.findIndex(h => h.id === id);
+      if (advanceIndex === -1) return;
+      
+      history[advanceIndex].status = 'Rejected';
+      
+      await dataService.saveAdvanceHistory(history);
+      setAdvances(history);
+    } catch (err) {
+      console.error("Error rejecting advance:", err);
+      alert("Failed to reject. Please try again.");
     }
   };
 
@@ -237,6 +286,10 @@ const Advances = () => {
       : true
     );
   }, [advances, isEmployee, resolvedMyEmpId]);
+
+  const pendingAdvances = useMemo(() => {
+    return advances.filter(h => h.status === 'Pending');
+  }, [advances]);
 
   if (loading) {
     return (
@@ -338,6 +391,56 @@ const Advances = () => {
         </div>
       </div>
 
+      {/* Pending Approvals */}
+      {!isEmployee && pendingAdvances.length > 0 && (
+        <div className="card" style={{ marginBottom: '2rem', border: '1px solid var(--color-warning)' }}>
+          <h2 style={{ marginBottom: '1.5rem', color: 'var(--color-warning)' }}>Pending Approvals</h2>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '900px' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
+                  <th style={{ padding: '1rem', fontWeight: '500' }}>Date</th>
+                  <th style={{ padding: '1rem', fontWeight: '500' }}>Employee</th>
+                  <th style={{ padding: '1rem', fontWeight: '500' }}>Amount</th>
+                  <th style={{ padding: '1rem', fontWeight: '500' }}>Approvals</th>
+                  <th style={{ padding: '1rem', textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingAdvances.map(h => (
+                  <tr key={h.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                    <td style={{ padding: '1rem' }}>{h.issueDate}</td>
+                    <td style={{ padding: '1rem', fontWeight: 600 }}>{h.empName || `ID: ${h.empId}`}</td>
+                    <td style={{ padding: '1rem', fontWeight: 700 }}>₹{h.amount?.toLocaleString()}</td>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <span style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold', backgroundColor: h.approvals?.admin ? 'rgba(16,185,129,0.1)' : '#f1f5f9', color: h.approvals?.admin ? 'var(--color-success)' : 'var(--color-text-muted)' }}>Admin {h.approvals?.admin ? '✓' : ''}</span>
+                        <span style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold', backgroundColor: h.approvals?.director ? 'rgba(16,185,129,0.1)' : '#f1f5f9', color: h.approvals?.director ? 'var(--color-success)' : 'var(--color-text-muted)' }}>Director {h.approvals?.director ? '✓' : ''}</span>
+                        <span style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold', backgroundColor: h.approvals?.finance ? 'rgba(16,185,129,0.1)' : '#f1f5f9', color: h.approvals?.finance ? 'var(--color-success)' : 'var(--color-text-muted)' }}>Finance {h.approvals?.finance ? '✓' : ''}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '1rem', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                        {(userRole === 'admin' || userRole === 'management') && (
+                          <button onClick={() => handleApprove(h.id, 'admin')} disabled={h.approvals?.admin} className="btn btn-primary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }}>Approve (Admin)</button>
+                        )}
+                        {(userRole === 'director' || userRole === 'management') && (
+                          <button onClick={() => handleApprove(h.id, 'director')} disabled={h.approvals?.director} className="btn btn-primary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }}>Approve (Director)</button>
+                        )}
+                        {(userRole === 'finance' || userRole === 'management') && (
+                          <button onClick={() => handleApprove(h.id, 'finance')} disabled={h.approvals?.finance} className="btn btn-primary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }}>Approve (Finance)</button>
+                        )}
+                        <button onClick={() => handleReject(h.id)} className="btn btn-outline" style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem', color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}>Reject</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <div className="card">
          <h2 style={{ marginBottom: '1.5rem' }}>Advance Transaction History</h2>
          <div style={{ overflowX: 'auto' }}>
@@ -358,7 +461,12 @@ const Advances = () => {
                     <td style={{ padding: '1rem' }}>{h.issueDate}</td>
                     <td style={{ padding: '1rem', fontWeight: 600 }}>{h.empName || `ID: ${h.empId}`}</td>
                     <td style={{ padding: '1rem' }}>
-                       <span className={`badge ${h.type === 'Personal Advance' ? 'badge-primary' : 'badge-warning'}`}>{h.type}</span>
+                       <div><span className={`badge ${h.type === 'Personal Advance' ? 'badge-primary' : 'badge-warning'}`}>{h.type}</span></div>
+                       <div style={{ marginTop: '0.5rem' }}>
+                         <span className={`badge`} style={{ backgroundColor: h.status === 'Pending' ? 'var(--color-warning)' : h.status === 'Rejected' ? 'var(--color-danger)' : 'var(--color-success)', color: '#fff' }}>
+                           {h.status || 'Active'}
+                         </span>
+                       </div>
                     </td>
                     <td style={{ padding: '1rem', fontWeight: 700 }}>₹{h.amount?.toLocaleString()}</td>
                     <td style={{ padding: '1rem' }}>

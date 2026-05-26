@@ -348,6 +348,9 @@ const UserManagement = () => {
                     onChange={(e) => setSelectedRole(e.target.value)}
                 >
                     <option value="All">All Roles</option>
+                    <option value="admin">Admin</option>
+                    <option value="director">Director</option>
+                    <option value="finance">Finance</option>
                     <option value="management">Management/HR</option>
                     <option value="employee">Employee</option>
                 </select>
@@ -393,6 +396,9 @@ const UserManagement = () => {
                             value={user.role}
                             onChange={(e) => handleRoleChange(user.id, e.target.value)}
                           >
+                            <option value="admin">Admin</option>
+                            <option value="director">Director</option>
+                            <option value="finance">Finance</option>
                             <option value="management">HR / Admin</option>
                             <option value="employee">Employee</option>
                           </select>
@@ -683,7 +689,7 @@ const UserManagement = () => {
 
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Access Role</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
                     <button 
                       type="button" 
                       className={`btn ${newUser.role === 'employee' ? 'btn-primary' : 'btn-outline'}`}
@@ -694,7 +700,22 @@ const UserManagement = () => {
                       className={`btn ${newUser.role === 'management' ? 'btn-primary' : 'btn-outline'}`}
                       style={{ backgroundColor: newUser.role === 'management' ? 'var(--color-text-main)' : '' }}
                       onClick={() => setNewUser({...newUser, role: 'management'})}
-                    >HR / Admin</button>
+                    >HR/Mgmt</button>
+                    <button 
+                      type="button" 
+                      className={`btn ${newUser.role === 'admin' ? 'btn-primary' : 'btn-outline'}`}
+                      onClick={() => setNewUser({...newUser, role: 'admin'})}
+                    >Admin</button>
+                    <button 
+                      type="button" 
+                      className={`btn ${newUser.role === 'director' ? 'btn-primary' : 'btn-outline'}`}
+                      onClick={() => setNewUser({...newUser, role: 'director'})}
+                    >Director</button>
+                    <button 
+                      type="button" 
+                      className={`btn ${newUser.role === 'finance' ? 'btn-primary' : 'btn-outline'}`}
+                      onClick={() => setNewUser({...newUser, role: 'finance'})}
+                    >Finance</button>
                   </div>
                 </div>
               </div>
