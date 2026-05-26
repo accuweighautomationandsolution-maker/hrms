@@ -624,6 +624,55 @@ export const dataService = {
     }
   },
 
+  getMonthlyAttendance: async (month, year) => {
+    if (!supabase) return {};
+    try {
+      const map = {};
+      const start = new Date(year, month, 1).toISOString().split('T')[0];
+      const end = new Date(year, month + 1, 0).toISOString().split('T')[0];
+
+      let startIdx = 0;
+      const CHUNK_SIZE = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase.from('attendance')
+          .select('*')
+          .gte('date', start)
+          .lte('date', end)
+          .order('id', { ascending: false })
+          .range(startIdx, startIdx + CHUNK_SIZE - 1);
+          
+        if (error) throw error;
+        
+        if (!data || data.length === 0) {
+          hasMore = false;
+        } else {
+          data.forEach(r => {
+            const k = `${String(r.emp_id)}_${r.date}`;
+            if (map[k]) return;
+            const json = r.data || {};
+            map[k] = {
+              id: r.id,
+              punchIn: json.punchIn || (r.punch_in ? new Date(r.punch_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null),
+              punchOut: json.punchOut || (r.punch_out ? new Date(r.punch_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null),
+              status: r.status,
+              remark: json.remark || '',
+              source: json.source || 'Database'
+            };
+          });
+
+          startIdx += CHUNK_SIZE;
+          if (data.length < CHUNK_SIZE) hasMore = false;
+        }
+      }
+      return map;
+    } catch (err) {
+      console.error("getMonthlyAttendance Error:", err);
+      return {};
+    }
+  },
+
   saveAttendance: async (recordsMap) => {
     if (!supabase || !recordsMap || Object.keys(recordsMap).length === 0) return;
     

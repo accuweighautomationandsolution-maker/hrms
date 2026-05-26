@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { IndianRupee, Download, Search, Filter, Eye, AlertCircle, Info, FileText, FileSpreadsheet, Printer, Mail, X, Lock, History, Check } from 'lucide-react';
-import { calculateSalaryComponents, formatCurrency, getHolidayDates, numberToWords, getOnRollWorkerPayableDays } from '../utils/payrollCalculator';
+import { calculateSalaryComponents, formatCurrency, getHolidayDates, numberToWords, getOnRollWorkerPayableDays, calculateAttendanceStats } from '../utils/payrollCalculator';
 import { dataService } from '../utils/dataService';
 import { authService } from '../utils/authService';
 import { useNotification } from '../context/NotificationContext';
@@ -59,6 +59,8 @@ const Payroll = () => {
     const struct = salaryStructures[String(emp.id)] || {};
     const defaultAdvance = struct.advanceLoanEMI !== undefined ? struct.advanceLoanEMI : (emp.advanceLoanEMI || 0);
     setProcAdvanceDeduction(defaultAdvance);
+    setProcDaysPresent(emp.payableDays || emp.daysPresent || 0);
+    setProcOTAmount(emp.calculatedOTAmount || 0);
   };
 
   // ── INTERNAL HELPERS (Inlined for stability) ───────────────────────────
@@ -229,7 +231,7 @@ const Payroll = () => {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginBottom: '1.5rem' }}>
             <div className="form-group">
-              <label className="form-label">Days Present (Attendance count: {employee.daysPresent})</label>
+              <label className="form-label">Payable Days (Attendance count: {employee.daysPresent})</label>
               <input 
                 type="number" 
                 step="0.5"
@@ -347,7 +349,7 @@ const Payroll = () => {
                     <tr><td style={{ padding: '0.3rem 0', color: '#64748b', fontWeight: '500' }}>Category:</td><td style={{ padding: '0.3rem 0', fontWeight: '600', color: '#334155' }}>{employee.category || 'Staff Employee'}</td></tr>
                     <tr><td style={{ padding: '0.3rem 0', color: '#64748b', fontWeight: '500' }}>UAN Number:</td><td style={{ padding: '0.3rem 0', fontWeight: '600', color: '#334155' }}>{employee.uanNumber || 'N/A'}</td></tr>
                     <tr><td style={{ padding: '0.3rem 0', color: '#64748b', fontWeight: '500' }}>ESIC Number:</td><td style={{ padding: '0.3rem 0', fontWeight: '600', color: '#334155' }}>{employee.esicNumber || 'N/A'}</td></tr>
-                    <tr><td style={{ padding: '0.3rem 0', color: '#64748b', fontWeight: '500' }}>Days Present:</td><td style={{ padding: '0.3rem 0', fontWeight: '700', color: '#0f172a' }}>{employee.daysPresent} / {payrollContext.divisor || 30} days</td></tr>
+                    <tr><td style={{ padding: '0.3rem 0', color: '#64748b', fontWeight: '500' }}>Payable Days:</td><td style={{ padding: '0.3rem 0', fontWeight: '700', color: '#0f172a' }}>{payrollContext.divisor - payrollContext.absentDays} / {payrollContext.divisor || 30} days</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -453,22 +455,21 @@ const Payroll = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [emps, hols, dbRecs, structuresMap] = await Promise.all([
+        const [emps, hols, dbRecs, structuresMap, monthlyAtt, leaves] = await Promise.all([
           dataService.getEmployees().catch(() => []),
           dataService.getCustomHolidays().catch(() => []),
           dataService.getPayrollRecordsByMonth(month, year).catch(() => []),
-          dataService.getSalaryStructuresMap().catch(() => ({}))
+          dataService.getSalaryStructuresMap().catch(() => ({})),
+          dataService.getMonthlyAttendance(month, year).catch(() => ({})),
+          dataService.getLeaveRequests().catch(() => [])
         ]);
         
         const attMap = {};
         const balMap = {};
         
         await Promise.all(emps.map(async (emp) => {
-          const [count, balance] = await Promise.all([
-            dataService.getPresentDaysCount(emp.id, month, year).catch(() => 0),
-            dataService.getEmployeeBalance(emp.id).catch(() => 0)
-          ]);
-          attMap[emp.id] = count;
+          const balance = await dataService.getEmployeeBalance(emp.id).catch(() => 0);
+          attMap[emp.id] = calculateAttendanceStats(emp.id, year, month, monthlyAtt, hols, emp.category, leaves);
           balMap[emp.id] = balance;
         }));
 
@@ -500,7 +501,10 @@ const Payroll = () => {
 
   const employeesWithPayroll = useMemo(() => {
     return employees.map(emp => {
-      const daysPresent = attendanceMap[emp.id] || 0;
+      const stats = attendanceMap[emp.id] || { payableDays: 0, presentDays: 0, holidayWorkedDays: 0, divisor: 30 };
+      const daysPresent = stats.presentDays;
+      const payableDays = stats.payableDays;
+      const holidayWorkedDays = stats.holidayWorkedDays;
       const dbRec = dbRecords[String(emp.id)] || {};
       const struct = salaryStructures[String(emp.id)] || {};
 
@@ -512,13 +516,16 @@ const Payroll = () => {
       const specialManual = struct.salSpecial || 0;
       const advanceDeduction = struct.advanceLoanEMI !== undefined ? struct.advanceLoanEMI : (emp.advanceLoanEMI || 0);
 
+      const isWorker = (emp.category || '').toLowerCase().includes('worker');
+      const calculatedOT = isWorker && stats.divisor > 0 ? Math.round((emp.grossSalary / stats.divisor) * holidayWorkedDays) : 0;
+
       const calculatedContext = emp.category !== 'Contractual Worker'
         ? calculateSalaryComponents(
             emp.grossSalary, 
             pfCapped, 
             advanceDeduction, 
             emp.category, 
-            daysPresent, 
+            payableDays, 
             30, 
             { 
               hasPF: struct.hasPF !== undefined ? struct.hasPF : !!emp.uanNumber, 
@@ -529,7 +536,8 @@ const Payroll = () => {
               salConveyance: conveyance,
               salPerformance: performance,
               salOther: otherManual,
-              salSpecial: specialManual
+              salSpecial: specialManual,
+              otAmount: calculatedOT
             }
           )
         : null;
@@ -537,6 +545,9 @@ const Payroll = () => {
       return {
         ...emp,
         daysPresent,
+        payableDays,
+        holidayWorkedDays,
+        calculatedOTAmount: calculatedOT,
         balanceLeaves: balanceMap[emp.id],
         payrollGenerated: !!dbRec.payrollGenerated,
         payslipGenerated: !!dbRec.payslipGenerated,

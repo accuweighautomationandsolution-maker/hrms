@@ -20,23 +20,112 @@ const ESIC_GROSS_LIMIT = 21000;
 const PT_AMOUNT_MH = 200;
 
 export const getOnRollWorkerPayableDays = (year, month) => {
-  // month is 0-indexed: 0 = Jan, 1 = Feb, etc.
-  if (month === 1) { // February
-    const isLeap = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
-    return isLeap ? 25 : 24;
-  }
-  
-  // Count Saturdays in the month
-  let satCount = 0;
+  let sunCount = 0;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   for (let d = 1; d <= daysInMonth; d++) {
     const dow = new Date(year, month, d).getDay();
-    if (dow === 6) { // 6 = Saturday
-      satCount++;
+    if (dow === 0) { // 0 = Sunday
+      sunCount++;
     }
   }
+  return daysInMonth - sunCount;
+};
+
+export const calculateAttendanceStats = (empId, year, month, recordsMap, holidayList, category, leaveRequests = []) => {
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const holidays = getHolidayDates(year, month, holidayList);
+  const holidaySet = new Set(holidays.map(h => h.day));
   
-  return satCount === 5 ? 27 : 26;
+  const cat = (category || '').toLowerCase().trim();
+  const isOnRollWorker = cat === 'on role worker' || cat === 'on-roll worker';
+  const isContractualWorker = cat === 'contractual worker';
+
+  let absentDays = 0;
+  let presentDays = 0;
+  let holidayWorkedDays = 0;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Find approved leaves for this month
+  const approvedLeaves = new Set();
+  (leaveRequests || []).forEach(lr => {
+    if (String(lr.empId) === String(empId) && lr.status === 'Approved') {
+      const isLWP = (lr.type || '').toLowerCase().includes('lwp') || (lr.type || '').toLowerCase().includes('unpaid');
+      if (!isLWP && lr.startDate && lr.endDate) {
+        let current = new Date(lr.startDate);
+        const end = new Date(lr.endDate);
+        while (current <= end) {
+          if (current.getFullYear() === year && current.getMonth() === month) {
+            approvedLeaves.add(current.getDate());
+          }
+          current.setDate(current.getDate() + 1);
+        }
+      }
+    }
+  });
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateObj = new Date(year, month, d);
+    const dow = dateObj.getDay();
+    const isFuture = dateObj > today;
+    
+    const key = `${empId}_${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const rec = recordsMap[key];
+    const punchedIn = !!(rec && rec.punchIn);
+
+    if (punchedIn) presentDays++;
+
+    let isHolidayForEmp = false;
+
+    if (isOnRollWorker || isContractualWorker) {
+      // Sundays are excluded, Odd Saturdays are holidays
+      if (dow !== 0 && holidaySet.has(d)) {
+        isHolidayForEmp = true;
+      }
+    } else {
+      if (holidaySet.has(d)) {
+        isHolidayForEmp = true;
+      }
+    }
+
+    if (punchedIn && isHolidayForEmp) {
+      holidayWorkedDays++;
+    }
+
+    if (!isFuture && !punchedIn) {
+      if (isOnRollWorker || isContractualWorker) {
+        if (!isHolidayForEmp && dow !== 0) {
+          if (!approvedLeaves.has(d)) {
+            absentDays++;
+          }
+        }
+      } else {
+        if (!isHolidayForEmp) {
+          if (!approvedLeaves.has(d)) {
+            absentDays++;
+          }
+        }
+      }
+    }
+  }
+
+  let divisor = daysInMonth;
+  if (isOnRollWorker || isContractualWorker) {
+    divisor = getOnRollWorkerPayableDays(year, month);
+  }
+
+  const payableDays = Math.max(0, divisor - absentDays);
+  
+  // Basic calculation for holiday OT Amount (Assume 8 hours standard or something similar, or just gross/divisor * holidayWorkedDays)
+  // We don't compute the exact amount here since it depends on gross. But we can return the count.
+  return {
+    presentDays,
+    absentDays,
+    holidayWorkedDays,
+    payableDays,
+    divisor
+  };
 };
 
 export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, advanceDeduction = 0, category = 'Staff Employee', daysWorked = 30, daysInMonth = 30, options = {}) => {
