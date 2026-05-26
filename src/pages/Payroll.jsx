@@ -313,7 +313,7 @@ const Payroll = () => {
         <div className="card" style={{ width: '100%', maxWidth: '850px', padding: '2rem', maxHeight: '95vh', overflowY: 'auto' }}>
           <div id="payslip-capture" style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '12px', color: '#1e293b' }}>
             
-            {/* Header / Branding */}
+            {/* Header / Branding */}<br><br>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #e2e8f0', paddingBottom: '1.5rem', marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem' }}>
                 <img src="/Accuweigh.svg" alt="Accuweigh" style={{ height: '100px', width: 'auto', objectFit: 'contain' }} />
