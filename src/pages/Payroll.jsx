@@ -315,9 +315,9 @@ const Payroll = () => {
             
             {/* Header / Branding */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #e2e8f0', paddingBottom: '1.5rem', marginBottom: '1.5rem' }}>
-              <div>
-                <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '800', color: '#2563eb' }}>ACCUWEIGH</h1>
-                <p style={{ margin: '0.2rem 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: '600' }}>Automation & Solution Pvt. Ltd.</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <img src="/Accuweigh.svg" alt="Accuweigh" style={{ height: '36px', width: 'auto' }} />
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: '600' }}>Automation & Solution Pvt. Ltd.</p>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#0f172a' }}>PAYSLIP</h3>
