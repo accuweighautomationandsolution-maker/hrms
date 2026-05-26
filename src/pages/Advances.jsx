@@ -132,82 +132,92 @@ const Advances = () => {
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!selectedEmpId) {
       alert("Please select an employee first.");
       return;
     }
     
-    // Update dataService employees
-    const list = dataService.getEmployees();
-    const updated = list.map(e => {
-      if (e.id === Number(selectedEmpId)) {
-        return { ...e, advanceLoanEMI: (e.advanceLoanEMI || 0) + emi };
-      }
-      return e;
-    });
-    dataService.saveEmployees(updated);
-
-    // Create Historical Record
-    const history = dataService.getAdvanceHistory();
-
-    const emp = employeesList.find(e => e.id === Number(selectedEmpId));
-    const totalAmount = advanceType === 'Personal Advance' ? Number(amount) : calculateSiteTotal();
-
-    const newAdvance = {
-      id: `ADV-${Date.now()}`,
-      empId: emp.id,
-      empName: emp.name,
-      type: advanceType,
-      amount: totalAmount,
-      installments: Number(installments),
-      emi: emi,
-      date: new Date().toISOString().split('T')[0],
-      issueDate: new Date().toLocaleDateString('en-GB'),
-      status: 'Active'
-    };
-
-    if (advanceType === 'Official Site Advance') {
-      newAdvance.siteDetails = siteExpenses;
-    }
-
-    const finalHistory = [...history, newAdvance];
-    dataService.saveAdvanceHistory(finalHistory);
-    setAdvances(finalHistory);
-    
-    const msg = advanceType === 'Official Site Advance' 
-        ? `Official Site Advance of ₹${totalAmount} approved. This will be settled against expense submissions.`
-        : `Advance of ₹${totalAmount} approved. Monthly EMI of ₹${emi} will be deducted from salary.`;
-    alert(msg);
-    
-    setShowModal(false);
-    // Reset state
-    setAmount('');
-    setInstallments('1');
-    setSelectedEmpId('');
-  };
-
-  const handleDeleteAdvance = (id) => {
-    if (!window.confirm("Are you sure you want to delete this advance record? This will also remove the associated EMI from the employee's active deductions.")) return;
-    
-    const history = dataService.getAdvanceHistory();
-    const recordToDelete = history.find(h => h.id === id);
-    if (!recordToDelete) return;
-
-    // 1. Remove from history
-    const updatedHistory = history.filter(h => h.id !== id);
-    dataService.saveAdvanceHistory(updatedHistory);
-    setAdvances(updatedHistory);
-
-    // 2. Adjust employee EMI
-    const allEmps = dataService.getEmployees();
-    const updatedEmps = allEmps.map(e => {
-        if (e.id === recordToDelete.empId) {
-            return { ...e, advanceLoanEMI: Math.max(0, (e.advanceLoanEMI || 0) - (recordToDelete.emi || 0)) };
+    try {
+      // Update dataService employees
+      const list = await dataService.getEmployees();
+      const updated = list.map(e => {
+        if (e.id === Number(selectedEmpId)) {
+          return { ...e, advanceLoanEMI: (e.advanceLoanEMI || 0) + emi };
         }
         return e;
-    });
-    dataService.saveEmployees(updatedEmps);
+      });
+      await dataService.saveEmployees(updated);
+
+      // Create Historical Record
+      const history = await dataService.getAdvanceHistory();
+
+      const emp = employeesList.find(e => e.id === Number(selectedEmpId));
+      const totalAmount = advanceType === 'Personal Advance' ? Number(amount) : calculateSiteTotal();
+
+      const newAdvance = {
+        id: `ADV-${Date.now()}`,
+        empId: emp.id,
+        empName: emp.name,
+        type: advanceType,
+        amount: totalAmount,
+        installments: Number(installments),
+        emi: emi,
+        date: new Date().toISOString().split('T')[0],
+        issueDate: new Date().toLocaleDateString('en-GB'),
+        status: 'Active'
+      };
+
+      if (advanceType === 'Official Site Advance') {
+        newAdvance.siteDetails = siteExpenses;
+      }
+
+      const finalHistory = [...history, newAdvance];
+      await dataService.saveAdvanceHistory(finalHistory);
+      setAdvances(finalHistory);
+      
+      const msg = advanceType === 'Official Site Advance' 
+          ? `Official Site Advance of ₹${totalAmount} approved. This will be settled against expense submissions.`
+          : `Advance of ₹${totalAmount} approved. Monthly EMI of ₹${emi} will be deducted from salary.`;
+      alert(msg);
+      
+      setShowModal(false);
+      // Reset state
+      setAmount('');
+      setInstallments('1');
+      setSelectedEmpId(isEmployee ? String(resolvedMyEmpId) : '');
+    } catch (err) {
+      console.error("Error saving advance:", err);
+      alert("Failed to save advance. Please try again.");
+    }
+  };
+
+  const handleDeleteAdvance = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this advance record? This will also remove the associated EMI from the employee's active deductions.")) return;
+    
+    try {
+      const history = await dataService.getAdvanceHistory();
+      const recordToDelete = history.find(h => h.id === id);
+      if (!recordToDelete) return;
+
+      // 1. Remove from history
+      const updatedHistory = history.filter(h => h.id !== id);
+      await dataService.saveAdvanceHistory(updatedHistory);
+      setAdvances(updatedHistory);
+
+      // 2. Adjust employee EMI
+      const allEmps = await dataService.getEmployees();
+      const updatedEmps = allEmps.map(e => {
+          if (e.id === recordToDelete.empId) {
+              return { ...e, advanceLoanEMI: Math.max(0, (e.advanceLoanEMI || 0) - (recordToDelete.emi || 0)) };
+          }
+          return e;
+      });
+      await dataService.saveEmployees(updatedEmps);
+    } catch (err) {
+      console.error("Error deleting advance:", err);
+      alert("Failed to delete advance. Please try again.");
+    }
   };
 
   const stats = useMemo(() => {
