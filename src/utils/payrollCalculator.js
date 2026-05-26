@@ -153,12 +153,13 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
   const hasESIC = options.hasESIC !== undefined ? options.hasESIC : false;
 
   // ─────────────────────────────────────────────────────────────────────────
-  // STEP 1: Calculate ALL components on the FULL gross salary
-  //         Basic = exactly 50% of gross, DA = 5% of Basic, etc.
-  //         These are the FULL MONTH values (displayed on payslip header).
+  // STEP 1: Calculate ALL components on the FULL gross salary, then pro-rate
+  //         Earnings = (Monthly Component ÷ Total Eligible Days) × Payable Days
   // ─────────────────────────────────────────────────────────────────────────
   let basic, da, hra, washingAllowance, conveyance, performance, otherManual, specialManual;
   let fullMonthGross = baseGross;
+
+  const prorationRatio = divisor > 0 ? (daysWorked / divisor) : 0;
 
   if (isContractualWorker) {
     // Contractual worker: baseGross is a daily rate; total = dayRate × daysWorked
@@ -172,35 +173,42 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
     specialManual   = 0;
     fullMonthGross  = baseGross * daysWorked;
   } else {
-    // Staff / On-Roll: all components based on FULL gross salary
-    basic           = Math.round(baseGross * 0.50);
-    da              = Math.round(basic * 0.05);
-    const hraPercentVal = (options.hraPercent !== undefined) ? (Number(options.hraPercent) / 100) : 0.40;
-    hra             = Math.round((basic + da) * hraPercentVal);
-    washingAllowance= 1000; // Full month washing allowance
-    conveyance      = Number(options.salConveyance) || 0;
-    performance     = Number(options.salPerformance) || 0;
-    otherManual     = Number(options.salOther) || 0;
-    specialManual   = Number(options.salSpecial) || 0;
+    // Staff / On-Roll: compute full components then pro-rate
+    const fullBasic           = baseGross * 0.50;
+    const fullDA              = fullBasic * 0.05;
+    const hraPercentVal       = (options.hraPercent !== undefined) ? (Number(options.hraPercent) / 100) : 0.40;
+    const fullHRA             = (fullBasic + fullDA) * hraPercentVal;
+    const fullWashing         = 1000;
+    const fullConveyance      = Number(options.salConveyance) || 0;
+    const fullPerformance     = Number(options.salPerformance) || 0;
+    const fullOther           = Number(options.salOther) || 0;
+    const fullSpecial         = Number(options.salSpecial) || 0;
+
+    basic           = Math.round(fullBasic * prorationRatio);
+    da              = Math.round(fullDA * prorationRatio);
+    hra             = Math.round(fullHRA * prorationRatio);
+    washingAllowance= Math.round(fullWashing * prorationRatio);
+    conveyance      = Math.round(fullConveyance * prorationRatio);
+    performance     = Math.round(fullPerformance * prorationRatio);
+    otherManual     = Math.round(fullOther * prorationRatio);
+    specialManual   = Math.round(fullSpecial * prorationRatio);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // STEP 2: Calculate Loss of Pay (LOP) for absent days
-  //         LOP = (grossSalary / totalDays) × absentDays
-  //         This is shown as a deduction, keeping component values intact.
+  // STEP 2: Absent days impact is now directly applied to earnings. No separate LOP.
   // ─────────────────────────────────────────────────────────────────────────
   const absentDays = Math.max(0, divisor - (Number(daysWorked) || 0));
-  const lopDeduction = isContractualWorker ? 0 : Math.round((baseGross / divisor) * absentDays);
+  const lopDeduction = 0; // Set to 0 to remove visible LOP
 
   // 3. OT Pay
   const otAmount = Number(options.otAmount) || 0;
 
-  // Total Earnings = sum of all components (full month) + OT
+  // Total Earnings = sum of all pro-rated components + OT
   const componentTotal = basic + da + hra + washingAllowance + conveyance + performance + otherManual + specialManual;
-  const totalEarnings = componentTotal + otAmount;
+  const totalEarnings = isContractualWorker ? (fullMonthGross + otAmount) : (componentTotal + otAmount);
 
-  // Effective pay after LOP (for net pay calculation and PF/ESIC base)
-  const effectivePay = Math.max(0, totalEarnings - lopDeduction);
+  // Effective pay for net pay calculation and PF/ESIC base is exactly totalEarnings
+  const effectivePay = totalEarnings;
 
   // ─────────────────────────────────────────────────────────────────────────
   // STEP 3: Statutory Deductions — computed on FULL component values
@@ -269,7 +277,6 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
       esic: esicDeduction,
       pt: ptDeduction,
       tds: tdsDeduction,
-      lop: lopDeduction,       // Loss of Pay for absent days
       advance: advanceDeduction,
       total: totalDeduction
     },

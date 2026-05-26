@@ -281,12 +281,6 @@ const Payroll = () => {
                 <span>Gross Earnings:</span>
                 <span style={{ fontWeight: '600' }}>{formatCurrency(liveContext.earnings.gross)}</span>
               </div>
-              {(liveContext.deductions.lop > 0) && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#dc2626' }}>
-                  <span>Loss of Pay (LOP — {liveContext.absentDays} absent day{liveContext.absentDays !== 1 ? 's' : ''}):</span>
-                  <span style={{ fontWeight: '600' }}>-{formatCurrency(liveContext.deductions.lop)}</span>
-                </div>
-              )}
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>Total Deductions:</span>
                 <span style={{ fontWeight: '600', color: 'var(--color-danger)' }}>{formatCurrency(liveContext.deductions.total)}</span>
@@ -386,12 +380,8 @@ const Payroll = () => {
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>ESIC (Employee Share)</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(deductions.esic)}</td></tr>
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>Professional Tax (PT)</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(deductions.pt)}</td></tr>
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>TDS (Income Tax)</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(deductions.tds)}</td></tr>
-                    {(deductions.lop > 0) && (
-                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#dc2626', fontWeight: '600' }}>Loss of Pay (LOP)</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600', color: '#dc2626' }}>{fmt(deductions.lop)}</td></tr>
-                    )}
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>Advance / Loan Deduction</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(deductions.advance)}</td></tr>
-                    {/* Spacer rows */}
-                    {!(deductions.lop > 0) && <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: 'transparent' }}>-</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', color: 'transparent' }}>0</td></tr>}
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: 'transparent' }}>-</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', color: 'transparent' }}>0</td></tr>
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: 'transparent' }}>-</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', color: 'transparent' }}>0</td></tr>
                     <tr style={{ borderBottom: '1px solid #cbd5e1' }}><td style={{ padding: '0.5rem 1rem', color: 'transparent' }}>-</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', color: 'transparent' }}>0</td></tr>
                     <tr style={{ backgroundColor: '#f8fafc', fontWeight: '700' }}><td style={{ padding: '0.6rem 1rem', color: '#0f172a' }}>Total Deductions</td><td style={{ padding: '0.6rem 1rem', textAlign: 'right', color: '#0f172a' }}>{fmt(deductions.total)}</td></tr>
