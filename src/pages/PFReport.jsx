@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { FileText, Download, Users, User, IndianRupee, Printer, Search, FileSpreadsheet, Mail, X } from 'lucide-react';
-import { calculateSalaryComponents } from '../utils/payrollCalculator';
+import { calculateSalaryComponents, calculateAttendanceStats } from '../utils/payrollCalculator';
 import { dataService } from '../utils/dataService';
 import { generatePDF, dispatchMockEmail } from '../utils/exportUtils';
 
@@ -24,15 +24,18 @@ const PFReport = () => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [emps, structuresMap, dbRecs] = await Promise.all([
+                const [emps, structuresMap, dbRecs, monthlyAtt, hols, leaves] = await Promise.all([
                     dataService.getEmployees().then(list => list.filter(e => e.hasPF !== false && e.uanNumber !== 'N/A')),
                     dataService.getSalaryStructuresMap().catch(() => ({})),
-                    dataService.getPayrollRecordsByMonth(month, year).catch(() => [])
+                    dataService.getPayrollRecordsByMonth(month, year).catch(() => []),
+                    dataService.getMonthlyAttendance(month, year).catch(() => ({})),
+                    dataService.getCustomHolidays().catch(() => []),
+                    dataService.getLeaveRequests().catch(() => [])
                 ]);
                 
-                const dayCounts = {};
+                const statsMap = {};
                 await Promise.all(emps.map(async (emp) => {
-                    dayCounts[emp.id] = await dataService.getPresentDaysCount(emp.id, month, year);
+                    statsMap[emp.id] = calculateAttendanceStats(emp.id, year, month, monthlyAtt, hols, emp.category, leaves);
                 }));
 
                 const dbRecsMap = {};
@@ -45,7 +48,7 @@ const PFReport = () => {
                 setEmployees(emps);
                 setSalaryStructures(structuresMap);
                 setDbRecords(dbRecsMap);
-                setPresentDaysMap(dayCounts);
+                setPresentDaysMap(statsMap);
             } catch (err) {
                 console.error("Failed to load PF report data:", err);
             } finally {
@@ -63,8 +66,15 @@ const PFReport = () => {
         return list.map(emp => {
             const daysInMonth = new Date(year, month + 1, 0).getDate();
             const dbRec = dbRecords[String(emp.id)] || {};
-            const presentDays = dbRec.daysPresent !== undefined ? dbRec.daysPresent : (presentDaysMap[emp.id] || 0);
-            const ncpDays = daysInMonth - presentDays;
+            const stats = presentDaysMap[emp.id] || { payableDays: 0, absentDays: 0, divisor: 30 };
+            
+            let presentDaysForCalc = dbRec.daysPresent !== undefined ? dbRec.daysPresent : stats.payableDays;
+            if (dbRec.payrollGenerated && dbRec.payrollContext) {
+                presentDaysForCalc = dbRec.payrollContext.divisor - dbRec.payrollContext.absentDays;
+            }
+            const ncpDays = dbRec.payrollGenerated && dbRec.payrollContext 
+                ? dbRec.payrollContext.absentDays 
+                : stats.absentDays;
             
             const struct = salaryStructures[String(emp.id)] || {};
             const pfCapped = struct.pfCapped !== false;
@@ -82,7 +92,7 @@ const PFReport = () => {
                     pfCapped, 
                     0, 
                     emp.category, 
-                    presentDays, 
+                    presentDaysForCalc, 
                     daysInMonth,
                     {
                         hasPF: struct.hasPF !== undefined ? struct.hasPF : !!emp.uanNumber,

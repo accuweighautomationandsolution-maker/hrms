@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { FileText, Download, Users, User, IndianRupee, Printer, Search, ShieldCheck, FileSpreadsheet, Mail, X } from 'lucide-react';
-import { calculateSalaryComponents } from '../utils/payrollCalculator';
+import { calculateSalaryComponents, calculateAttendanceStats } from '../utils/payrollCalculator';
 import { dataService } from '../utils/dataService';
 import { generatePDF, dispatchMockEmail } from '../utils/exportUtils';
 
@@ -26,19 +26,22 @@ const ESICReport = () => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [empsData, structuresMap, dbRecs] = await Promise.all([
+                const [empsData, structuresMap, dbRecs, monthlyAtt, hols, leaves] = await Promise.all([
                     dataService.getEmployees(),
                     dataService.getSalaryStructuresMap().catch(() => ({})),
-                    dataService.getPayrollRecordsByMonth(month, year).catch(() => [])
+                    dataService.getPayrollRecordsByMonth(month, year).catch(() => []),
+                    dataService.getMonthlyAttendance(month, year).catch(() => ({})),
+                    dataService.getCustomHolidays().catch(() => []),
+                    dataService.getLeaveRequests().catch(() => [])
                 ]);
                 const filteredEmps = empsData.filter(e => {
                     const hasIp = e.esicIp || (e.esicNumber && e.esicNumber !== 'N/A');
                     return e.hasESIC !== false && hasIp;
                 });
                 
-                const dayCounts = {};
+                const statsMap = {};
                 await Promise.all(filteredEmps.map(async (emp) => {
-                    dayCounts[emp.id] = await dataService.getPresentDaysCount(emp.id, month, year);
+                    statsMap[emp.id] = calculateAttendanceStats(emp.id, year, month, monthlyAtt, hols, emp.category, leaves);
                 }));
 
                 const dbRecsMap = {};
@@ -51,7 +54,7 @@ const ESICReport = () => {
                 setEmployees(filteredEmps);
                 setSalaryStructures(structuresMap);
                 setDbRecords(dbRecsMap);
-                setPresentDaysMap(dayCounts);
+                setPresentDaysMap(statsMap);
             } catch (err) {
                 console.error("Failed to load ESIC report data:", err);
             } finally {
@@ -67,7 +70,12 @@ const ESICReport = () => {
         return list.map(emp => {
             const daysInMonth = new Date(year, month + 1, 0).getDate();
             const dbRec = dbRecords[String(emp.id)] || {};
-            const presentDays = dbRec.daysPresent !== undefined ? dbRec.daysPresent : (presentDaysMap[emp.id] || 0);
+            const stats = presentDaysMap[emp.id] || { payableDays: 0, absentDays: 0, divisor: 30 };
+            
+            let presentDaysForCalc = dbRec.daysPresent !== undefined ? dbRec.daysPresent : stats.payableDays;
+            if (dbRec.payrollGenerated && dbRec.payrollContext) {
+                presentDaysForCalc = dbRec.payrollContext.divisor - dbRec.payrollContext.absentDays;
+            }
             
             const struct = salaryStructures[String(emp.id)] || {};
             const pfCapped = struct.pfCapped !== false;
@@ -85,7 +93,7 @@ const ESICReport = () => {
                     pfCapped, 
                     0, 
                     emp.category, 
-                    presentDays, 
+                    presentDaysForCalc, 
                     daysInMonth,
                     {
                         hasPF: struct.hasPF !== undefined ? struct.hasPF : !!emp.uanNumber,
@@ -112,7 +120,7 @@ const ESICReport = () => {
                 id: emp.id,
                 name: emp.name.toUpperCase().replace(/[^A-Z ]/g, ''), // Strict Image constraint
                 ipNumber: emp.esicIp || emp.esicNumber || '0000000000',
-                workingDays: Math.ceil(presentDays > 0 ? presentDays : 0),
+                workingDays: Math.ceil(presentDaysForCalc > 0 ? presentDaysForCalc : 0),
                 monthlyWages: Math.round(components.esicReport.grossWages), 
                 eeContri: components.esicReport.eeShare,
                 erContri: components.esicReport.erShare,

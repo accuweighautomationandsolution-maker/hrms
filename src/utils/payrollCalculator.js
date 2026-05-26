@@ -72,7 +72,7 @@ export const calculateAttendanceStats = (empId, year, month, recordsMap, holiday
     
     const key = `${empId}_${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const rec = recordsMap[key];
-    const punchedIn = !!(rec && rec.punchIn);
+    const punchedIn = !!(rec && (rec.punchIn || rec.punchOut));
 
     if (punchedIn) presentDays++;
 
