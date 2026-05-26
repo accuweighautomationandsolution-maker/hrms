@@ -628,8 +628,9 @@ export const dataService = {
     if (!supabase) return {};
     try {
       const map = {};
-      const start = new Date(year, month, 1).toISOString().split('T')[0];
-      const end = new Date(year, month + 1, 0).toISOString().split('T')[0];
+      const start = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const end = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
       let startIdx = 0;
       const CHUNK_SIZE = 1000;
