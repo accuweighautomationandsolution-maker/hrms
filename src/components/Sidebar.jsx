@@ -222,6 +222,10 @@ const Sidebar = ({ userRole, isManager }) => {
               <Building2 size={24} />
               <span>Department Master</span>
             </Link>
+            <Link to="/designations" className={`nav-item ${location.pathname === '/designations' ? 'active' : ''}`}>
+              <Briefcase size={24} />
+              <span>Designation Master</span>
+            </Link>
             <Link to="/user-management" className={`nav-item ${location.pathname === '/user-management' ? 'active' : ''}`}>
               <ShieldCheck size={24} />
               <span>Identity & Access</span>

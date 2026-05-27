@@ -32,6 +32,7 @@ import TrainingInduction from './pages/TrainingInduction';
 import ComplianceHub from './pages/ComplianceHub';
 import UserManagement from './pages/UserManagement';
 import DepartmentManagement from './pages/DepartmentManagement';
+import DesignationManagement from './pages/DesignationManagement';
 import Recruitment from './pages/Recruitment';
 import LetterTemplates from './pages/LetterTemplates';
 import DocumentHub from './pages/DocumentHub';
@@ -285,6 +286,7 @@ function App() {
                     <Route path="/bonus-management" element={<BonusManagement />} />
                     <Route path="/user-management" element={<UserManagement />} />
                     <Route path="/departments" element={<DepartmentManagement />} />
+                    <Route path="/designations" element={<DesignationManagement />} />
                     <Route path="/movement-policies" element={<MovementPolicySettings />} />
                   </>
                 )}

@@ -574,6 +574,30 @@ export const dataService = {
     return updated;
   },
 
+  // ── Designations ─────────────────────────────────────────────────────────
+  getDesignations: async () => {
+    const list = await getConfig('designations', ['Manager', 'Developer', 'Designer', 'HR Executive', 'Sales Executive', 'Accountant']);
+    return Array.isArray(list) ? list : ['Manager', 'Developer', 'Designer', 'HR Executive', 'Sales Executive', 'Accountant'];
+  },
+
+  addDesignation: async (name) => {
+    const current = await dataService.getDesignations();
+    if (!current.includes(name)) {
+      const updated = [...current, name];
+      await saveConfig('designations', updated);
+      return updated;
+    }
+    return current;
+  },
+
+  deleteDesignation: async (name) => {
+    const current = await dataService.getDesignations();
+    const updated = current.filter(d => d !== name);
+    await saveConfig('designations', updated);
+    return updated;
+  },
+
+
   // ── Attendance ─────────────────────────────────────────────────────────────
   getAttendance: async () => {
     if (!supabase) return {};
