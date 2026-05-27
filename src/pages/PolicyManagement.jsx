@@ -140,6 +140,31 @@ const PolicyManagement = ({ userRole }) => {
     showNotification('Audit log exported successfully.', 'success');
   };
 
+  const handleViewDocument = (url, title) => {
+    if (!url) return;
+    if (url.startsWith('data:')) {
+      try {
+        const arr = url.split(',');
+        const mime = arr[0].match(/:(.*?);/)[1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const blob = new Blob([u8arr], { type: mime });
+        const blobUrl = window.URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank');
+        setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60000); // cleanup
+      } catch (e) {
+        console.error("Error viewing data URL:", e);
+        showNotification("Failed to view document.", "error");
+      }
+    } else {
+      window.open(url, '_blank');
+    }
+  };
+
   const getAckStats = (policyId) => {
     const totalEmps = employees.length;
     const signedCount = acks.filter(a => a.policyId === policyId).length;
@@ -264,7 +289,7 @@ const PolicyManagement = ({ userRole }) => {
                     <button 
                       className="btn btn-outline" 
                       style={{ flex: 1, padding: '0.5rem' }}
-                      onClick={() => p.fileUrl && window.open(p.fileUrl, '_blank')}
+                      onClick={() => handleViewDocument(p.fileUrl, p.title)}
                     >
                       <Eye size={16} /> View
                     </button>
