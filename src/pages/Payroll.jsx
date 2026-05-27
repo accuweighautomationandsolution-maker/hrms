@@ -40,6 +40,7 @@ const Payroll = () => {
   const [month, setMonth] = useState(INITIAL_MONTH);
   const [employees, setEmployees] = useState([]);
   const [holidayList, setHolidayList] = useState([]);
+  const [advanceHistory, setAdvanceHistory] = useState([]);
   const [attendanceMap, setAttendanceMap] = useState({});
   const [balanceMap, setBalanceMap] = useState({});
   const [isProcessing, setIsProcessing] = useState(false);
@@ -56,8 +57,9 @@ const Payroll = () => {
     setProcessModalEmp(emp);
     setProcDaysPresent(emp.daysPresent);
     setProcOTAmount(0);
-    const struct = salaryStructures[String(emp.id)] || {};
-    const defaultAdvance = struct.advanceLoanEMI !== undefined ? struct.advanceLoanEMI : (emp.advanceLoanEMI || 0);
+    
+    // Instead of using struct.advanceLoanEMI, use the precalculated deduction from payrollContext
+    const defaultAdvance = emp.payrollContext?.deductions?.advance || 0;
     setProcAdvanceDeduction(defaultAdvance);
     setProcDaysPresent(emp.payableDays || emp.daysPresent || 0);
     setProcOTAmount(emp.calculatedOTAmount || 0);
@@ -198,6 +200,31 @@ const Payroll = () => {
             ...prev,
             [String(employee.id)]: updatedRecord
           }));
+          
+          // Only update advances if it's the first time generating this month
+          if (!employee.payrollGenerated && Number(procAdvanceDeduction) > 0) {
+             try {
+                let remainingToDeduct = Number(procAdvanceDeduction);
+                const allAdvances = await dataService.getAdvanceHistory();
+                let updated = false;
+                const activeAdv = allAdvances.filter(a => a.empId === employee.id && (a.status === 'Approved' || a.status === 'Foreclosed'));
+                for (let a of activeAdv) {
+                   if (remainingToDeduct <= 0) break;
+                   const amountToTake = a.status === 'Foreclosed' ? (a.amount - (a.totalRepaid || 0)) : (a.emi || 0);
+                   const deducted = Math.min(amountToTake, remainingToDeduct);
+                   a.totalRepaid = (a.totalRepaid || 0) + deducted;
+                   remainingToDeduct -= deducted;
+                   if (a.totalRepaid >= a.amount) {
+                      a.status = 'Closed';
+                   }
+                   updated = true;
+                }
+                if (updated) await dataService.saveAdvanceHistory(allAdvances);
+             } catch (err) {
+                console.error("Failed to update advance totalRepaid", err);
+             }
+          }
+
           showNotification("Payroll generated successfully", "success");
         } else {
           showNotification("Failed to generate payroll", "error");
@@ -445,13 +472,14 @@ const Payroll = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [emps, hols, dbRecs, structuresMap, monthlyAtt, leaves] = await Promise.all([
+        const [emps, hols, dbRecs, structuresMap, monthlyAtt, leaves, advancesData] = await Promise.all([
           dataService.getEmployees().catch(() => []),
           dataService.getCustomHolidays().catch(() => []),
           dataService.getPayrollRecordsByMonth(month, year).catch(() => []),
           dataService.getSalaryStructuresMap().catch(() => ({})),
           dataService.getMonthlyAttendance(month, year).catch(() => ({})),
-          dataService.getLeaveRequests().catch(() => [])
+          dataService.getLeaveRequests().catch(() => []),
+          dataService.getAdvanceHistory().catch(() => [])
         ]);
         
         const attMap = {};
@@ -477,6 +505,7 @@ const Payroll = () => {
           setBalanceMap(balMap);
           setDbRecords(dbRecsMap);
           setSalaryStructures(structuresMap);
+          setAdvanceHistory(advancesData || []);
         }
       } catch (err) {
         console.error("Failed to load payroll:", err);
@@ -504,7 +533,9 @@ const Payroll = () => {
       const performance = struct.salPerformance || 0;
       const otherManual = struct.salOther || 0;
       const specialManual = struct.salSpecial || 0;
-      const advanceDeduction = struct.advanceLoanEMI !== undefined ? struct.advanceLoanEMI : (emp.advanceLoanEMI || 0);
+      
+      const empAdvances = advanceHistory.filter(a => a.empId === emp.id && (a.status === 'Approved' || a.status === 'Foreclosed'));
+      const advanceDeduction = empAdvances.reduce((sum, a) => sum + (a.status === 'Foreclosed' ? (a.amount - (a.totalRepaid || 0)) : (a.emi || 0)), 0);
 
       const isWorker = (emp.category || '').toLowerCase().includes('worker');
       const calculatedOT = isWorker && stats.divisor > 0 ? Math.round((emp.grossSalary / stats.divisor) * holidayWorkedDays) : 0;
@@ -593,6 +624,33 @@ const Payroll = () => {
     }
 
     try {
+      // If reverting payroll, we should attempt to reverse the advance deduction. (Basic implementation)
+      if (updates.payrollGenerated === false && emp.payrollGenerated) {
+         const advDeduction = emp.payrollContext?.deductions?.advance || 0;
+         if (advDeduction > 0) {
+            try {
+               let toReverse = advDeduction;
+               const allAdvances = await dataService.getAdvanceHistory();
+               let isAdvUpdated = false;
+               const activeAdv = allAdvances.filter(a => a.empId === empId && (a.status === 'Approved' || a.status === 'Closed' || a.status === 'Foreclosed')).reverse();
+               for (let a of activeAdv) {
+                  if (toReverse <= 0) break;
+                  const availableToReverse = a.totalRepaid || 0;
+                  const reversed = Math.min(availableToReverse, toReverse);
+                  a.totalRepaid -= reversed;
+                  toReverse -= reversed;
+                  if (a.status === 'Closed' && a.totalRepaid < a.amount && !a.waivedAmount) {
+                     a.status = a.isForeclosed ? 'Foreclosed' : 'Approved';
+                  }
+                  isAdvUpdated = true;
+               }
+               if (isAdvUpdated) await dataService.saveAdvanceHistory(allAdvances);
+            } catch (err) {
+               console.error("Failed to reverse advance", err);
+            }
+         }
+      }
+
       const updatedRecord = await dataService.updatePayrollRecord(
         month, 
         year, 
@@ -675,6 +733,30 @@ const Payroll = () => {
             ...prev,
             [String(emp.id)]: updated
           }));
+          
+          const advDeduction = emp.payrollContext?.deductions?.advance || 0;
+          if (advDeduction > 0) {
+             try {
+                let remainingToDeduct = advDeduction;
+                const allAdvances = await dataService.getAdvanceHistory();
+                let isAdvUpdated = false;
+                const activeAdv = allAdvances.filter(a => a.empId === emp.id && (a.status === 'Approved' || a.status === 'Foreclosed'));
+                for (let a of activeAdv) {
+                   if (remainingToDeduct <= 0) break;
+                   const amountToTake = a.status === 'Foreclosed' ? (a.amount - (a.totalRepaid || 0)) : (a.emi || 0);
+                   const deducted = Math.min(amountToTake, remainingToDeduct);
+                   a.totalRepaid = (a.totalRepaid || 0) + deducted;
+                   remainingToDeduct -= deducted;
+                   if (a.totalRepaid >= a.amount) {
+                      a.status = 'Closed';
+                   }
+                   isAdvUpdated = true;
+                }
+                if (isAdvUpdated) await dataService.saveAdvanceHistory(allAdvances);
+             } catch (err) {
+                console.error("Failed to update advance totalRepaid", err);
+             }
+          }
         }
       }
       showNotification(`Successfully processed payroll for ${successCount} employees`, "success");

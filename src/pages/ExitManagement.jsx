@@ -289,8 +289,8 @@ const ExitManagement = () => {
         const dayRate = baseSalary / 30;
         
         let pendingLoans = 0;
-        const myLoans = advances?.filter(a => a.employeeId === emp.id && a.status === 'Approved') || [];
-        myLoans.forEach(l => pendingLoans += (l.amount - l.repaid));
+        const myLoans = advances?.filter(a => a.empId === emp.id && (a.status === 'Approved' || a.status === 'Foreclosed')) || [];
+        myLoans.forEach(l => pendingLoans += (l.amount - (l.totalRepaid || 0)));
 
         const tenure = calculateServiceTenure(emp.joiningDate, exitInfo.lwd);
         const elig = checkGratuityEligibility(emp, tenure, gratConfig);

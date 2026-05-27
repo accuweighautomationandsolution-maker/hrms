@@ -160,9 +160,11 @@ const Advances = () => {
         amount: totalAmount,
         installments: Number(installments),
         emi: emi,
+        totalRepaid: 0,
+        isForeclosed: false,
         date: new Date().toISOString().split('T')[0],
         issueDate: new Date().toLocaleDateString('en-GB'),
-        status: 'Pending',
+        status: 'Pending Admin Approval',
         approvals: { admin: false, director: false, finance: false }
       };
 
@@ -176,7 +178,7 @@ const Advances = () => {
       
       const msg = advanceType === 'Official Site Advance' 
           ? `Official Site Advance of ₹${totalAmount} submitted for approval.`
-          : `Advance of ₹${totalAmount} submitted for approval. EMI will be deducted upon final finance approval.`;
+          : `Advance of ₹${totalAmount} submitted for approval. Workflow initiated.`;
       alert(msg);
       
       setShowModal(false);
@@ -201,19 +203,12 @@ const Advances = () => {
       
       advance.approvals[role] = true;
       
+      if (role === 'admin') advance.status = 'Pending Director Approval';
+      if (role === 'director') advance.status = 'Pending Finance Approval';
+      
       // Check if all approved
       if (advance.approvals.admin && advance.approvals.director && advance.approvals.finance) {
-        advance.status = 'Active';
-        
-        // Apply the EMI to the employee
-        const allEmps = await dataService.getEmployees();
-        const updatedEmps = allEmps.map(e => {
-            if (e.id === advance.empId) {
-                return { ...e, advanceLoanEMI: (e.advanceLoanEMI || 0) + (advance.emi || 0) };
-            }
-            return e;
-        });
-        await dataService.saveEmployees(updatedEmps);
+        advance.status = 'Approved';
       }
       
       history[advanceIndex] = advance;
@@ -253,24 +248,62 @@ const Advances = () => {
       const updatedHistory = history.filter(h => h.id !== id);
       await dataService.saveAdvanceHistory(updatedHistory);
       setAdvances(updatedHistory);
-
-      // 2. Adjust employee EMI
-      const allEmps = await dataService.getEmployees();
-      const updatedEmps = allEmps.map(e => {
-          if (e.id === recordToDelete.empId) {
-              return { ...e, advanceLoanEMI: Math.max(0, (e.advanceLoanEMI || 0) - (recordToDelete.emi || 0)) };
-          }
-          return e;
-      });
-      await dataService.saveEmployees(updatedEmps);
     } catch (err) {
       console.error("Error deleting advance:", err);
       alert("Failed to delete advance. Please try again.");
     }
   };
 
+  const handleForeclose = async (id) => {
+    if (!window.confirm("Are you sure you want to Foreclose this advance? The entire remaining balance will be deducted in the next payroll.")) return;
+    try {
+      const history = await dataService.getAdvanceHistory();
+      const idx = history.findIndex(h => h.id === id);
+      if (idx === -1) return;
+      history[idx].isForeclosed = true;
+      history[idx].foreclosureDate = new Date().toISOString();
+      history[idx].status = 'Foreclosed';
+      await dataService.saveAdvanceHistory(history);
+      setAdvances(history);
+    } catch (err) {
+      alert("Failed to foreclose.");
+    }
+  };
+
+  const handleWaive = async (id) => {
+    const history = await dataService.getAdvanceHistory();
+    const idx = history.findIndex(h => h.id === id);
+    if (idx === -1) return;
+    const balance = (history[idx].amount || 0) - (history[idx].totalRepaid || 0);
+    if (!window.confirm(`Are you sure you want to Waive the remaining balance of ₹${balance.toLocaleString()}? This will close the advance.`)) return;
+    
+    try {
+      history[idx].waivedAmount = balance;
+      history[idx].status = 'Closed';
+      await dataService.saveAdvanceHistory(history);
+      setAdvances(history);
+    } catch (err) {
+      alert("Failed to waive.");
+    }
+  };
+
+  const handleStopEMI = async (id) => {
+    if (!window.confirm("Are you sure you want to Stop EMI recovery? This will cancel further deductions.")) return;
+    try {
+      const history = await dataService.getAdvanceHistory();
+      const idx = history.findIndex(h => h.id === id);
+      if (idx === -1) return;
+      history[idx].status = 'Cancelled';
+      await dataService.saveAdvanceHistory(history);
+      setAdvances(history);
+    } catch (err) {
+      alert("Failed to cancel.");
+    }
+  };
+
   const stats = useMemo(() => {
-    const totalEMI = activeEmployees.reduce((sum, e) => sum + (e.advanceLoanEMI || 0), 0);
+    const activeAdvances = advances.filter(a => a.status === 'Approved' || a.status === 'Active' || a.status === 'Foreclosed');
+    const totalEMI = activeAdvances.reduce((sum, a) => sum + (a.status === 'Foreclosed' ? ((a.amount||0) - (a.totalRepaid||0)) : (a.emi || 0)), 0);
     // SECURITY: Filter using resolvedMyEmpId (actual employees table ID)
     const myHistory = advances.filter(h => isEmployee
       ? (resolvedMyEmpId !== null && String(h.empId) === String(resolvedMyEmpId))
@@ -288,7 +321,7 @@ const Advances = () => {
   }, [advances, isEmployee, resolvedMyEmpId]);
 
   const pendingAdvances = useMemo(() => {
-    return advances.filter(h => h.status === 'Pending');
+    return advances.filter(h => String(h.status).startsWith('Pending'));
   }, [advances]);
 
   if (loading) {
@@ -359,32 +392,35 @@ const Advances = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredEmployees.length === 0 ? (
+              {advances.filter(a => a.status === 'Approved' || a.status === 'Foreclosed').length === 0 ? (
                 <tr>
                    <td colSpan="5" style={{ padding: '2rem', textAlign: 'center', opacity: 0.5 }}>No active deductions found.</td>
                 </tr>
               ) : (
-                filteredEmployees.map((emp) => (
-                  <tr key={emp.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                advances.filter(a => a.status === 'Approved' || a.status === 'Foreclosed').map((adv) => {
+                  const emp = activeEmployees.find(e => e.id === adv.empId) || { name: adv.empName, empCode: '', grossSalary: 1 };
+                  const deduction = adv.status === 'Foreclosed' ? (adv.amount - (adv.totalRepaid || 0)) : adv.emi;
+                  return (
+                  <tr key={adv.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                     <td style={{ padding: '1rem', fontWeight: '600' }}>
                        <div>{emp.name}</div>
-                       <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: '400' }}>{emp.empCode}</div>
+                       <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: '400' }}>{adv.id}</div>
                     </td>
-                    <td style={{ padding: '1rem', color: 'var(--color-danger)', fontWeight: '700' }}>₹{(emp.advanceLoanEMI || 0).toLocaleString()} / mo</td>
+                    <td style={{ padding: '1rem', color: 'var(--color-danger)', fontWeight: '700' }}>₹{deduction.toLocaleString()} / mo</td>
                     <td style={{ padding: '1rem' }}>₹{(emp.grossSalary || 0).toLocaleString()}</td>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <div style={{ flex: 1, height: '6px', backgroundColor: '#e2e8f0', borderRadius: '3px', position: 'relative' }}>
-                          <div style={{ width: `${Math.min((emp.advanceLoanEMI / emp.grossSalary) * 100 * 2, 100)}%`, height: '100%', backgroundColor: 'var(--color-warning)', borderRadius: '3px' }}></div>
+                          <div style={{ width: `${Math.min((deduction / (emp.grossSalary || 1)) * 100 * 2, 100)}%`, height: '100%', backgroundColor: 'var(--color-warning)', borderRadius: '3px' }}></div>
                         </div>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>{((emp.advanceLoanEMI / (emp.grossSalary || 1)) * 100).toFixed(1)}%</span>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>{((deduction / (emp.grossSalary || 1)) * 100).toFixed(1)}%</span>
                       </div>
                     </td>
                     <td style={{ padding: '1rem' }}>
-                      <span className="badge badge-primary">Deducting</span>
+                      <span className="badge badge-primary">{adv.status === 'Foreclosed' ? 'Foreclosure Recovery' : 'Deducting'}</span>
                     </td>
                   </tr>
-                ))
+                )})
               )}
             </tbody>
           </table>
@@ -421,14 +457,14 @@ const Advances = () => {
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'right' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                        {(userRole === 'admin' || userRole === 'management') && (
-                          <button onClick={() => handleApprove(h.id, 'admin')} disabled={h.approvals?.admin} className="btn btn-primary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }}>Approve (Admin)</button>
+                        {(userRole === 'admin' || userRole === 'management') && h.status === 'Pending Admin Approval' && (
+                          <button onClick={() => handleApprove(h.id, 'admin')} className="btn btn-primary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }}>Approve (Admin)</button>
                         )}
-                        {(userRole === 'director' || userRole === 'management') && (
-                          <button onClick={() => handleApprove(h.id, 'director')} disabled={h.approvals?.director} className="btn btn-primary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }}>Approve (Director)</button>
+                        {(userRole === 'director' || userRole === 'management') && h.status === 'Pending Director Approval' && (
+                          <button onClick={() => handleApprove(h.id, 'director')} className="btn btn-primary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }}>Approve (Director)</button>
                         )}
-                        {(userRole === 'finance' || userRole === 'management') && (
-                          <button onClick={() => handleApprove(h.id, 'finance')} disabled={h.approvals?.finance} className="btn btn-primary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }}>Approve (Finance)</button>
+                        {(userRole === 'finance' || userRole === 'management') && h.status === 'Pending Finance Approval' && (
+                          <button onClick={() => handleApprove(h.id, 'finance')} className="btn btn-primary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }}>Approve (Finance)</button>
                         )}
                         <button onClick={() => handleReject(h.id)} className="btn btn-outline" style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem', color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}>Reject</button>
                       </div>
@@ -471,12 +507,22 @@ const Advances = () => {
                     <td style={{ padding: '1rem', fontWeight: 700 }}>₹{h.amount?.toLocaleString()}</td>
                     <td style={{ padding: '1rem' }}>
                        {h.emi > 0 ? (
-                         <div>₹{(h.emi || 0).toLocaleString()} over {h.installments}mo</div>
+                         <div>
+                           <div>₹{(h.emi || 0).toLocaleString()} / mo</div>
+                           <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Repaid: ₹{(h.totalRepaid || 0).toLocaleString()} / ₹{(h.amount || 0).toLocaleString()}</div>
+                         </div>
                        ) : 'Lump-sum Settlement'}
                     </td>
-                    <td style={{ padding: '1rem', textAlign: 'right' }}>
+                    <td style={{ padding: '1rem', textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '0.25rem' }}>
+                       {!isEmployee && h.status === 'Approved' && (
+                         <>
+                           <button onClick={() => handleForeclose(h.id)} title="Foreclose Advance" className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}>Foreclose</button>
+                           <button onClick={() => handleWaive(h.id)} title="Waive Balance" className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}>Waive</button>
+                           <button onClick={() => handleStopEMI(h.id)} title="Stop EMI" className="btn btn-outline" style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', color: 'var(--color-danger)' }}>Stop</button>
+                         </>
+                       )}
                        {!isEmployee && (
-                         <button onClick={() => handleDeleteAdvance(h.id)} className="btn btn-ghost" style={{ color: 'var(--color-danger)' }}>
+                         <button onClick={() => handleDeleteAdvance(h.id)} className="btn btn-ghost" style={{ color: 'var(--color-danger)', padding: '0.25rem' }}>
                            <Trash2 size={16} />
                          </button>
                        )}

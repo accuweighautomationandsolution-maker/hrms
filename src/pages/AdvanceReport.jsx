@@ -70,6 +70,7 @@ const AdvanceReport = () => {
     // Filter Logic
     const reportData = useMemo(() => {
         return allAdvances.filter(adv => {
+            if (String(adv.status).startsWith('Pending') || adv.status === 'Rejected') return false;
             const dateObj = new Date(adv.issueDate);
             if (dateObj.getFullYear() !== year) return false;
             if (selectedEmpId !== 'all' && adv.empId !== Number(selectedEmpId)) return false;
@@ -89,17 +90,10 @@ const AdvanceReport = () => {
         reportData.forEach(adv => {
             totalIssued += adv.amount;
 
-            if (adv.status === 'Settled') {
-                amountRecovered += adv.amount;
+            if (adv.status === 'Settled' || adv.status === 'Closed') {
+                amountRecovered += (adv.amount - (adv.waivedAmount || 0));
             } else if (adv.type === 'Personal Advance') {
-                // Simulate recovered amount for active loans
-                const issueDate = new Date(adv.issueDate);
-                const now = new Date();
-                const monthsPassed = (now.getFullYear() - issueDate.getFullYear()) * 12 + (now.getMonth() - issueDate.getMonth());
-                
-                const emi = adv.amount / adv.installments;
-                const recovered = Math.min(adv.amount, Math.max(0, monthsPassed) * emi);
-                amountRecovered += recovered;
+                amountRecovered += (adv.totalRepaid || 0);
             }
         });
 
@@ -349,8 +343,8 @@ const AdvanceReport = () => {
                                         </td>
                                         <td style={{ padding: '1rem', fontWeight: '600' }}>{adv.employeeName}</td>
                                         <td style={{ padding: '1rem' }}>
-                                            <span className={`badge ${adv.status === 'Settled' ? 'badge-success' : 'badge-warning'}`}>
-                                                {adv.status === 'Settled' ? <CheckCircle2 size={12} style={{ marginRight: '4px' }} /> : <Clock size={12} style={{ marginRight: '4px' }} />}
+                                            <span className={`badge ${['Settled', 'Closed', 'Foreclosed'].includes(adv.status) ? 'badge-success' : adv.status === 'Cancelled' ? 'badge-danger' : 'badge-warning'}`}>
+                                                {['Settled', 'Closed'].includes(adv.status) ? <CheckCircle2 size={12} style={{ marginRight: '4px' }} /> : <Clock size={12} style={{ marginRight: '4px' }} />}
                                                 {adv.status}
                                             </span>
                                         </td>

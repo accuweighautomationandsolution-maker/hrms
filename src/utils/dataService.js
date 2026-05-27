@@ -1556,6 +1556,65 @@ export const dataService = {
   getExitRecords: async () => sbGetAll('exit_records'),
   saveExitRecords: async (list) => sbSaveAll('exit_records', list),
 
+  deleteExitRecord: async (id) => {
+    if (!supabase) return [];
+    try {
+      const current = await dataService.getExitRecords();
+      const updated = current.filter(record => record.id !== id);
+      await dataService.saveExitRecords(updated);
+      return updated;
+    } catch (err) {
+      console.error('Exception in deleteExitRecord:', err);
+      throw err;
+    }
+  },
+
+  completeFnFSystemProcess: async (empId) => {
+     if (!supabase) return;
+     try {
+        const [emps, exits, advances] = await Promise.all([
+           dataService.getEmployees(),
+           dataService.getExitRecords(),
+           dataService.getAdvanceHistory()
+        ]);
+        
+        // 1. Mark employee as Inactive
+        const empIndex = emps.findIndex(e => e.id === empId);
+        if (empIndex > -1 && emps[empIndex].status !== 'Inactive') {
+           emps[empIndex].status = 'Inactive';
+           await dataService.saveEmployee(emps[empIndex]);
+        }
+
+        // 2. Mark exit record as Completed
+        const exitIndex = exits.findIndex(ex => ex.empId === empId && ex.status !== 'Completed');
+        if (exitIndex > -1) {
+           exits[exitIndex].status = 'Completed';
+           exits[exitIndex].stage = 4;
+           exits[exitIndex].activity = [
+              { date: new Date().toISOString(), action: 'Full & Final Settlement Authorized & Completed', user: 'System Admin' },
+              ...(exits[exitIndex].activity || [])
+           ];
+           await dataService.saveExitRecords(exits);
+        }
+
+        // 3. Close active loans/advances
+        let isAdvUpdated = false;
+        for (let a of advances) {
+           if (a.empId === empId && (a.status === 'Approved' || a.status === 'Foreclosed')) {
+              a.status = 'Closed';
+              a.notes = (a.notes ? a.notes + '\n' : '') + 'Closed due to Employee Exit FnF Settlement.';
+              isAdvUpdated = true;
+           }
+        }
+        if (isAdvUpdated) {
+           await dataService.saveAdvanceHistory(advances);
+        }
+     } catch (err) {
+        console.error('Exception in completeFnFSystemProcess:', err);
+        throw err;
+     }
+  },
+
   getTrainingRecords: async () => sbGetAll('training_records'),
   saveTrainingRecords: async (list) => sbSaveAll('training_records', list),
 
