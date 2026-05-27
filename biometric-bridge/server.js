@@ -23,7 +23,7 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-const PORT = 9000;
+const PORT = 9001;
 
 // Allow requests from the HRMS web app (any origin on local network)
 app.use(cors({ origin: '*' }));
@@ -116,16 +116,25 @@ async function syncStatusToSupabase() {
       ...state,
       lastPingTime: new Date().toISOString()
     };
+    const stringValue = JSON.stringify(statusPayload);
     
-    const { error } = await supabase
+    // Strategy 1: Try app_config
+    const { error: e1 } = await supabase
       .from('app_config')
-      .upsert({ 
-        key: 'biometric_bridge_status', 
-        value: JSON.stringify(statusPayload) 
-      }, { onConflict: 'key' });
+      .upsert({ key: 'biometric_bridge_status', value: stringValue }, { onConflict: 'key' });
       
-    if (error) {
-      console.warn('[Supabase] Failed to sync bridge status:', error.message);
+    if (!e1) return;
+    
+    // Strategy 2: Fallback to letter_templates
+    const { error: e2 } = await supabase
+      .from('letter_templates')
+      .upsert({ 
+        id: 'sys_config_biometric_bridge_status', 
+        data: { key: 'biometric_bridge_status', value: stringValue } 
+      }, { onConflict: 'id' });
+      
+    if (e2) {
+      console.warn('[Supabase] Failed to sync bridge status (both strategies):', e1.message, e2.message);
     }
   } catch (err) {
     console.warn('[Supabase] Exception syncing bridge status:', err.message);

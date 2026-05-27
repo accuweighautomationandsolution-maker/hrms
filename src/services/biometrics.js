@@ -9,7 +9,7 @@ export const BiometricService = {
   fetchLogs: async (ip, port) => {
     console.log(`Connecting to Biometric Bridge → Device: ${ip}:${port}...`);
     
-    const BRIDGE_URL = `http://localhost:9000/api/pull?ip=${ip}&port=${port}`;
+    const BRIDGE_URL = `http://localhost:9001/api/pull?ip=${ip}&port=${port}`;
     
     try {
       // Removed the 5-second timeout. Hardware with many logs can take 20-30 seconds to respond.
@@ -28,7 +28,7 @@ export const BiometricService = {
     } catch (err) {
       console.error("Biometric fetch Error:", err);
       if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
-        throw new Error("Cannot connect to the Biometric Bridge server. Ensure 'node server.js' is running in the biometric-bridge folder on port 9000.");
+        throw new Error("Cannot connect to the Biometric Bridge server. Ensure 'node server.js' is running in the biometric-bridge folder on port 9001.");
       }
       throw err;
     }
