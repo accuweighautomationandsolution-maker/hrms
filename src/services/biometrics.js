@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { dataService } from '../utils/dataService';
 
 export const BiometricService = {
   /**
@@ -155,32 +156,38 @@ export const BiometricService = {
    */
   getDeviceStatus: async (ip, port) => {
     try {
-      const response = await fetch(`http://localhost:9000/api/bridge-status`, {
-        signal: AbortSignal.timeout(3000)
-      });
-      if (response.ok) {
-        const data = await response.json();
+      const data = await dataService.getConfig('biometric_bridge_status', null);
+      
+      if (data) {
+        // Staleness check: if lastPingTime is older than 2 minutes, consider it offline.
+        const lastPing = data.lastPingTime ? new Date(data.lastPingTime).getTime() : 0;
+        const now = Date.now();
+        const isStale = (now - lastPing) > 120000; // 2 minutes
+
+        const bridgeStatus = isStale ? 'Offline' : (data.bridgeStatus || 'Online');
+        const deviceStatus = isStale ? 'Offline' : (data.deviceStatus || 'Offline');
+
         return [{ 
           deviceId: 'IDX-X2008-PRO',
           model: 'Identix X2008',
           location: 'Office Gateway',
-          status: data.deviceStatus,
-          bridgeStatus: data.bridgeStatus,
-          activeSessionState: data.activeSessionState,
-          lastSyncTime: data.lastSyncTime,
-          totalRecordsSynced: data.totalRecordsSynced,
-          reconnectAttempts: data.reconnectAttempts,
-          lastError: data.lastError,
-          lastSuccessfulConnection: data.lastSuccessfulConnection,
-          userCount: data.userCount,
-          logCount: data.logCount,
-          method: 'TCP/IP via Bridge',
-          lastPing: new Date().toLocaleTimeString(),
+          status: deviceStatus,
+          bridgeStatus: bridgeStatus,
+          activeSessionState: data.activeSessionState || 'idle',
+          lastSyncTime: data.lastSyncTime || null,
+          totalRecordsSynced: data.totalRecordsSynced || 0,
+          reconnectAttempts: data.reconnectAttempts || 0,
+          lastError: data.lastError || (isStale ? 'Bridge heartbeat timeout (stale data)' : null),
+          lastSuccessfulConnection: data.lastSuccessfulConnection || null,
+          userCount: data.userCount || 0,
+          logCount: data.logCount || 0,
+          method: 'TCP/IP via Bridge (Cloud Synced)',
+          lastPing: data.lastPingTime ? new Date(data.lastPingTime).toLocaleTimeString() : new Date().toLocaleTimeString(),
           ip: `${ip}:${port}`
         }];
       }
     } catch (e) {
-      console.warn("Failed to reach biometric bridge status endpoint:", e.message);
+      console.warn("Failed to fetch biometric bridge status from Supabase:", e.message);
     }
     
     return [{
@@ -193,7 +200,7 @@ export const BiometricService = {
       lastSyncTime: null,
       totalRecordsSynced: 0,
       reconnectAttempts: 0,
-      lastError: 'Bridge service is not running or unreachable on port 9000',
+      lastError: 'Bridge service status not found in database',
       method: 'TCP/IP (ADMS Enabled)',
       lastPing: new Date().toLocaleTimeString(),
       ip: `${ip}:${port}`
