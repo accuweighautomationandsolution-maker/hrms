@@ -22,6 +22,7 @@ const PolicyManagement = ({ userRole }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [viewingPolicy, setViewingPolicy] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -154,14 +155,13 @@ const PolicyManagement = ({ userRole }) => {
         }
         const blob = new Blob([u8arr], { type: mime });
         const blobUrl = window.URL.createObjectURL(blob);
-        window.open(blobUrl, '_blank');
-        setTimeout(() => window.URL.revokeObjectURL(blobUrl), 60000); // cleanup
+        setViewingPolicy({ url: blobUrl, title, isBlob: true });
       } catch (e) {
         console.error("Error viewing data URL:", e);
         showNotification("Failed to view document.", "error");
       }
     } else {
-      window.open(url, '_blank');
+      setViewingPolicy({ url, title, isBlob: false });
     }
   };
 
@@ -446,6 +446,33 @@ const PolicyManagement = ({ userRole }) => {
              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
                 <button className="btn btn-outline" onClick={() => setShowUploadModal(false)}>Cancel</button>
                 <button className="btn btn-primary" onClick={handlePublish}>Dispatch Policy</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {viewingPolicy && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)', padding: '2rem' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '900px', height: '90vh', display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem 1.5rem' }}>
+             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem' }}>
+                <h2 style={{ margin: 0, fontSize: '1.25rem' }}>{viewingPolicy.title || 'Document Viewer'}</h2>
+                <button className="btn btn-ghost" onClick={() => {
+                  if (viewingPolicy.isBlob) {
+                    window.URL.revokeObjectURL(viewingPolicy.url);
+                  }
+                  setViewingPolicy(null);
+                }}>
+                  <X size={20} />
+                </button>
+             </div>
+             <div style={{ flex: 1, backgroundColor: '#f5f5f5', borderRadius: '8px', overflow: 'hidden' }}>
+               <iframe 
+                 src={viewingPolicy.url} 
+                 title="Document Preview" 
+                 width="100%" 
+                 height="100%" 
+                 style={{ border: 'none' }}
+               />
              </div>
           </div>
         </div>
