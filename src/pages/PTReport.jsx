@@ -17,8 +17,8 @@ const PTReport = () => {
     
     // Config placeholders (could be fetched from a config service in the future)
     const [companyConfig, setCompanyConfig] = useState({
-        name: 'Accuweigh Automation and Solution',
-        address: '123 Business Hub, Sector 62, Noida, UP - 201309',
+        name: 'Accuweigh Automation & Solutions Pvt. Ltd.',
+        address: 'Shed. No. 2, Sr. No. 23/3/1, Wadekar Industrial Estate, Behind Abhinav Pharma College, Mauje - Narhe, Pune-411041.',
         ptRegNumber: 'PTR-27AABCD1234E1Z5'
     });
 
@@ -143,7 +143,7 @@ const PTReport = () => {
                           {showExportMenu && (
                               <div className="card" style={{ position: 'absolute', top: '100%', right: 0, marginTop: '0.5rem', padding: '0.5rem', zIndex: 100, display: 'flex', flexDirection: 'column', gap: '0.25rem', width: '200px' }}>
                                    <button className="btn btn-ghost" style={{ justifyContent: 'flex-start', padding: '0.5rem' }} onClick={() => { handleExport('csv'); setShowExportMenu(false) }}><FileText size={16} style={{ marginRight: '0.5rem' }} /> CSV Data</button>
-                                    <button className="btn btn-ghost" style={{ justifyContent: 'flex-start', padding: '0.5rem' }} onClick={() => { handleExport('xlsx'); setShowExportMenu(false) }}><FileSpreadsheet size={16} style={{ marginRight: '0.5rem' }} /> Excel Workbook</button>
+                                    <button className="btn btn-ghost" style={{ justifyContent: 'flex-start', padding: '0.5rem' }} onClick={() => { handleExport('xlsx'); setShowExportMenu(false) }}><FileSpreadsheet size={16} style={{ marginRight: '0.5rem' }} /> Download Excel (.xlsx)</button>
                                     <button className="btn btn-ghost" style={{ justifyContent: 'flex-start', padding: '0.5rem' }} onClick={() => { generatePDF('pt-challan-capture', `PT_Challan_${monthNames[month]}_${year}.pdf`); setShowExportMenu(false) }}><Printer size={16} style={{ marginRight: '0.5rem' }} /> Professional PDF</button>
                               </div>
                           )}
