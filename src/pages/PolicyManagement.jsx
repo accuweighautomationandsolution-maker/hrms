@@ -467,7 +467,7 @@ const PolicyManagement = ({ userRole }) => {
              </div>
              <div style={{ flex: 1, backgroundColor: '#f5f5f5', borderRadius: '8px', overflow: 'hidden' }}>
                <iframe 
-                 src={viewingPolicy.url} 
+                 src={`${viewingPolicy.url}#toolbar=0&navpanes=0&scrollbar=0`} 
                  title="Document Preview" 
                  width="100%" 
                  height="100%" 
