@@ -1193,8 +1193,19 @@ export const dataService = {
   },
 
   uploadPolicyFile: async (file) => {
-    const { url } = await storageUpload('policies', file);
-    return url;
+    try {
+      if (!supabase) throw new Error("No supabase");
+      const { url } = await storageUpload('policies', file);
+      return url;
+    } catch (e) {
+      console.warn("Policy storage upload failed, falling back to base64 Data URL:", e.message);
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
   },
 
   getAcknowledgments: async () => sbGetAll('policy_acks'),
