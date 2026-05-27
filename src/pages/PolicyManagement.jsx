@@ -24,6 +24,7 @@ const PolicyManagement = ({ userRole }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [viewingPolicy, setViewingPolicy] = useState(null);
   const [isMaximized, setIsMaximized] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState('All');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -50,10 +51,12 @@ const PolicyManagement = ({ userRole }) => {
     return (policies || []).filter(p => {
       const title = p.title || '';
       const category = p.category || '';
-      return title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-             category.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            category.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = categoryFilter === 'All' || category === categoryFilter;
+      return matchesSearch && matchesCategory;
     });
-  }, [policies, searchQuery]);
+  }, [policies, searchQuery, categoryFilter]);
 
   const user = authService.getCurrentUser();
   const isAcknowledged = (policyId) => acks.some(a => a.policyId === policyId && a.empId === user?.id);
@@ -227,7 +230,18 @@ const PolicyManagement = ({ userRole }) => {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <button className="btn btn-outline"><Filter size={18} /> Filter</button>
+            <select 
+              className="form-input" 
+              style={{ width: '200px', cursor: 'pointer' }}
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+            >
+              <option value="All">All Categories</option>
+              <option value="HR Policies">HR Policies</option>
+              <option value="IT Policies">IT Policies</option>
+              <option value="Compliance">Compliance</option>
+              <option value="Legal">Legal</option>
+            </select>
           </div>
 
           {loading ? (
