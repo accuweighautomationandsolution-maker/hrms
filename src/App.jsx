@@ -18,6 +18,7 @@ import HolidayList from './pages/HolidayList';
 import Login from './pages/Login';
 import PFReport from './pages/PFReport';
 import ESICReport from './pages/ESICReport';
+import PTReport from './pages/PTReport';
 import AttendanceReport from './pages/AttendanceReport';
 import LeaveReport from './pages/LeaveReport';
 import AdvanceReport from './pages/AdvanceReport';
@@ -272,6 +273,7 @@ function App() {
                     <Route path="/payroll" element={<Payroll />} />
                     <Route path="/pf-report" element={<PFReport />} />
                     <Route path="/esic-report" element={<ESICReport />} />
+                    <Route path="/pt-report" element={<PTReport />} />
                     <Route path="/leave-report" element={<LeaveReport />} />
                     <Route path="/advance-report" element={<AdvanceReport />} />
                     <Route path="/payroll-report" element={<PayrollReport />} />

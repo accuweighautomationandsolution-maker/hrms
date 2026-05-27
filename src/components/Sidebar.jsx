@@ -177,6 +177,10 @@ const Sidebar = ({ userRole, isManager }) => {
                     <ShieldCheck size={21} />
                     <span>ESIC Report</span>
                   </Link>
+                  <Link to="/pt-report" className={`nav-item ${location.pathname === '/pt-report' ? 'active' : ''}`} style={{ paddingLeft: '2.5rem' }}>
+                    <ShieldCheck size={21} />
+                    <span>PT Report</span>
+                  </Link>
                   <Link to="/movement-reports" className={`nav-item ${location.pathname === '/movement-reports' ? 'active' : ''}`} style={{ paddingLeft: '2.5rem' }}>
                     <FileSpreadsheet size={21} />
                     <span>Movement Reports</span>
