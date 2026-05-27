@@ -154,6 +154,7 @@ const Attendance = () => {
   const [importPreview, setImportPreview] = useState(null); // { logs, filename }
   const [importLoading, setImportLoading] = useState(false);
   const [holidayList, setHolidayList] = useState([]);
+  const [leaveRequests, setLeaveRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // --- Sync Control States ---
@@ -199,11 +200,12 @@ const Attendance = () => {
           ? dataService.getAttendanceForEmployee(myProfile.id).catch(() => ({}))
           : dataService.getAttendance().catch(() => ({}));
 
-        const [att, hol, bConf, lSync] = await Promise.all([
+        const [att, hol, bConf, lSync, lReqs] = await Promise.all([
           attFetch,
           dataService.getCustomHolidays().catch(() => []),
           dataService.getBiometricConfig().catch(() => null),
-          dataService.getConfig('biometric_last_sync', null).catch(() => null)
+          dataService.getConfig('biometric_last_sync', null).catch(() => null),
+          dataService.getLeaveRequests().catch(() => [])
         ]);
 
         if (isMounted) {
@@ -218,6 +220,7 @@ const Attendance = () => {
           setEmployeesList(emps);
           setRecords(att);
           setHolidayList(hol);
+          setLeaveRequests(lReqs);
           if (bConf) setBioConfig(bConf);
           if (lSync) setLastSync(lSync);
 
@@ -575,6 +578,26 @@ const Attendance = () => {
   };
 
   const dayStatus = (empId, day, dow) => {
+    // Check movement requests first so they show on the calendar
+    if (leaveRequests && leaveRequests.length > 0) {
+      const activeMovement = leaveRequests.find(l => {
+        if (l.status !== 'Approved') return false;
+        if (l.type !== 'Out Duty Request' && l.type !== 'Out Pass Request') return false;
+        if (String(l.empId || l.emp_id) !== String(empId)) return false;
+        
+        const reqDateStr = l.start_date || l.data?.date || l.data?.startDate || l.data?.requestDate;
+        if (!reqDateStr) return false;
+        
+        const [y, m, dNum] = reqDateStr.split('-');
+        return parseInt(y) === year && parseInt(m) - 1 === month && parseInt(dNum) === day;
+      });
+
+      if (activeMovement) {
+        if (activeMovement.type === 'Out Duty Request') return 'out-duty';
+        if (activeMovement.type === 'Out Pass Request') return 'out-pass';
+      }
+    }
+
     const rec = getRecord(empId, day);
     
     // ODD SATURDAY LOGIC: 1st, 3rd, 5th
@@ -605,6 +628,8 @@ const Attendance = () => {
     'holiday': { bg: 'rgba(239,68,68,0.07)', border: 'transparent', color: 'var(--color-danger)' },
     'holiday-worked': { bg: 'rgba(245,158,11,0.15)', border: 'var(--color-warning)', color: '#b45309' },
     'absent': { bg: 'rgba(239,68,68,0.07)', border: 'var(--color-danger)', color: 'var(--color-danger)' },
+    'out-duty': { bg: 'rgba(59,130,246,0.1)', border: 'var(--color-primary)', color: 'var(--color-primary)' }, // Blue for Out Duty
+    'out-pass': { bg: 'rgba(168,85,247,0.1)', border: '#a855f7', color: '#a855f7' }, // Purple for Out Pass
     'future': { bg: 'transparent', border: 'var(--color-border)', color: 'var(--color-text-muted)' },
   };
 

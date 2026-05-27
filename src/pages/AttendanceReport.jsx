@@ -110,12 +110,12 @@ const AttendanceReport = () => {
             const rawData = dataService.getReportRangeData(emp.id, dateRange.start, dateRange.end, attendanceRecords);
             
             const logs = rawData.map(day => {
-                // Check if on leave
-                const isOnLeave = leaveRequests.find(l => 
+                // Check if on leave or out duty
+                const approvedMovement = leaveRequests.find(l => 
                     l.empId === emp.id && 
                     l.status === 'Approved' && 
-                    day.date >= l.startDate && 
-                    day.date <= l.endDate
+                    day.date >= (l.start_date || l.startDate || l.data?.date) && 
+                    day.date <= (l.end_date || l.endDate || l.data?.date)
                 );
 
                 const dateObj = new Date(day.date);
@@ -124,7 +124,11 @@ const AttendanceReport = () => {
 
                 let status = 'Absent';
                 if (day.log && day.log.punchIn) status = 'Present';
-                else if (isOnLeave) status = 'On Leave';
+                else if (approvedMovement) {
+                    if (approvedMovement.type === 'Out Duty Request') status = 'Out Duty (OD)';
+                    else if (approvedMovement.type === 'Out Pass Request') status = 'Out Pass';
+                    else status = 'On Leave';
+                }
                 else if (day.dayName === 'Sun' || isFirstOrThirdSat) status = 'Weekly Off';
 
                 return {
@@ -139,6 +143,8 @@ const AttendanceReport = () => {
                 present: logs.filter(l => l.status === 'Present').length,
                 absent: logs.filter(l => l.status === 'Absent').length,
                 leave: logs.filter(l => l.status === 'On Leave').length,
+                outDuty: logs.filter(l => l.status === 'Out Duty (OD)').length,
+                outPass: logs.filter(l => l.status === 'Out Pass').length,
                 total: logs.filter(l => l.status !== 'Weekly Off').length
             };
 
@@ -160,8 +166,10 @@ const AttendanceReport = () => {
         return reportData.reduce((acc, curr) => ({
             present: acc.present + (curr.summary?.present || 0),
             absent: acc.absent + (curr.summary?.absent || 0),
-            leave: acc.leave + (curr.summary?.leave || 0)
-        }), { present: 0, absent: 0, leave: 0 });
+            leave: acc.leave + (curr.summary?.leave || 0),
+            outDuty: acc.outDuty + (curr.summary?.outDuty || 0),
+            outPass: acc.outPass + (curr.summary?.outPass || 0)
+        }), { present: 0, absent: 0, leave: 0, outDuty: 0, outPass: 0 });
     }, [reportData]);
 
     const [detailedEmp, setDetailedEmp] = useState(null);
@@ -412,10 +420,12 @@ const AttendanceReport = () => {
                                         <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{res.employee.empCode}</div>
                                     </td>
                                     <td style={{ padding: '1rem' }}>
-                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                             <span className="badge badge-success">P: {res.summary.present}</span>
                                             <span className="badge badge-danger">A: {res.summary.absent}</span>
                                             <span className="badge badge-primary">L: {res.summary.leave}</span>
+                                            {res.summary.outDuty > 0 && <span className="badge" style={{ backgroundColor: 'rgba(59,130,246,0.1)', color: 'var(--color-primary)' }}>OD: {res.summary.outDuty}</span>}
+                                            {res.summary.outPass > 0 && <span className="badge" style={{ backgroundColor: 'rgba(168,85,247,0.1)', color: '#a855f7' }}>OP: {res.summary.outPass}</span>}
                                         </div>
                                     </td>
                                     <td style={{ padding: '1rem' }}>
@@ -430,6 +440,8 @@ const AttendanceReport = () => {
                                                         borderRadius: '2px',
                                                         backgroundColor: l.status === 'Present' ? 'var(--color-success)' : 
                                                                          l.status === 'On Leave' ? 'var(--color-primary)' :
+                                                                         l.status === 'Out Duty (OD)' ? 'var(--color-primary)' :
+                                                                         l.status === 'Out Pass' ? '#a855f7' :
                                                                          l.status === 'Weekly Off' ? 'var(--color-border)' : 'var(--color-danger)'
                                                     }}
                                                 ></div>
@@ -484,8 +496,13 @@ const AttendanceReport = () => {
                                                 <span className={`badge ${
                                                     log.status === 'Present' ? 'badge-success' : 
                                                     log.status === 'On Leave' ? 'badge-primary' :
-                                                    log.status === 'Weekly Off' ? 'badge-ghost' : 'badge-danger'
-                                                }`} style={{ fontSize: '0.7rem' }}>
+                                                    log.status === 'Weekly Off' ? 'badge-ghost' : 
+                                                    (log.status === 'Out Duty (OD)' || log.status === 'Out Pass') ? '' : 'badge-danger'
+                                                }`} style={{ 
+                                                    fontSize: '0.7rem',
+                                                    ...(log.status === 'Out Duty (OD)' ? { backgroundColor: 'rgba(59,130,246,0.1)', color: 'var(--color-primary)' } : {}),
+                                                    ...(log.status === 'Out Pass' ? { backgroundColor: 'rgba(168,85,247,0.1)', color: '#a855f7' } : {})
+                                                }}>
                                                     {log.status}
                                                 </span>
                                             </td>
