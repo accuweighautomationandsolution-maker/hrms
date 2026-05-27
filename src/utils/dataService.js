@@ -1206,22 +1206,10 @@ export const dataService = {
 
   // ── Advances & Payroll ─────────────────────────────────────────────────
   getAdvanceHistory: async () => sbGetAll('advances'),
-  saveAdvanceHistory: async (history) => {
-    if (!supabase || !history || history.length === 0) return history;
-    try {
-      const rows = history.map(r => ({
-        id: String(r.id),
-        emp_id: String(r.empId || r.emp_id),
-        data: r
-      }));
-      await supabase.from('advances').upsert(rows, { onConflict: 'id' });
-    } catch (e) { console.error(`saveAdvanceHistory exception:`, e); }
-    return history;
-  },
+  saveAdvanceHistory: async (history) => sbSaveAll('advances', history),
   getPersonalAdvances: async (empId) => {
-    if (!supabase) return [];
-    const { data } = await supabase.from('advances').select('data').eq('emp_id', String(empId));
-    return (data || []).map(r => r.data);
+    const all = await dataService.getAdvanceHistory();
+    return all.filter(a => String(a.empId) === String(empId) || String(a.emp_id) === String(empId));
   },
 
   getPayrollHistory: async () => sbGetAll('payroll_history'),
