@@ -32,6 +32,7 @@ app.use(express.json());
 // ── Environment Configuration ──────────────────────────────────────────────────
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const BIOMETRIC_IP = process.env.BIOMETRIC_IP || '192.168.1.202';
 const BIOMETRIC_PORT = parseInt(process.env.BIOMETRIC_PORT || '4370', 10);
 const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS || '30000', 10);
@@ -40,9 +41,11 @@ const STATE_FILE = path.join(__dirname, 'sync_state.json');
 
 // Initialize Supabase Client
 let supabase = null;
-if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+const activeKey = SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
+
+if (SUPABASE_URL && activeKey) {
   try {
-    supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    supabase = createClient(SUPABASE_URL, activeKey);
     console.log(`[Supabase] Initialized with endpoint: ${SUPABASE_URL}`);
   } catch (e) {
     console.error('[Supabase] Failed to initialize client:', e.message);
@@ -164,6 +167,9 @@ const MIN_RETRY_INTERVAL = 5000;  // 5 seconds
 const MAX_RETRY_INTERVAL = 60000; // 60 seconds
 
 async function runSyncCycle() {
+  // Immediately push a heartbeat to show we are alive
+  syncStatusToSupabase();
+
   if (isZkBusy) {
     console.log('[Sync] Device is currently busy with another operation. Skipping cycle.');
     setTimeout(runSyncCycle, currentInterval);
