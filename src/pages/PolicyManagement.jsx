@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
   FileText, ShieldCheck, Download, Search, Filter, Plus, 
   ChevronRight, AlertCircle, CheckCircle, History, Users, Eye, 
-  ArrowUpRight, Clock, FileSignature, Trash2, X
+  ArrowUpRight, Clock, FileSignature, Trash2, X, Maximize2, Minimize2
 } from 'lucide-react';
 import { dataService } from '../utils/dataService';
 import { authService } from '../utils/authService';
@@ -23,6 +23,7 @@ const PolicyManagement = ({ userRole }) => {
   const [loading, setLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [viewingPolicy, setViewingPolicy] = useState(null);
+  const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -452,18 +453,31 @@ const PolicyManagement = ({ userRole }) => {
       )}
 
       {viewingPolicy && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)', padding: '2rem' }}>
-          <div className="card" style={{ width: '100%', maxWidth: '900px', height: '90vh', display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem 1.5rem' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)', padding: isMaximized ? '0' : '2rem' }}>
+          <div className="card" style={{ 
+              width: '100%', 
+              maxWidth: isMaximized ? '100vw' : '900px', 
+              height: isMaximized ? '100vh' : '90vh', 
+              borderRadius: isMaximized ? '0' : '12px',
+              display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem 1.5rem',
+              margin: 0
+            }}>
              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem' }}>
                 <h2 style={{ margin: 0, fontSize: '1.25rem' }}>{viewingPolicy.title || 'Document Viewer'}</h2>
-                <button className="btn btn-ghost" onClick={() => {
-                  if (viewingPolicy.isBlob) {
-                    window.URL.revokeObjectURL(viewingPolicy.url);
-                  }
-                  setViewingPolicy(null);
-                }}>
-                  <X size={20} />
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button className="btn btn-ghost" onClick={() => setIsMaximized(!isMaximized)}>
+                    {isMaximized ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+                  </button>
+                  <button className="btn btn-ghost" onClick={() => {
+                    if (viewingPolicy.isBlob) {
+                      window.URL.revokeObjectURL(viewingPolicy.url);
+                    }
+                    setViewingPolicy(null);
+                    setIsMaximized(false);
+                  }}>
+                    <X size={20} />
+                  </button>
+                </div>
              </div>
              <div style={{ flex: 1, backgroundColor: '#f5f5f5', borderRadius: '8px', overflow: 'hidden' }}>
                <iframe 
