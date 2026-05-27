@@ -109,6 +109,29 @@ function savePersistentState() {
 // Load state file on boot
 loadPersistentState();
 
+async function syncStatusToSupabase() {
+  if (!supabase) return;
+  try {
+    const statusPayload = {
+      ...state,
+      lastPingTime: new Date().toISOString()
+    };
+    
+    const { error } = await supabase
+      .from('app_config')
+      .upsert({ 
+        key: 'biometric_bridge_status', 
+        value: JSON.stringify(statusPayload) 
+      }, { onConflict: 'key' });
+      
+    if (error) {
+      console.warn('[Supabase] Failed to sync bridge status:', error.message);
+    }
+  } catch (err) {
+    console.warn('[Supabase] Exception syncing bridge status:', err.message);
+  }
+}
+
 // Fetch employee mappings from Supabase
 async function getEmployeeMapping() {
   if (!supabase) return {};
@@ -369,6 +392,10 @@ function scheduleNext(isSuccess) {
     currentInterval = Math.min(MIN_RETRY_INTERVAL * Math.pow(2, state.reconnectAttempts - 1), MAX_RETRY_INTERVAL);
   }
   console.log(`[Sync] Next execution scheduled in ${currentInterval / 1000}s`);
+  
+  // Sync latest state heartbeat to Supabase
+  syncStatusToSupabase();
+  
   setTimeout(runSyncCycle, currentInterval);
 }
 
