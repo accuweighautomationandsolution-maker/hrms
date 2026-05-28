@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Calendar as CalendarIcon, Clock, CheckCircle, XCircle, AlertCircle, FileText, UserPlus, ShieldAlert, MapPin, ArrowRight, UserCheck, Search, Shield, RefreshCw, Eye, Check, AlertTriangle, Filter, ArrowUpRight, HelpCircle } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, CheckCircle, XCircle, AlertCircle, FileText, UserPlus, ShieldAlert, MapPin, ArrowRight, UserCheck, Search, Shield, RefreshCw, Eye, Check, AlertTriangle, Filter, ArrowUpRight, HelpCircle, X, Maximize2, Minimize2 } from 'lucide-react';
 import { dataService } from '../utils/dataService';
 import { authService } from '../utils/authService';
 import { useNotification } from '../context/NotificationContext';
@@ -25,6 +25,8 @@ const Approvals = () => {
   const [auditTrail, setAuditTrail] = useState([]);
   const [loading, setLoading] = useState(true);
   const [reloads, setReloads] = useState(0);
+  const [viewingDocument, setViewingDocument] = useState(null);
+  const [isMaximized, setIsMaximized] = useState(false);
 
   // Profile & Role States
   const [managerProfile, setManagerProfile] = useState(null);
@@ -114,6 +116,18 @@ const Approvals = () => {
     };
     fetchData();
   }, [reloads, currentUser]);
+
+  const handleViewDocument = async (url, title) => {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      setViewingDocument({ url: blobUrl, title, isBlob: true, isImage: blob.type.startsWith('image/') });
+    } catch (e) {
+      console.error("Error fetching document blob:", e);
+      setViewingDocument({ url, title, isBlob: false, isImage: url.match(/\.(jpeg|jpg|gif|png)$/i) != null });
+    }
+  };
 
   // Helper: Trigger and Log Simulated Notification
   const triggerNotification = (recipientName, role, message, type = 'info') => {
@@ -994,10 +1008,11 @@ const Approvals = () => {
                   )}
                   <div><strong>Reason:</strong> "{selectedRequest.reason || selectedRequest.data?.purposeDetails}"</div>
                   {selectedRequest.data?.attachment && (
-                    <div style={{ marginTop: '0.25rem' }}>
-                      <a href={selectedRequest.data.attachment} target="_blank" rel="noopener noreferrer" className="btn btn-ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', display: 'inline-flex', gap: '0.25rem', color: 'var(--color-primary)' }}>
+                    <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: 'var(--color-background)', borderRadius: '8px', border: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>Supporting Document</span>
+                      <button onClick={() => handleViewDocument(selectedRequest.data.attachment, 'Attachment Preview')} className="btn btn-ghost" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', display: 'inline-flex', gap: '0.25rem', color: 'var(--color-primary)' }}>
                         <FileText size={12} /> View Attachment
-                      </a>
+                      </button>
                     </div>
                   )}
                 </div>
@@ -1323,6 +1338,49 @@ const Approvals = () => {
         </div>
       )}
 
+      {viewingDocument && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)', padding: isMaximized ? '0' : '2rem' }}>
+          <div className="card" style={{ 
+              width: '100%', 
+              maxWidth: isMaximized ? '100vw' : '900px', 
+              height: isMaximized ? '100vh' : '90vh', 
+              borderRadius: isMaximized ? '0' : '12px',
+              display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem 1.5rem',
+              margin: 0
+            }}>
+             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem' }}>
+                <h2 style={{ margin: 0, fontSize: '1.25rem' }}>{viewingDocument.title || 'Document Viewer'}</h2>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button className="btn btn-ghost" onClick={() => setIsMaximized(!isMaximized)}>
+                    {isMaximized ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+                  </button>
+                  <button className="btn btn-ghost" onClick={() => {
+                    if (viewingDocument.isBlob) {
+                      window.URL.revokeObjectURL(viewingDocument.url);
+                    }
+                    setViewingDocument(null);
+                    setIsMaximized(false);
+                  }}>
+                    <X size={20} />
+                  </button>
+                </div>
+             </div>
+             <div style={{ flex: 1, backgroundColor: '#f5f5f5', borderRadius: '8px', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+               {viewingDocument.isImage ? (
+                 <img src={viewingDocument.url} alt="Document Preview" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+               ) : (
+                 <iframe 
+                   src={`${viewingDocument.url}#toolbar=0&navpanes=0&scrollbar=0`} 
+                   title="Document Preview" 
+                   width="100%" 
+                   height="100%" 
+                   style={{ border: 'none' }}
+                 />
+               )}
+             </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
