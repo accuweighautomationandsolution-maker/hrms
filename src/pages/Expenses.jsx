@@ -55,6 +55,7 @@ const Expenses = () => {
   const [expenseRecords, setExpenseRecords] = useState([]);
   const [activeAdvances, setActiveAdvances] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -121,31 +122,46 @@ const Expenses = () => {
         return;
     }
 
-    const currentUser = authService.getCurrentUser();
-    const currentUserName = currentUser ? currentUser.name : 'Employee User';
-    const myEmpId = resolvedMyEmpId || (currentUser ? currentUser.id : null);
+    setIsSubmitting(true);
+    try {
+      const currentUser = authService.getCurrentUser();
+      const currentUserName = currentUser ? currentUser.name : 'Employee User';
+      const myEmpId = resolvedMyEmpId || (currentUser ? currentUser.id : null);
 
-    const newEntries = expenseItems.map(item => ({
-        id: Date.now() + Math.floor(Math.random() * 1000),
-        date: item.date,
-        name: currentUserName,
-        empId: myEmpId, 
-        department: currentUser ? currentUser.department : 'Engineering',
-        site: targetSite,
-        category: item.category || 'Others',
-        amount: Number(item.amount) || 0,
-        status: 'Pending',
-        linkedAdvance: linkedAdvance === 'none' ? 'None' : (linkedAdvance === 'company_direct' ? 'Company Direct' : linkedAdvance),
-        attachments: item.attachment ? 1 : 0
-    }));
+      const newEntries = await Promise.all(expenseItems.map(async item => {
+          let attachmentUrl = null;
+          if (item.attachment) {
+             attachmentUrl = await dataService.uploadExpenseFile(item.attachment);
+          }
+          return {
+              id: Date.now() + Math.floor(Math.random() * 1000),
+              date: item.date,
+              name: currentUserName,
+              empId: myEmpId, 
+              department: currentUser ? currentUser.department : 'Engineering',
+              site: targetSite,
+              category: item.category || 'Others',
+              amount: Number(item.amount) || 0,
+              status: 'Pending',
+              linkedAdvance: linkedAdvance === 'none' ? 'None' : (linkedAdvance === 'company_direct' ? 'Company Direct' : linkedAdvance),
+              attachments: item.attachment ? 1 : 0,
+              attachmentUrl: attachmentUrl
+          };
+      }));
 
-    const existing = await dataService.getExpenses();
-    await dataService.saveExpenses([...newEntries, ...existing]);
+      // Only upsert the new entries to avoid hitting the 1MB payload limit
+      await dataService.saveExpenses(newEntries);
 
-    setShowModal(false);
-    setReloads(r => r+1);
-    setExpenseItems([{ id: Date.now(), date: new Date().toISOString().split('T')[0], category: '', amount: '', description: '', attachment: null }]);
-    setTargetSite('');
+      setShowModal(false);
+      setReloads(r => r+1);
+      setExpenseItems([{ id: Date.now(), date: new Date().toISOString().split('T')[0], category: '', amount: '', description: '', attachment: null }]);
+      setTargetSite('');
+    } catch (err) {
+      console.error("Failed to submit expenses:", err);
+      alert("Failed to submit expenses. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleAddNewProject = async () => {
@@ -259,9 +275,20 @@ const Expenses = () => {
                   </td>
                   <td style={{ padding: '1rem', textAlign: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
-                        <FileText size={16} /> {rec.attachments}
-                      </span>
+                      {rec.attachmentUrl ? (
+                        <button 
+                           onClick={() => window.open(rec.attachmentUrl, '_blank')}
+                           className="btn btn-ghost" 
+                           style={{ padding: '0.25rem', color: 'var(--color-primary)' }}
+                           title="View Receipt"
+                        >
+                           <FileText size={16} />
+                        </button>
+                      ) : (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
+                          <FileText size={16} style={{ opacity: 0.5 }} /> {rec.attachments}
+                        </span>
+                      )}
                       <button onClick={() => handleDeleteExpense(rec.id)} className="btn btn-ghost" style={{ color: 'var(--color-danger)', padding: '0.25rem' }}>
                         <Trash2 size={16} />
                       </button>
@@ -416,8 +443,8 @@ const Expenses = () => {
                   <span style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', display: 'block' }}>Total Submission Amount</span>
                   <span style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--color-text-main)' }}>₹{totalExpenseAmount.toLocaleString('en-IN')}</span>
                 </div>
-                <button className="btn btn-primary" style={{ padding: '0.75rem 2rem', fontSize: '1rem' }} onClick={handleSubmit}>
-                  Submit Grouped Expense
+                <button className="btn btn-primary" style={{ padding: '0.75rem 2rem', fontSize: '1rem' }} onClick={handleSubmit} disabled={isSubmitting}>
+                  {isSubmitting ? 'Submitting...' : 'Submit Grouped Expense'}
                 </button>
               </div>
             </div>

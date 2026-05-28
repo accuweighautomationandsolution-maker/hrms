@@ -142,15 +142,16 @@ const SiteExpenseReport = () => {
 
     // ── Handlers ────────────────────────────────────────────────────────────
     const updateStatus = async (id, status) => {
-        const updated = rawExpenses.map(r => r.id === id ? { ...r, status } : r);
-        const saved = await dataService.saveExpenses(updated);
-        setRawExpenses(saved);
+        const target = rawExpenses.find(r => r.id === id);
+        if (!target) return;
+        await dataService.saveExpenses([{ ...target, status }]);
+        setRawExpenses(rawExpenses.map(r => r.id === id ? { ...r, status } : r));
     };
 
     const deleteExpense = async (id) => {
         if (!window.confirm('Are you sure you want to delete this expense record?')) return;
-        const updated = await dataService.deleteExpense(id);
-        setRawExpenses(updated);
+        await dataService.deleteExpense(id);
+        setRawExpenses(rawExpenses.filter(r => r.id !== id));
     };
 
     const handleFormSubmit = async (e) => {
@@ -166,8 +167,8 @@ const SiteExpenseReport = () => {
             status: 'Pending',
             attachments: 0
         };
-        const updated = await dataService.saveExpenses([newExpense, ...rawExpenses]);
-        setRawExpenses(updated);
+        await dataService.saveExpenses([newExpense]);
+        setRawExpenses([newExpense, ...rawExpenses]);
         setActiveTab('ledger');
         setFormData({ empId: '', date: new Date().toISOString().split('T')[0], site: '', category: 'Travel / Tickets', amount: '', paymentMode: 'Card', description: '' });
     };

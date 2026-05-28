@@ -1208,6 +1208,22 @@ export const dataService = {
     }
   },
 
+  uploadExpenseFile: async (file) => {
+    try {
+      if (!supabase) throw new Error("No supabase");
+      const { url } = await storageUpload('expenses', file);
+      return url;
+    } catch (e) {
+      console.warn("Expense storage upload failed, falling back to base64 Data URL:", e.message);
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+  },
+
   getAcknowledgments: async () => sbGetAll('policy_acks'),
   saveAcknowledgment: async (ack) => {
     const id = `ACK_${Date.now()}`;
@@ -1420,7 +1436,12 @@ export const dataService = {
   addProject: async (name) => {
     if (!supabase) return;
     const id = name.toLowerCase().replace(/ /g, '_');
-    await supabase.from('projects').insert({ id, name, status: 'Active' });
+    const { data, error } = await supabase.from('projects').insert({ id, name, status: 'Active' }).select().single();
+    if (error) {
+      console.error("Failed to add project:", error);
+      throw error;
+    }
+    return data;
   },
 
   toggleProjectStatus: async (id) => {
