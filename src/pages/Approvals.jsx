@@ -84,17 +84,31 @@ const Approvals = () => {
         }
 
         // 2. Fetch all collections
-        const [hiring, leaves, emps, depts, activePolicy, auditLogs] = await Promise.all([
+        const [hiring, leaves, expenses, emps, depts, activePolicy, auditLogs] = await Promise.all([
           dataService.getManpowerRequests().catch(() => []),
           dataService.getLeaveRequests().catch(() => []),
+          dataService.getExpenses().catch(() => []),
           dataService.getEmployees().catch(() => []),
           dataService.getDepartments().catch(() => []),
           dataService.getMovementPolicies().catch(() => null),
           dataService.getApprovalAuditTrail().catch(() => [])
         ]);
 
+        const expReqs = expenses.map(e => ({
+          id: `EXP-${e.id}`,
+          type: 'Expense',
+          employee: e.name || 'Unknown',
+          emp_id: e.empId,
+          date: e.date,
+          status: e.status,
+          title: `Expense: ${e.category} at ${e.site}`,
+          reason: e.description || 'No description provided',
+          amount: e.amount,
+          data: { ...e, attachment: e.attachmentUrl }
+        }));
+
         setManpowerReqs(hiring);
-        setRequests(leaves);
+        setRequests([...leaves, ...expReqs]);
         setEmployees(emps);
         setDepartments(depts);
         setAuditTrail(auditLogs);

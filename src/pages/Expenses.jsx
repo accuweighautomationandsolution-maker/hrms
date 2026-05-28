@@ -278,11 +278,19 @@ const Expenses = () => {
                      {rec.site}
                      <div style={{fontSize: '0.75rem', fontWeight:'normal', color: 'var(--color-text-muted)'}}>{rec.name}</div>
                   </td>
-                  <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>{rec.category}</td>
+                  <td style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>
+                    {rec.category}
+                    {rec.description && <div style={{ fontSize: '0.75rem', marginTop: '0.25rem', fontStyle: 'italic' }}>{rec.description}</div>}
+                  </td>
                   <td style={{ padding: '1rem' }}>
                     <span className={`badge ${rec.status === 'Approved' ? 'badge-success' : rec.status === 'Rejected' ? 'badge-danger' : 'badge-warning'}`}>
                       {rec.status}
                     </span>
+                    {rec.admin_remarks && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--color-danger)', marginTop: '0.25rem', fontWeight: '500' }}>
+                        Note: {rec.admin_remarks}
+                      </div>
+                    )}
                   </td>
                   <td style={{ padding: '1rem', fontWeight: '600', textAlign: 'right' }}>₹{rec.amount.toLocaleString('en-IN')}</td>
                   <td style={{ padding: '1rem', fontSize: '0.875rem' }}>
@@ -433,8 +441,18 @@ const Expenses = () => {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <label className="btn btn-outline" style={{ padding: '0.4rem 0.5rem', fontSize: '0.75rem', flex: 1, justifyContent: 'center', cursor: 'pointer', backgroundColor: item.attachment ? 'var(--color-success)' : 'transparent', color: item.attachment ? 'white' : 'inherit' }}>
                           <UploadCloud size={14} /> {item.attachment ? 'File Attached' : 'Upload Bill'}
-                          <input type="file" style={{ display: 'none' }} onChange={(e) => handleItemChange(item.id, 'attachment', e.target.files[0])} />
+                          <input type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={(e) => handleItemChange(item.id, 'attachment', e.target.files[0])} />
                         </label>
+                        {item.attachment && (
+                          <button 
+                            className="btn btn-ghost"
+                            onClick={(e) => { e.preventDefault(); handleViewDocument(URL.createObjectURL(item.attachment), 'Attachment Preview'); }}
+                            style={{ padding: '0.4rem', color: 'var(--color-primary)' }}
+                            title="Preview Attachment"
+                          >
+                            <FileText size={16} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

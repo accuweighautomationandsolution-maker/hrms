@@ -1389,26 +1389,38 @@ export const dataService = {
   saveHandoverMaster: async (list) => sbSaveAll('handover_master', list),
 
   // ── Expenses ──────────────────────────────────────────────────────────
-  getExpenses: async () => {
-    if (!supabase) return [];
-    const { data } = await supabase.from('expenses').select('*').order('date', { ascending: false });
-    return (data || []).map(d => ({
+  // Helper for parsing expense description
+  _parseExpenseDesc: (d) => {
+    let parsedDesc = {};
+    let isJson = false;
+    try {
+      if (d.description && d.description.trim().startsWith('{')) {
+        parsedDesc = JSON.parse(d.description);
+        isJson = true;
+      }
+    } catch (e) {}
+    
+    return {
       id: d.id, date: d.date, name: d.name, empId: d.emp_id,
       department: d.department, site: d.site, category: d.category,
       amount: d.amount, status: d.status, linkedAdvance: d.linked_advance,
-      attachments: d.attachments, attachmentUrl: d.description
-    }));
+      attachments: d.attachments, 
+      attachmentUrl: isJson ? parsedDesc.url : d.description,
+      description: isJson ? parsedDesc.text : '',
+      admin_remarks: isJson ? parsedDesc.admin_remarks : ''
+    };
+  },
+
+  getExpenses: async () => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('expenses').select('*').order('date', { ascending: false });
+    return (data || []).map(dataService._parseExpenseDesc);
   },
 
   getPersonalExpenses: async (empId) => {
     if (!supabase) return [];
     const { data } = await supabase.from('expenses').select('*').eq('emp_id', empId).order('date', { ascending: false });
-    return (data || []).map(d => ({
-      id: d.id, date: d.date, name: d.name, empId: d.emp_id,
-      department: d.department, site: d.site, category: d.category,
-      amount: d.amount, status: d.status, linkedAdvance: d.linked_advance,
-      attachments: d.attachments, attachmentUrl: d.description
-    }));
+    return (data || []).map(dataService._parseExpenseDesc);
   },
 
   saveExpenses: async (list) => {
@@ -1421,7 +1433,8 @@ export const dataService = {
         id: e.id, date: e.date, name: e.name, emp_id: validEmpId,
         department: e.department, site: e.site, category: e.category,
         amount: e.amount, status: e.status, linked_advance: e.linkedAdvance,
-        attachments: e.attachments, description: e.attachmentUrl
+        attachments: e.attachments,
+        description: JSON.stringify({ url: e.attachmentUrl || '', text: e.description || '', admin_remarks: e.admin_remarks || '' })
       };
     });
     const { error } = await supabase.from('expenses').upsert(dbList, { onConflict: 'id' });
@@ -2142,6 +2155,54 @@ export const dataService = {
   updateRequestWorkflowAction: async (requestId, actionDetails) => {
     if (!supabase) return null;
     try {
+      if (String(requestId).startsWith('EXP-')) {
+        const expId = String(requestId).replace('EXP-', '');
+        
+        // Fetch existing expense
+        const { data: expRow } = await supabase.from('expenses').select('*').eq('id', expId).maybeSingle();
+        if (!expRow) throw new Error("Expense not found");
+        
+        // Multiplex admin remarks
+        let parsedDesc = {};
+        let isJson = false;
+        try {
+          if (expRow.description && expRow.description.trim().startsWith('{')) {
+            parsedDesc = JSON.parse(expRow.description);
+            isJson = true;
+          }
+        } catch (e) {}
+
+        const newDesc = JSON.stringify({
+          url: isJson ? parsedDesc.url : expRow.description,
+          text: isJson ? parsedDesc.text : '',
+          admin_remarks: actionDetails.remarks || ''
+        });
+
+        const { error } = await supabase.from('expenses').update({
+          status: actionDetails.status,
+          description: newDesc
+        }).eq('id', expId);
+
+        if (error) throw error;
+
+        // Log audit trail
+        const auditTrail = await getConfig('approval_audit_trail', []);
+        const newAuditLog = {
+          id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          timestamp: new Date().toISOString(),
+          requestId: requestId,
+          requestType: 'Expense',
+          actionType: actionDetails.actionType,
+          actionBy: actionDetails.managerName,
+          remarks: actionDetails.remarks || '',
+          status: actionDetails.status,
+          details: actionDetails
+        };
+        await saveConfig('approval_audit_trail', [...auditTrail, newAuditLog]);
+        
+        return { status: actionDetails.status };
+      }
+
       const ltId = String(requestId).startsWith('LR_') ? String(requestId) : `LR_${requestId}`;
       const rawId = String(requestId).replace(/^LR_/, '');
 
