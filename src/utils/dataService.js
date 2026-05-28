@@ -1413,12 +1413,17 @@ export const dataService = {
 
   saveExpenses: async (list) => {
     if (!supabase) return list;
-    const dbList = list.map(e => ({
-      id: e.id, date: e.date, name: e.name, emp_id: e.empId,
-      department: e.department, site: e.site, category: e.category,
-      amount: e.amount, status: e.status, linked_advance: e.linkedAdvance,
-      attachments: e.attachments, description: e.attachmentUrl
-    }));
+    const dbList = list.map(e => {
+      // Ensure emp_id is a valid integer, otherwise set to null to avoid Postgres BIGINT syntax error
+      const parsedEmpId = Number(e.empId);
+      const validEmpId = isNaN(parsedEmpId) ? null : parsedEmpId;
+      return {
+        id: e.id, date: e.date, name: e.name, emp_id: validEmpId,
+        department: e.department, site: e.site, category: e.category,
+        amount: e.amount, status: e.status, linked_advance: e.linkedAdvance,
+        attachments: e.attachments, description: e.attachmentUrl
+      };
+    });
     const { error } = await supabase.from('expenses').upsert(dbList, { onConflict: 'id' });
     if (error) console.error("Failed to save expenses:", error);
     return list;

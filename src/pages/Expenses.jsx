@@ -86,8 +86,11 @@ const Expenses = () => {
 
   const filteredExpenses = useMemo(() => {
     // SECURITY: Employee-role users only see their own expenses
-    const visibleRecords = isEmployee && resolvedMyEmpId
-      ? expenseRecords.filter(r => String(r.empId) === String(resolvedMyEmpId))
+    const visibleRecords = isEmployee 
+      ? expenseRecords.filter(r => 
+          (resolvedMyEmpId && String(r.empId) === String(resolvedMyEmpId)) ||
+          (!resolvedMyEmpId && r.name === currentUser?.name)
+        )
       : expenseRecords;
     return visibleRecords.filter(r => 
         (r.site || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
