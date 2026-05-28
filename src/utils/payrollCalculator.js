@@ -19,16 +19,17 @@ const ESIC_PERCENTAGE_EMPLOYER = 0.0325;
 const ESIC_GROSS_LIMIT = 21000;
 const PT_AMOUNT_MH = 200;
 
-export const getOnRollWorkerPayableDays = (year, month) => {
+export const getOnRollWorkerPayableDays = (year, month, endDay) => {
   let sunCount = 0;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  for (let d = 1; d <= daysInMonth; d++) {
+  const limit = endDay || daysInMonth;
+  for (let d = 1; d <= limit; d++) {
     const dow = new Date(year, month, d).getDay();
     if (dow === 0) { // 0 = Sunday
       sunCount++;
     }
   }
-  return daysInMonth - sunCount;
+  return limit - sunCount;
 };
 
 export const calculateAttendanceStats = (empId, year, month, recordsMap, holidayList, category, leaveRequests = []) => {
@@ -110,9 +111,16 @@ export const calculateAttendanceStats = (empId, year, month, recordsMap, holiday
     }
   }
 
-  let divisor = daysInMonth;
+  const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+  
+  let endDay = daysInMonth;
+  if (isCurrentMonth) {
+    endDay = today.getDate();
+  }
+
+  let divisor = endDay;
   if (isOnRollWorker || isContractualWorker) {
-    divisor = getOnRollWorkerPayableDays(year, month);
+    divisor = getOnRollWorkerPayableDays(year, month, endDay);
   }
 
   const payableDays = Math.max(0, divisor - absentDays);
