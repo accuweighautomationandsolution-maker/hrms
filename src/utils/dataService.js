@@ -1392,18 +1392,35 @@ export const dataService = {
   getExpenses: async () => {
     if (!supabase) return [];
     const { data } = await supabase.from('expenses').select('*').order('date', { ascending: false });
-    return data || [];
+    return (data || []).map(d => ({
+      id: d.id, date: d.date, name: d.name, empId: d.emp_id,
+      department: d.department, site: d.site, category: d.category,
+      amount: d.amount, status: d.status, linkedAdvance: d.linked_advance,
+      attachments: d.attachments, attachmentUrl: d.description
+    }));
   },
 
   getPersonalExpenses: async (empId) => {
     if (!supabase) return [];
     const { data } = await supabase.from('expenses').select('*').eq('emp_id', empId).order('date', { ascending: false });
-    return data || [];
+    return (data || []).map(d => ({
+      id: d.id, date: d.date, name: d.name, empId: d.emp_id,
+      department: d.department, site: d.site, category: d.category,
+      amount: d.amount, status: d.status, linkedAdvance: d.linked_advance,
+      attachments: d.attachments, attachmentUrl: d.description
+    }));
   },
 
   saveExpenses: async (list) => {
     if (!supabase) return list;
-    await supabase.from('expenses').upsert(list);
+    const dbList = list.map(e => ({
+      id: e.id, date: e.date, name: e.name, emp_id: e.empId,
+      department: e.department, site: e.site, category: e.category,
+      amount: e.amount, status: e.status, linked_advance: e.linkedAdvance,
+      attachments: e.attachments, description: e.attachmentUrl
+    }));
+    const { error } = await supabase.from('expenses').upsert(dbList, { onConflict: 'id' });
+    if (error) console.error("Failed to save expenses:", error);
     return list;
   },
 
