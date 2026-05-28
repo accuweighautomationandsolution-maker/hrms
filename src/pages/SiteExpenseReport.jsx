@@ -637,10 +637,14 @@ const SiteExpenseReport = () => {
                             <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowAddProjectModal(false)}>Cancel</button>
                             <button className="btn btn-primary" style={{ flex: 1 }} onClick={async () => {
                                 if (!newProjName.trim()) return;
-                                await dataService.addProject(newProjName);
-                                setProjects(await dataService.getProjects());
-                                setShowAddProjectModal(false);
-                                setNewProjName('');
+                                try {
+                                    await dataService.addProject(newProjName);
+                                    setProjects(await dataService.getProjects());
+                                    setShowAddProjectModal(false);
+                                    setNewProjName('');
+                                } catch (e) {
+                                    alert("Failed to create project. It may already exist or there was a network error.");
+                                }
                             }}>Create Project</button>
                         </div>
                     </div>

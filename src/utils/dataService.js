@@ -1436,12 +1436,13 @@ export const dataService = {
   addProject: async (name) => {
     if (!supabase) return;
     const id = name.toLowerCase().replace(/ /g, '_');
-    const { data, error } = await supabase.from('projects').insert({ id, name, status: 'Active' }).select().single();
+    const project = { id, name, status: 'Active' };
+    const { error } = await supabase.from('projects').insert(project);
     if (error) {
       console.error("Failed to add project:", error);
       throw error;
     }
-    return data;
+    return project;
   },
 
   toggleProjectStatus: async (id) => {

@@ -166,11 +166,15 @@ const Expenses = () => {
 
   const handleAddNewProject = async () => {
     if (!newProjectName.trim()) return;
-    const newPrj = await dataService.addProject(newProjectName);
-    setProjects([...projects, newPrj]);
-    setTargetSite(newPrj.name);
-    setIsAddingNewProject(false);
-    setNewProjectName('');
+    try {
+      const newPrj = await dataService.addProject(newProjectName);
+      setProjects([...projects, newPrj]);
+      setTargetSite(newPrj.name);
+      setIsAddingNewProject(false);
+      setNewProjectName('');
+    } catch (e) {
+      alert("Failed to add project. It may already exist or there was a network error.");
+    }
   };
 
   if (loading) {
