@@ -233,7 +233,7 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
     const basicPct = options.formulaConfig?.basic_pct !== undefined ? options.formulaConfig.basic_pct : 0.50;
     const daPct = options.formulaConfig?.da_pct !== undefined ? options.formulaConfig.da_pct : 0.05;
     const hraPct = options.formulaConfig?.hra_pct !== undefined ? options.formulaConfig.hra_pct : ((options.hraPercent !== undefined) ? (Number(options.hraPercent) / 100) : 0.40);
-    const washingFixed = options.formulaConfig?.washing_fixed !== undefined ? options.formulaConfig.washing_fixed : (options.salWashing !== undefined ? Number(options.salWashing) : 1000);
+    const washingFixed = options.formulaConfig?.washing_fixed !== undefined ? options.formulaConfig.washing_fixed : ((options.salWashing !== undefined && options.salWashing !== '') ? Number(options.salWashing) : 1000);
 
     const fullBasic           = baseGross * basicPct;
     const fullDA              = fullBasic * daPct;
@@ -255,10 +255,8 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
     
     // Balance remainder strictly in otherManual to achieve EXACT prorated gross
     const proSumWithoutOther = basic + da + hra + washingAllowance + conveyance + performance + specialManual;
-    otherManual = targetProGross - proSumWithoutOther;
-    if (otherManual < 0) {
-      otherManual = 0;
-    }
+    
+    otherManual = (options.salOther !== undefined && options.salOther !== '') ? Number(options.salOther) : 0;
   }
 
   const absentDays = Math.max(0, divisor - (Number(daysWorked) || 0));
