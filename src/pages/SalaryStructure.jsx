@@ -20,7 +20,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     hasPF: true, pfCapped: true, hasESIC: false,
     dayRate: ''
   });
-
+  const [formulaConfig, setFormulaConfig] = useState(null);
   const hasFetched = useRef(false);
 
   useEffect(() => {
@@ -38,12 +38,23 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
       if (effectiveEmpId && !isEmbedded && !hasFetched.current) {
         hasFetched.current = true;
         try {
-          const [existing, emp] = await Promise.all([
+          const [existing, emp, configData] = await Promise.all([
             dataService.getSalaryStructure(effectiveEmpId).catch(() => null),
-            dataService.getEmployees().then(list => list.find(e => e.id === effectiveEmpId)).catch(() => null)
+            dataService.getEmployees().then(list => list.find(e => e.id === effectiveEmpId)).catch(() => null),
+            dataService.getPayrollFormulaConfig().catch(() => [])
           ]);
           
           if (isMounted) {
+            if (configData && configData.length > 0) {
+              const parsed = {};
+              configData.forEach(c => {
+                if (c.component_name === 'Basic') parsed.basic_pct = c.formula_value / 100;
+                if (c.component_name === 'DA') parsed.da_pct = c.formula_value / 100;
+                if (c.component_name === 'HRA') parsed.hra_pct = c.formula_value / 100;
+                if (c.component_name === 'Washing Allowance') parsed.washing_fixed = c.formula_value;
+              });
+              setFormulaConfig(parsed);
+            }
             if (existing) {
               setForm(prev => ({ 
                 ...prev, 
@@ -126,7 +137,8 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
       hasPF: form.hasPF,
       hasESIC: form.hasESIC,
       year: previewYear,
-      month: previewMonth
+      month: previewMonth,
+      formulaConfig
     }
   );
 

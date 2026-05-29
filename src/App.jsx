@@ -28,6 +28,7 @@ import BudgetControl from './pages/BudgetControl';
 import HiringRequests from './pages/HiringRequests';
 import ExitManagement from './pages/ExitManagement';
 import BonusManagement from './pages/BonusManagement';
+import PayrollFormulaSettings from './pages/PayrollFormulaSettings';
 import PolicyManagement from './pages/PolicyManagement';
 import TrainingInduction from './pages/TrainingInduction';
 import ComplianceHub from './pages/ComplianceHub';
@@ -290,6 +291,7 @@ function App() {
                     <Route path="/departments" element={<DepartmentManagement />} />
                     <Route path="/designations" element={<DesignationManagement />} />
                     <Route path="/movement-policies" element={<MovementPolicySettings />} />
+                    <Route path="/payroll-formulas" element={<PayrollFormulaSettings />} />
                   </>
                 )}
                 

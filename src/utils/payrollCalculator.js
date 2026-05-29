@@ -182,11 +182,15 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
     fullMonthGross  = baseGross * daysWorked;
   } else {
     // Staff / On-Roll: compute full components then pro-rate
-    const fullBasic           = baseGross * 0.50;
-    const fullDA              = fullBasic * 0.05;
-    const hraPercentVal       = (options.hraPercent !== undefined) ? (Number(options.hraPercent) / 100) : 0.40;
-    const fullHRA             = fullBasic * hraPercentVal;
-    const fullWashing         = options.salWashing !== undefined ? Number(options.salWashing) : 1000;
+    const basicPct = options.formulaConfig?.basic_pct !== undefined ? options.formulaConfig.basic_pct : 0.50;
+    const daPct = options.formulaConfig?.da_pct !== undefined ? options.formulaConfig.da_pct : 0.05;
+    const hraPct = options.formulaConfig?.hra_pct !== undefined ? options.formulaConfig.hra_pct : ((options.hraPercent !== undefined) ? (Number(options.hraPercent) / 100) : 0.40);
+    const washingFixed = options.formulaConfig?.washing_fixed !== undefined ? options.formulaConfig.washing_fixed : (options.salWashing !== undefined ? Number(options.salWashing) : 1000);
+
+    const fullBasic           = baseGross * basicPct;
+    const fullDA              = fullBasic * daPct;
+    const fullHRA             = fullBasic * hraPct;
+    const fullWashing         = washingFixed;
     const fullConveyance      = Number(options.salConveyance) || 0;
     const fullPerformance     = Number(options.salPerformance) || 0;
     const fullSpecial         = Number(options.salSpecial) || 0;

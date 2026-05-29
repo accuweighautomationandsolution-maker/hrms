@@ -1256,6 +1256,45 @@ export const dataService = {
   },
 
   // ── Advances & Payroll ─────────────────────────────────────────────────
+  getPayrollFormulaConfig: async () => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('payroll_formula_config').select('*');
+    return data || [];
+  },
+  
+  savePayrollFormulaConfig: async (configs, updatedBy) => {
+    if (!supabase) return;
+    const { error } = await supabase.from('payroll_formula_config').upsert(configs);
+    if (error) {
+      console.error('savePayrollFormulaConfig failed:', error);
+      throw error;
+    }
+    // Simple audit log creation for MVP
+    for (const conf of configs) {
+       await supabase.from('payroll_formula_audit_log').insert({
+         component_name: conf.component_name,
+         new_value: conf.formula_value,
+         changed_by: updatedBy,
+         reason: 'Admin UI Update'
+       });
+    }
+  },
+
+  calculateSalaryStructureBackend: async (grossSalary, conveyance = 0, performance = 0, special = 0) => {
+    if (!supabase) return null;
+    const { data, error } = await supabase.rpc('calculate_salary_structure', {
+      p_gross_salary: grossSalary,
+      p_conveyance: conveyance,
+      p_performance: performance,
+      p_special: special
+    });
+    if (error) {
+      console.error('calculateSalaryStructureBackend failed:', error);
+      throw error;
+    }
+    return data;
+  },
+
   getAdvanceHistory: async () => sbGetAll('advances'),
   saveAdvanceHistory: async (history) => sbSaveAll('advances', history),
   getPersonalAdvances: async (empId) => {

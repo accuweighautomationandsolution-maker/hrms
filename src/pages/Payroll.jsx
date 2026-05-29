@@ -52,6 +52,7 @@ const Payroll = () => {
   const [procDaysPresent, setProcDaysPresent] = useState(0);
   const [procOTAmount, setProcOTAmount] = useState(0);
   const [procAdvanceDeduction, setProcAdvanceDeduction] = useState(0);
+  const [formulaConfig, setFormulaConfig] = useState(null);
 
   const handleOpenProcessModal = (emp) => {
     setProcessModalEmp(emp);
@@ -177,7 +178,8 @@ const Payroll = () => {
             salOther: struct.salOther || 0,
             salSpecial: struct.salSpecial || 0,
             salWashing: struct.salWashing,
-            otAmount: Number(procOTAmount) || 0
+            otAmount: Number(procOTAmount) || 0,
+            formulaConfig
           }
         );
 
@@ -473,14 +475,15 @@ const Payroll = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [emps, hols, dbRecs, structuresMap, monthlyAtt, leaves, advancesData] = await Promise.all([
+        const [emps, hols, dbRecs, structuresMap, monthlyAtt, leaves, advancesData, configData] = await Promise.all([
           dataService.getEmployees().catch(() => []),
           dataService.getCustomHolidays().catch(() => []),
           dataService.getPayrollRecordsByMonth(month, year).catch(() => []),
           dataService.getSalaryStructuresMap().catch(() => ({})),
           dataService.getMonthlyAttendance(month, year).catch(() => ({})),
           dataService.getLeaveRequests().catch(() => []),
-          dataService.getAdvanceHistory().catch(() => [])
+          dataService.getAdvanceHistory().catch(() => []),
+          dataService.getPayrollFormulaConfig().catch(() => [])
         ]);
         
         const attMap = {};
@@ -507,6 +510,17 @@ const Payroll = () => {
           setDbRecords(dbRecsMap);
           setSalaryStructures(structuresMap);
           setAdvanceHistory(advancesData || []);
+          
+          if (configData && configData.length > 0) {
+            const parsed = {};
+            configData.forEach(c => {
+              if (c.component_name === 'Basic') parsed.basic_pct = c.formula_value / 100;
+              if (c.component_name === 'DA') parsed.da_pct = c.formula_value / 100;
+              if (c.component_name === 'HRA') parsed.hra_pct = c.formula_value / 100;
+              if (c.component_name === 'Washing Allowance') parsed.washing_fixed = c.formula_value;
+            });
+            setFormulaConfig(parsed);
+          }
         }
       } catch (err) {
         console.error("Failed to load payroll:", err);
@@ -560,7 +574,8 @@ const Payroll = () => {
               salOther: otherManual,
               salSpecial: specialManual,
               salWashing: struct.salWashing,
-              otAmount: calculatedOT
+              otAmount: calculatedOT,
+              formulaConfig
             }
           )
         : null;
