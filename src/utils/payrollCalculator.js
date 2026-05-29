@@ -20,16 +20,22 @@ const ESIC_GROSS_LIMIT = 21000;
 const PT_AMOUNT_MH = 200;
 
 export const getOnRollWorkerPayableDays = (year, month, endDay) => {
+  let offCount = 0;
   let satCount = 0;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const limit = endDay || daysInMonth;
   for (let d = 1; d <= limit; d++) {
     const dow = new Date(year, month, d).getDay();
-    if (dow === 6) { // 6 = Saturday
+    if (dow === 0) { // Sunday
+      offCount++;
+    } else if (dow === 6) { // Saturday
       satCount++;
+      if (satCount % 2 !== 0) { // Odd Saturday
+        offCount++;
+      }
     }
   }
-  return limit - satCount;
+  return limit - offCount;
 };
 
 export const calculateAttendanceStats = (empId, year, month, recordsMap, holidayList, category, leaveRequests = []) => {
@@ -58,10 +64,11 @@ export const calculateAttendanceStats = (empId, year, month, recordsMap, holiday
   const toMins = (t) => { if (!t) return null; const [h, m] = t.split(':').map(Number); return h * 60 + m; };
   const shiftStart = toMins('09:00');
   const shiftEnd = toMins('18:30');
-  const lateGrace = 10;
+  const lateGrace = 15;
   const lateLimit = shiftStart + lateGrace;
   const halfDayStartLimit = shiftStart + 120 + lateGrace;
   const halfDayEndLimit = shiftEnd - 120;
+  const earlyLeaveLimit = shiftEnd - lateGrace;
 
   // Find approved leaves
   const approvedLeaves = new Set();
@@ -91,20 +98,9 @@ export const calculateAttendanceStats = (empId, year, month, recordsMap, holiday
     const punchedIn = !!(rec && (rec.punchIn || rec.punchOut));
     
     let isHolidayForEmp = false;
-    let isOddSaturday = false;
 
-    if (isOnRollWorker || isContractualWorker) {
-      if (dow === 6 || holidaySet.has(d)) {
-        isHolidayForEmp = true;
-      }
-      const saturdayNumber = Math.ceil(d / 7);
-      if (dow === 6 && (saturdayNumber === 1 || saturdayNumber === 3 || saturdayNumber === 5)) {
-        isOddSaturday = true;
-      }
-    } else {
-      if (holidaySet.has(d)) {
-        isHolidayForEmp = true;
-      }
+    if (holidaySet.has(d)) {
+      isHolidayForEmp = true;
     }
 
     if (punchedIn) {
@@ -129,7 +125,7 @@ export const calculateAttendanceStats = (empId, year, month, recordsMap, holiday
         // Check leaving early
         if (outMins < halfDayEndLimit) {
           isHalfDayPunched = true;
-        } else if (outMins < shiftEnd) {
+        } else if (outMins < earlyLeaveLimit) {
           isLateMark = true;
         }
         
