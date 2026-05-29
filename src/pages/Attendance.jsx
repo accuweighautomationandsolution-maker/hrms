@@ -50,8 +50,8 @@ const BADGE_COLOR = {
 
 // ── Punch-edit modal ────────────────────────────────────────────────────────
 const PunchModal = ({ entry, onSave, onClose }) => {
-  const [punchIn, setPunchIn] = useState(entry.punchIn || '09:00');
-  const [punchOut, setPunchOut] = useState(entry.punchOut || '18:30');
+  const [punchIn, setPunchIn] = useState(entry.punchIn || '');
+  const [punchOut, setPunchOut] = useState(entry.punchOut || '');
   const [remark, setRemark] = useState(entry.remark || '');
 
   const res = diffHHMM(punchIn, punchOut);
@@ -113,10 +113,15 @@ const PunchModal = ({ entry, onSave, onClose }) => {
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+          <button className="btn btn-outline" style={{ color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }} onClick={() => {
+            if (window.confirm('Are you sure you want to completely delete this attendance record?')) {
+              onSave({ punchIn: null, punchOut: null, remark: 'Record Cleared by Admin', source: 'Manual' });
+            }
+          }}>Clear Record</button>
           <button className="btn btn-outline" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary"
-            disabled={!punchIn || !punchOut || !remark.trim()}
-            onClick={() => onSave({ punchIn, punchOut, remark, source: 'Manual' })}>
+            disabled={!punchIn || !remark.trim()}
+            onClick={() => onSave({ punchIn, punchOut: punchOut || null, remark, source: 'Manual' })}>
             <Save size={16} /> Save Entry
           </button>
         </div>
