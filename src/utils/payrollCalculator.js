@@ -215,6 +215,11 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
   let fullMonthGross = baseGross;
 
   let prorationRatio = divisor > 0 ? (daysWorked / divisor) : 0;
+  let excessDaysForOT = 0;
+  if (prorationRatio > 1) {
+    excessDaysForOT = daysWorked - divisor;
+    prorationRatio = 1;
+  }
   if (options.isPreview) prorationRatio = 1;
 
   if (isContractualWorker) {
@@ -270,10 +275,12 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
   }
   
   // Double rate for Holiday Worked (if they worked full days on holidays, we add 1x extra, as 1x is in basic salary already)
+  // For excess days (worked on weekly offs beyond standard divisor), they are completely outside basic salary, so 1x rate here compensates them.
   let holidayBonusPay = 0;
-  if ((options.holidayWorkedDays || 0) > 0 && !isStaff) {
+  const totalExtraDays = (options.holidayWorkedDays || 0) + excessDaysForOT;
+  if (totalExtraDays > 0 && !isStaff) {
     const dailyRate = baseGross / divisor;
-    holidayBonusPay = Math.round((options.holidayWorkedDays || 0) * dailyRate);
+    holidayBonusPay = Math.round(totalExtraDays * dailyRate);
   }
 
   const componentTotal = basic + da + hra + washingAllowance + conveyance + performance + otherManual + specialManual;
