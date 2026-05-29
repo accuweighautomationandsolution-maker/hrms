@@ -575,7 +575,11 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
           </div>
           <div className="form-group hide-on-print-border">
             <label className="form-label">Employment Status</label>
-            <input type="text" className="form-input" style={{ width: '100%', fontWeight: '600', color: 'var(--color-primary)' }} value={form.empType || 'Probation'} disabled />
+            <select className="form-input" style={{ width: '100%', fontWeight: '600', color: 'var(--color-primary)' }} value={form.empType || 'Probation'} onChange={e => handleInput('empType', e.target.value)}>
+              <option value="Probation">Probation</option>
+              <option value="Permanent">Permanent</option>
+              <option value="Contract">Contract</option>
+            </select>
           </div>
         </div>
 

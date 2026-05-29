@@ -341,8 +341,8 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
     },
     erTotalStatutory: totalErStatutory,
     netPay: finalNetPay,
-    remainingAmount: 0,
-    isBalanced: true,
+    remainingAmount: Math.round(baseGross * prorationRatio) - componentTotal,
+    isBalanced: Math.abs(Math.round(baseGross * prorationRatio) - componentTotal) <= 1,
     divisor,
     absentDays,
     lopDeduction
