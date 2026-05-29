@@ -424,11 +424,11 @@ export const dataService = {
     const isExisting = !!empData.id && !empData.isNew;
     const status = empData.status || 'Active';
 
-    // Helper: wraps any Supabase promise with a 12-second timeout
+    // Helper: wraps any Supabase promise with a 60-second timeout
     const withTimeout = (promise, label) => Promise.race([
       promise,
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error(`${label} timed out after 12s`)), 12000)
+        setTimeout(() => reject(new Error(`${label} timed out after 60s. The database might be waking up.`)), 60000)
       )
     ]);
 
