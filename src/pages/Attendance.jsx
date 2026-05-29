@@ -413,9 +413,14 @@ const Attendance = () => {
         const canOverwrite = !existing || existing.source !== 'Manual';
 
         if (canOverwrite) {
+          let finalOut = log.punchOut;
+          if (finalOut === log.punchIn) {
+            finalOut = null; // Prevent single punch from duplicating into both IN and OUT
+          }
+          
           const entry = {
             punchIn: log.punchIn,
-            punchOut: log.punchOut,
+            punchOut: finalOut,
             remark: log.remark || 'Identix Hardware Pull',
             source: 'Biometric Terminal'
           };
