@@ -117,15 +117,20 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
   const targetGross = Number(form.targetSalary) || 0;
   const now = new Date();
   const previewYear = now.getFullYear();
-  const previewMonth = now.getMonth(); // 0-indexed
-  const previewDaysInMonth = new Date(previewYear, previewMonth + 1, 0).getDate();
+  const previewMonth = now.getMonth(); 
+  
+  // Standard Offer Structure Divisors
+  let previewDaysInMonth = 30; // Default for Staff
+  if ((empCategory || '').toLowerCase().trim() === 'on role worker' || (empCategory || '').toLowerCase().trim() === 'on-roll worker') {
+    previewDaysInMonth = 26; // 26 Days Standard for On-Role Offer
+  }
 
   const payroll = calculateSalaryComponents(
     targetGross,
-    form.pfCapped !== false, // pfCapped state from form
+    form.pfCapped !== false,
     0,
     empCategory || 'Staff Employee',
-    previewDaysInMonth, // daysWorked = full month → ratio = 1
+    previewDaysInMonth, 
     previewDaysInMonth,
     {
       salWashing: form.salWashing,
@@ -138,7 +143,8 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
       hasESIC: form.hasESIC,
       year: previewYear,
       month: previewMonth,
-      formulaConfig
+      formulaConfig,
+      isPreview: true
     }
   );
 

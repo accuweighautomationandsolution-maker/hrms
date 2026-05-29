@@ -20,16 +20,16 @@ const ESIC_GROSS_LIMIT = 21000;
 const PT_AMOUNT_MH = 200;
 
 export const getOnRollWorkerPayableDays = (year, month, endDay) => {
-  let sunCount = 0;
+  let satCount = 0;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const limit = endDay || daysInMonth;
   for (let d = 1; d <= limit; d++) {
     const dow = new Date(year, month, d).getDay();
-    if (dow === 0) { // 0 = Sunday
-      sunCount++;
+    if (dow === 6) { // 6 = Saturday
+      satCount++;
     }
   }
-  return limit - sunCount;
+  return limit - satCount;
 };
 
 export const calculateAttendanceStats = (empId, year, month, recordsMap, holidayList, category, leaveRequests = []) => {
@@ -40,15 +40,30 @@ export const calculateAttendanceStats = (empId, year, month, recordsMap, holiday
   const cat = (category || '').toLowerCase().trim();
   const isOnRollWorker = cat === 'on role worker' || cat === 'on-roll worker';
   const isContractualWorker = cat === 'contractual worker';
+  const isStaff = !isOnRollWorker && !isContractualWorker;
 
   let absentDays = 0;
   let presentDays = 0;
   let holidayWorkedDays = 0;
+  let lateMarks = 0;
+  let halfDays = 0;
+  let compOffEarned = 0;
+  let otHours = 0;
+  let holidayOtHours = 0;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Find approved leaves for this month
+  // Shift Timing Rules
+  const toMins = (t) => { if (!t) return null; const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+  const shiftStart = toMins('09:00');
+  const shiftEnd = toMins('18:30');
+  const lateGrace = 10;
+  const lateLimit = shiftStart + lateGrace;
+  const halfDayStartLimit = shiftStart + 120 + lateGrace;
+  const halfDayEndLimit = shiftEnd - 120;
+
+  // Find approved leaves
   const approvedLeaves = new Set();
   (leaveRequests || []).forEach(lr => {
     if (String(lr.empId) === String(empId) && lr.status === 'Approved') {
@@ -74,15 +89,17 @@ export const calculateAttendanceStats = (empId, year, month, recordsMap, holiday
     const key = `${empId}_${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const rec = recordsMap[key];
     const punchedIn = !!(rec && (rec.punchIn || rec.punchOut));
-
-    if (punchedIn) presentDays++;
-
+    
     let isHolidayForEmp = false;
+    let isOddSaturday = false;
 
     if (isOnRollWorker || isContractualWorker) {
-      // Sundays are excluded, Odd Saturdays are holidays
-      if (dow !== 0 && holidaySet.has(d)) {
+      if (dow === 6 || holidaySet.has(d)) {
         isHolidayForEmp = true;
+      }
+      const saturdayNumber = Math.ceil(d / 7);
+      if (dow === 6 && (saturdayNumber === 1 || saturdayNumber === 3 || saturdayNumber === 5)) {
+        isOddSaturday = true;
       }
     } else {
       if (holidaySet.has(d)) {
@@ -90,98 +107,129 @@ export const calculateAttendanceStats = (empId, year, month, recordsMap, holiday
       }
     }
 
-    if (punchedIn && isHolidayForEmp) {
-      holidayWorkedDays++;
-    }
+    if (punchedIn) {
+      presentDays++;
 
-    if (!isFuture && !punchedIn) {
-      if (isOnRollWorker || isContractualWorker) {
-        if (!isHolidayForEmp && dow !== 0) {
-          if (!approvedLeaves.has(d)) {
-            absentDays++;
-          }
+      const inMins = toMins(rec.punchIn);
+      const outMins = toMins(rec.punchOut);
+      const duration = (outMins && inMins && outMins > inMins) ? (outMins - inMins) : null;
+      let isHalfDayPunched = false;
+
+      // Late mark & Half day evaluation for regular working days
+      if (!isHolidayForEmp && inMins && outMins) {
+        let isLateMark = false;
+
+        // Check arriving late
+        if (inMins > halfDayStartLimit) {
+          isHalfDayPunched = true;
+        } else if (inMins > lateLimit) {
+          isLateMark = true;
         }
-      } else {
-        if (!isHolidayForEmp) {
-          if (!approvedLeaves.has(d)) {
-            absentDays++;
+
+        // Check leaving early
+        if (outMins < halfDayEndLimit) {
+          isHalfDayPunched = true;
+        } else if (outMins < shiftEnd) {
+          isLateMark = true;
+        }
+        
+        if (isHalfDayPunched) {
+          halfDays++;
+        } else if (isLateMark) {
+          lateMarks++;
+        }
+      }
+
+      // OT Calculation
+      if (isHolidayForEmp && duration) {
+        holidayWorkedDays++;
+        
+        if (isStaff) {
+          compOffEarned++;
+          holidayWorkedDays--; // Convert payout to comp off
+        } else {
+          // 30 mins deduction for holiday / odd saturday if worked > half day
+          let payableMins = duration;
+          if (duration >= 240) {
+             payableMins = Math.max(0, duration - 30);
           }
+          holidayOtHours += (payableMins / 60);
+        }
+      } else if (!isHolidayForEmp && duration && outMins > shiftEnd) {
+        // Regular day OT
+        let otDuration = outMins - shiftEnd;
+        otHours += (otDuration / 60);
+      }
+    } else {
+      // Not punched in
+      if (!isFuture) {
+        if (!isHolidayForEmp && !approvedLeaves.has(d)) {
+          absentDays++;
         }
       }
     }
   }
 
-  const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
-  
-  let endDay = daysInMonth;
-  if (isCurrentMonth) {
-    endDay = today.getDate();
-  }
+  // 4th Late Mark -> Half Day logic
+  const extraHalfDaysFromLates = Math.floor(lateMarks / 4);
+  halfDays += extraHalfDaysFromLates;
+  absentDays += (halfDays * 0.5);
 
-  let divisor = endDay;
+  let divisor = daysInMonth;
   if (isOnRollWorker || isContractualWorker) {
-    divisor = getOnRollWorkerPayableDays(year, month, endDay);
+    divisor = getOnRollWorkerPayableDays(year, month, daysInMonth);
   }
 
   const payableDays = Math.max(0, divisor - absentDays);
   
-  // Basic calculation for holiday OT Amount (Assume 8 hours standard or something similar, or just gross/divisor * holidayWorkedDays)
-  // We don't compute the exact amount here since it depends on gross. But we can return the count.
   return {
     presentDays,
     absentDays,
     holidayWorkedDays,
     payableDays,
-    divisor
+    divisor,
+    lateMarks,
+    halfDays,
+    compOffEarned,
+    otHours,
+    holidayOtHours
   };
 };
 
 export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, advanceDeduction = 0, category = 'Staff Employee', daysWorked = 30, daysInMonth = 30, options = {}) => {
   const baseGross = Number(targetGrossInput) || 0;
 
-  // Resolve year and month
   const yr = options.year !== undefined ? Number(options.year) : new Date().getFullYear();
   const mth = options.month !== undefined ? Number(options.month) : new Date().getMonth();
-
-  // Automatically detect actual calendar days in the selected month
   const actualDaysInMonth = new Date(yr, mth + 1, 0).getDate();
 
   const cat = (category || '').toLowerCase().trim();
   const isOnRollWorker = cat === 'on role worker' || cat === 'on-roll worker';
   const isContractualWorker = cat === 'contractual worker';
 
-  // For on-roll workers, the payable days divisor differs from calendar days
   let divisor = actualDaysInMonth;
   if (isOnRollWorker) {
-    divisor = getOnRollWorkerPayableDays(yr, mth);
+    divisor = getOnRollWorkerPayableDays(yr, mth, actualDaysInMonth);
   }
 
-  // Flags from options
   const hasPF = options.hasPF !== undefined ? options.hasPF : true;
   const hasESIC = options.hasESIC !== undefined ? options.hasESIC : false;
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // STEP 1: Calculate ALL components on the FULL gross salary, then pro-rate
-  //         Earnings = (Monthly Component ÷ Total Eligible Days) × Payable Days
-  // ─────────────────────────────────────────────────────────────────────────
   let basic, da, hra, washingAllowance, conveyance, performance, otherManual, specialManual;
   let fullMonthGross = baseGross;
 
-  const prorationRatio = divisor > 0 ? (daysWorked / divisor) : 0;
+  let prorationRatio = divisor > 0 ? (daysWorked / divisor) : 0;
+  if (options.isPreview) prorationRatio = 1;
 
   if (isContractualWorker) {
-    // Contractual worker: baseGross is a daily rate; total = dayRate × daysWorked
-    basic           = 0; // Contractual don't have component breakdown
-    da              = 0;
-    hra             = 0;
-    washingAllowance= 0;
-    conveyance      = 0;
-    performance     = 0;
-    otherManual     = 0;
-    specialManual   = 0;
-    fullMonthGross  = baseGross * daysWorked;
+    basic = 0; da = 0; hra = 0; washingAllowance = 0; conveyance = 0; performance = 0; otherManual = 0; specialManual = 0;
+    if (options.rateType === 'hourly') {
+      const hours = options.hoursWorked || (daysWorked * 9.3);
+      fullMonthGross = baseGross * hours;
+    } else {
+      fullMonthGross = baseGross * daysWorked;
+    }
   } else {
-    // Staff / On-Roll: compute full components then pro-rate
     const basicPct = options.formulaConfig?.basic_pct !== undefined ? options.formulaConfig.basic_pct : 0.50;
     const daPct = options.formulaConfig?.da_pct !== undefined ? options.formulaConfig.da_pct : 0.05;
     const hraPct = options.formulaConfig?.hra_pct !== undefined ? options.formulaConfig.hra_pct : ((options.hraPercent !== undefined) ? (Number(options.hraPercent) / 100) : 0.40);
@@ -195,9 +243,7 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
     const fullPerformance     = Number(options.salPerformance) || 0;
     const fullSpecial         = Number(options.salSpecial) || 0;
 
-    const sumWithoutOther     = fullBasic + fullDA + fullHRA + fullWashing + fullConveyance + fullPerformance + fullSpecial;
-    let fullOther             = baseGross - sumWithoutOther;
-    if (fullOther < 0) fullOther = 0;
+    const targetProGross = Math.round(baseGross * prorationRatio);
 
     basic           = Math.round(fullBasic * prorationRatio);
     da              = Math.round(fullDA * prorationRatio);
@@ -205,42 +251,46 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
     washingAllowance= Math.round(fullWashing * prorationRatio);
     conveyance      = Math.round(fullConveyance * prorationRatio);
     performance     = Math.round(fullPerformance * prorationRatio);
-    otherManual     = Math.round(fullOther * prorationRatio);
     specialManual   = Math.round(fullSpecial * prorationRatio);
+    
+    // Balance remainder strictly in otherManual to achieve EXACT prorated gross
+    const proSumWithoutOther = basic + da + hra + washingAllowance + conveyance + performance + specialManual;
+    otherManual = targetProGross - proSumWithoutOther;
+    if (otherManual < 0) {
+      otherManual = 0;
+    }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // STEP 2: Absent days impact is now directly applied to earnings. No separate LOP.
-  // ─────────────────────────────────────────────────────────────────────────
   const absentDays = Math.max(0, divisor - (Number(daysWorked) || 0));
-  const lopDeduction = 0; // Set to 0 to remove visible LOP
+  const lopDeduction = 0;
 
-  // 3. OT Pay
-  const otAmount = Number(options.otAmount) || 0;
+  // Overtime and Holiday double pay logic
+  // "OT should be calculated Gross / 26 / 9.3"
+  // "If worked OT that also be doubled (on holiday)"
+  let calculatedOtAmount = Number(options.otAmount) || 0; 
+  if (options.otHours || options.holidayOtHours) {
+    const otRatePerHour = (baseGross / 26) / 9.3;
+    const normalOtPay = (options.otHours || 0) * otRatePerHour;
+    const holidayOtPay = (options.holidayOtHours || 0) * (otRatePerHour * 2); // Doubled for holidays
+    calculatedOtAmount += Math.round(normalOtPay + holidayOtPay);
+  }
+  
+  // Double rate for Holiday Worked (if they worked full days on holidays, we add 1x extra, as 1x is in basic salary already)
+  let holidayBonusPay = 0;
+  if ((options.holidayWorkedDays || 0) > 0 && !isStaff) {
+    const dailyRate = baseGross / divisor;
+    holidayBonusPay = Math.round((options.holidayWorkedDays || 0) * dailyRate);
+  }
 
-  // Total Earnings = sum of all pro-rated components + OT
   const componentTotal = basic + da + hra + washingAllowance + conveyance + performance + otherManual + specialManual;
-  const totalEarnings = isContractualWorker ? (fullMonthGross + otAmount) : (componentTotal + otAmount);
-
-  // Effective pay for net pay calculation and PF/ESIC base is exactly totalEarnings
+  const totalEarnings = isContractualWorker ? (fullMonthGross + calculatedOtAmount + holidayBonusPay) : (componentTotal + calculatedOtAmount + holidayBonusPay);
   const effectivePay = totalEarnings;
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // STEP 3: Statutory Deductions — computed on FULL component values
-  //         (PF, ESIC must be on full Basic+DA, not pro-rated amounts)
-  // ─────────────────────────────────────────────────────────────────────────
   let pfEligibleAmount = basic + da;
-  if (pfCapped && pfEligibleAmount > PF_CAP_AMOUNT) {
-    pfEligibleAmount = PF_CAP_AMOUNT;
-  }
+  if (pfCapped && pfEligibleAmount > PF_CAP_AMOUNT) pfEligibleAmount = PF_CAP_AMOUNT;
 
-  // PF Deduction (Zero if disabled)
   const pfDeduction = hasPF ? Math.max(0, Math.round(pfEligibleAmount * PF_PERCENTAGE)) : 0;
-
-  // ESIC Calculation
-  // Base: Basic + DA + HRA + Washing Allowance + Special Allowance + Performance Allowance + Other Allowance + OT
-  // NOTE: Conveyance & Fuel is EXCLUDED from ESIC wages (not a part of ESIC gross).
-  const esicWages = basic + da + hra + washingAllowance + specialManual + performance + otherManual + otAmount;
+  const esicWages = basic + da + hra + washingAllowance + specialManual + performance + otherManual + calculatedOtAmount + holidayBonusPay;
 
   let esicDeduction = 0;
   let esicEmployerContribution = 0;
@@ -249,7 +299,6 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
     esicEmployerContribution = Math.max(0, Math.ceil(esicWages * ESIC_PERCENTAGE_EMPLOYER));
   }
 
-  // PT: ₹300 for February (month = 1), ₹200 for normal months (if Gross > ₹10,000)
   let ptDeduction = 0;
   if (effectivePay > 10000) {
     ptDeduction = (mth === 1) ? 300 : 200;
@@ -264,57 +313,38 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
   const totalDeduction = pfDeduction + esicDeduction + ptDeduction + tdsDeduction + lopDeduction + advanceDeduction;
   const finalNetPay = Math.max(0, totalEarnings - totalDeduction);
 
-  // 4. Employer Shares
   const totalPFStatutory = hasPF ? Math.max(0, Math.round(pfEligibleAmount * 0.13)) : 0;
   const erPension = hasPF ? Math.max(0, Math.round(pfEligibleAmount * ER_PENSION_PERCENTAGE)) : 0;
   const edli = hasPF ? Math.max(0, Math.round(pfEligibleAmount * EDLI_PERCENTAGE)) : 0;
   const admin = hasPF ? Math.max(0, Math.round(pfEligibleAmount * ADMIN_PERCENTAGE)) : 0;
   const erEPF = hasPF ? Math.max(0, totalPFStatutory - erPension - edli - admin) : 0;
-
   const totalErStatutory = totalPFStatutory + esicEmployerContribution;
 
   return {
     earnings: {
-      basic,
-      da,
-      hra,
-      washingAllowance,
-      specialAllowance: specialManual,
-      conveyance,
-      performance,
-      otherManual,
-      otAmount,
+      basic, da, hra, washingAllowance, specialAllowance: specialManual,
+      conveyance, performance, otherManual,
+      otAmount: calculatedOtAmount,
+      holidayBonusPay,
       gross: totalEarnings,
       totalEarnings,
     },
     deductions: {
-      pf: pfDeduction,
-      esic: esicDeduction,
-      pt: ptDeduction,
-      tds: tdsDeduction,
-      advance: advanceDeduction,
-      total: totalDeduction
+      pf: pfDeduction, esic: esicDeduction, pt: ptDeduction, tds: tdsDeduction,
+      advance: advanceDeduction, total: totalDeduction
     },
     pfReport: {
-      epfWages: hasPF ? pfEligibleAmount : 0,
-      epsWages: hasPF ? pfEligibleAmount : 0,
-      edliWages: hasPF ? pfEligibleAmount : 0,
-      eeShare: pfDeduction,
-      erPension,
-      erEPF,
-      edli,
-      admin
+      epfWages: hasPF ? pfEligibleAmount : 0, epsWages: hasPF ? pfEligibleAmount : 0,
+      edliWages: hasPF ? pfEligibleAmount : 0, eeShare: pfDeduction, erPension, erEPF, edli, admin
     },
     esicReport: {
-      grossWages: Math.round(esicWages),
-      eeShare: esicDeduction,
-      erShare: esicEmployerContribution,
+      grossWages: Math.round(esicWages), eeShare: esicDeduction, erShare: esicEmployerContribution,
       total: esicDeduction + esicEmployerContribution
     },
     erTotalStatutory: totalErStatutory,
     netPay: finalNetPay,
-    remainingAmount: isContractualWorker ? 0 : baseGross - (fullBasic + fullDA + fullHRA + fullWashing + fullConveyance + fullPerformance + fullSpecial + fullOther),
-    isBalanced: isContractualWorker ? true : (baseGross - (fullBasic + fullDA + fullHRA + fullWashing + fullConveyance + fullPerformance + fullSpecial + fullOther) === 0),
+    remainingAmount: 0,
+    isBalanced: true,
     divisor,
     absentDays,
     lopDeduction
