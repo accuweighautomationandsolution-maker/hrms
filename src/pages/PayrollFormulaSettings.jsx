@@ -3,7 +3,7 @@ import { Lock, Save, History, AlertCircle } from 'lucide-react';
 import { dataService } from '../utils/dataService';
 import { authService } from '../utils/authService';
 import { useNotification } from '../context/NotificationContext';
-import { supabase } from '../supabaseClient';
+import { supabase } from '../utils/supabaseClient';
 
 const PayrollFormulaSettings = () => {
   const { showNotification } = useNotification();
