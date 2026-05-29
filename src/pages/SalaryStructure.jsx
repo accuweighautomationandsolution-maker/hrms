@@ -16,7 +16,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     addressLine1: '', city: '', state: '', zipCode: '',
     roleApplied: '', datePrepared: new Date().toISOString().split('T')[0],
     targetSalary: '', hraPercent: 40,
-    salConveyance: '', salSpecial: '', salOther: '', salPerformance: '',
+    salWashing: '', salConveyance: '', salSpecial: '', salOther: '', salPerformance: '',
     hasPF: true, pfCapped: true, hasESIC: false,
     dayRate: ''
   });
@@ -117,6 +117,7 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
     previewDaysInMonth, // daysWorked = full month → ratio = 1
     previewDaysInMonth,
     {
+      salWashing: form.salWashing,
       salConveyance: form.salConveyance,
       salPerformance: form.salPerformance,
       salOther: form.salOther,
@@ -681,8 +682,11 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
                     <span style={{ fontWeight: '600' }}>₹ {earnings.hra.toLocaleString()}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>Washing Allowance <Lock size={12} style={{ display: 'inline' }} /></span>
-                    <span style={{ fontWeight: '600' }}>₹ {earnings.washingAllowance.toLocaleString()}</span>
+                    <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>Washing Allowance</span>
+                    <input type="number" className="form-input hide-on-print-border" min="0"
+                      value={form.salWashing}
+                      onChange={(e) => handleInput('salWashing', e.target.value)}
+                      style={{ width: '120px', padding: '0.25rem' }} placeholder="₹ 0" />
                   </div>
                   <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -707,11 +711,8 @@ const SalaryStructure = ({ isEmbedded = false, passedState = null, empCategory =
                         style={{ width: '120px', padding: '0.25rem' }} placeholder="₹ 0" />
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>Other Allowance</span>
-                      <input type="number" className="form-input hide-on-print-border" min="0"
-                        value={form.salOther}
-                        onChange={(e) => handleInput('salOther', e.target.value)}
-                        style={{ width: '120px', padding: '0.25rem' }} placeholder="₹ 0" />
+                      <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>Other Allowance (Balance) <Lock size={12} style={{ display: 'inline' }} /></span>
+                      <span style={{ fontWeight: '600' }}>₹ {earnings.otherManual.toLocaleString()}</span>
                     </div>
                   </div>
                   <div style={{ borderTop: '2px solid var(--color-border)', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

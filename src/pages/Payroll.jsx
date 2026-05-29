@@ -176,6 +176,7 @@ const Payroll = () => {
             salPerformance: struct.salPerformance || 0,
             salOther: struct.salOther || 0,
             salSpecial: struct.salSpecial || 0,
+            salWashing: struct.salWashing,
             otAmount: Number(procOTAmount) || 0
           }
         );
@@ -558,6 +559,7 @@ const Payroll = () => {
               salPerformance: performance,
               salOther: otherManual,
               salSpecial: specialManual,
+              salWashing: struct.salWashing,
               otAmount: calculatedOT
             }
           )
