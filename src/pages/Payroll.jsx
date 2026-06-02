@@ -275,7 +275,12 @@ const Payroll = () => {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Overtime (OT) Amount (₹)</label>
+              <label className="form-label">
+                Overtime (OT) Amount (₹)
+                <span style={{ fontWeight: 'normal', color: 'var(--color-text-muted)', marginLeft: '0.5rem' }}>
+                  (OT: {Number(employee.otHours || 0).toFixed(1)}h {employee.holidayOtHours ? `, Hol: ${Number(employee.holidayOtHours).toFixed(1)}h` : ''})
+                </span>
+              </label>
               <input 
                 type="number" 
                 min="0"
@@ -394,8 +399,18 @@ const Payroll = () => {
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>Conveyance & Fuel</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(earnings.conveyance)}</td></tr>
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>Special Allowance</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(earnings.specialAllowance)}</td></tr>
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>Performance Incentive</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(earnings.performance)}</td></tr>
-                    <tr style={{ borderBottom: '1px solid #cbd5e1' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>Other Allowance</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(earnings.otherManual)}</td></tr>
-                    <tr style={{ borderBottom: '1px solid #cbd5e1' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>Overtime (OT) Amount</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(earnings.otAmount)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>Other Allowance</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(earnings.otherManual)}</td></tr>
+                    <tr style={{ borderBottom: '1px solid #cbd5e1' }}>
+                      <td style={{ padding: '0.5rem 1rem', color: '#475569' }}>
+                        Overtime (OT) Amount 
+                        {(payrollContext.otHours > 0 || payrollContext.holidayOtHours > 0) && (
+                          <span style={{ fontSize: '0.75rem', marginLeft: '0.5rem', color: '#94a3b8' }}>
+                            ({Number(payrollContext.otHours || 0).toFixed(1)}h{payrollContext.holidayOtHours ? ` + ${Number(payrollContext.holidayOtHours).toFixed(1)}h hol` : ''})
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(earnings.otAmount)}</td>
+                    </tr>
                     <tr style={{ backgroundColor: '#f8fafc', fontWeight: '700' }}><td style={{ padding: '0.6rem 1rem', color: '#0f172a' }}>Gross Earnings</td><td style={{ padding: '0.6rem 1rem', textAlign: 'right', color: '#0f172a' }}>{fmt(earnings.gross)}</td></tr>
                   </tbody>
                 </table>
@@ -553,7 +568,13 @@ const Payroll = () => {
       const advanceDeduction = empAdvances.reduce((sum, a) => sum + (a.status === 'Foreclosed' ? (a.amount - (a.totalRepaid || 0)) : (a.emi || 0)), 0);
 
       const isWorker = (emp.category || '').toLowerCase().includes('worker');
-      const calculatedOT = isWorker && stats.divisor > 0 ? Math.round((emp.grossSalary / stats.divisor) * holidayWorkedDays) : 0;
+      let calculatedOT = 0;
+      if (isWorker && stats.divisor > 0) {
+        const otRatePerHour = (emp.grossSalary / 26) / 9.3;
+        const normalOtPay = (stats.otHours || 0) * otRatePerHour;
+        const holidayOtPay = (stats.holidayOtHours || 0) * (otRatePerHour * 2);
+        calculatedOT = Math.round(normalOtPay + holidayOtPay);
+      }
 
       const calculatedContext = emp.category !== 'Contractual Worker'
         ? calculateSalaryComponents(
@@ -575,6 +596,8 @@ const Payroll = () => {
               salSpecial: specialManual,
               salWashing: struct.salWashing,
               otAmount: calculatedOT,
+              otHours: stats.otHours || 0,
+              holidayOtHours: stats.holidayOtHours || 0,
               formulaConfig
             }
           )
@@ -585,6 +608,8 @@ const Payroll = () => {
         daysPresent,
         payableDays,
         holidayWorkedDays,
+        otHours: stats.otHours || 0,
+        holidayOtHours: stats.holidayOtHours || 0,
         calculatedOTAmount: calculatedOT,
         balanceLeaves: balanceMap[emp.id],
         payrollGenerated: !!dbRec.payrollGenerated,

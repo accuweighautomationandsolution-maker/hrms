@@ -21,18 +21,12 @@ const PT_AMOUNT_MH = 200;
 
 export const getOnRollWorkerPayableDays = (year, month, endDay) => {
   let offCount = 0;
-  let satCount = 0;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const limit = endDay || daysInMonth;
   for (let d = 1; d <= limit; d++) {
     const dow = new Date(year, month, d).getDay();
     if (dow === 0) { // Sunday
       offCount++;
-    } else if (dow === 6) { // Saturday
-      satCount++;
-      if (satCount % 2 !== 0) { // Odd Saturday
-        offCount++;
-      }
     }
   }
   return limit - offCount;
@@ -233,7 +227,11 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
   } else {
     const basicPct = options.formulaConfig?.basic_pct !== undefined ? options.formulaConfig.basic_pct : 0.50;
     const daPct = options.formulaConfig?.da_pct !== undefined ? options.formulaConfig.da_pct : 0.05;
-    const hraPct = options.formulaConfig?.hra_pct !== undefined ? options.formulaConfig.hra_pct : ((options.hraPercent !== undefined) ? (Number(options.hraPercent) / 100) : 0.40);
+    // Employee-specific HRA (options.hraPercent) must override the global formulaConfig.hra_pct
+    const hraPct = options.hraPercent !== undefined 
+      ? (Number(options.hraPercent) / 100) 
+      : (options.formulaConfig?.hra_pct !== undefined ? options.formulaConfig.hra_pct : 0.40);
+
     const washingFixed = options.formulaConfig?.washing_fixed !== undefined ? options.formulaConfig.washing_fixed : ((options.salWashing !== undefined && options.salWashing !== '') ? Number(options.salWashing) : 1000);
 
     const fullBasic           = baseGross * basicPct;
@@ -266,12 +264,14 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
   // Overtime and Holiday double pay logic
   // "OT should be calculated Gross / 26 / 9.3"
   // "If worked OT that also be doubled (on holiday)"
-  let calculatedOtAmount = Number(options.otAmount) || 0; 
-  if (options.otHours || options.holidayOtHours) {
+  let calculatedOtAmount = 0; 
+  if (options.otAmount !== undefined && options.otAmount !== null && options.otAmount !== '') {
+    calculatedOtAmount = Number(options.otAmount) || 0;
+  } else if (options.otHours || options.holidayOtHours) {
     const otRatePerHour = (baseGross / 26) / 9.3;
     const normalOtPay = (options.otHours || 0) * otRatePerHour;
     const holidayOtPay = (options.holidayOtHours || 0) * (otRatePerHour * 2); // Doubled for holidays
-    calculatedOtAmount += Math.round(normalOtPay + holidayOtPay);
+    calculatedOtAmount = Math.round(normalOtPay + holidayOtPay);
   }
   
   // Double rate for Holiday Worked (if they worked full days on holidays, we add 1x extra, as 1x is in basic salary already)
@@ -348,7 +348,9 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
     isBalanced: Math.abs(Math.round(baseGross * prorationRatio) - componentTotal) <= 1,
     divisor,
     absentDays,
-    lopDeduction
+    lopDeduction,
+    otHours: options.otHours || 0,
+    holidayOtHours: options.holidayOtHours || 0
   };
 };
 
