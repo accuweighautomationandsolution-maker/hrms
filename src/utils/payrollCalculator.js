@@ -242,24 +242,24 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
     const fullPerformance     = Number(options.salPerformance) || 0;
     const fullSpecial         = Number(options.salSpecial) || 0;
 
-    const targetProGross = Math.round(baseGross * prorationRatio);
+    const targetProGross = baseGross; // No longer prorating gross
 
-    basic           = Math.round(fullBasic * prorationRatio);
-    da              = Math.round(fullDA * prorationRatio);
-    hra             = Math.round(fullHRA * prorationRatio);
-    washingAllowance= Math.round(fullWashing * prorationRatio);
-    conveyance      = Math.round(fullConveyance * prorationRatio);
-    performance     = Math.round(fullPerformance * prorationRatio);
-    specialManual   = Math.round(fullSpecial * prorationRatio);
+    basic           = Math.round(fullBasic);
+    da              = Math.round(fullDA);
+    hra             = Math.round(fullHRA);
+    washingAllowance= Math.round(fullWashing);
+    conveyance      = Math.round(fullConveyance);
+    performance     = Math.round(fullPerformance);
+    specialManual   = Math.round(fullSpecial);
     
-    // Balance remainder strictly in otherManual to achieve EXACT prorated gross
+    // Balance remainder strictly in otherManual to achieve EXACT gross
     const proSumWithoutOther = basic + da + hra + washingAllowance + conveyance + performance + specialManual;
     
     otherManual = (options.salOther !== undefined && options.salOther !== '') ? Number(options.salOther) : 0;
   }
 
   const absentDays = Math.max(0, divisor - (Number(daysWorked) || 0));
-  const lopDeduction = 0;
+  const lopDeduction = divisor > 0 ? Math.round((baseGross / divisor) * absentDays) : 0;
 
   // Overtime and Holiday double pay logic
   // "OT should be calculated Gross / 26 / 9.3"
@@ -301,17 +301,12 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
   }
 
   let ptDeduction = 0;
-  if (effectivePay > 10000) {
+  if (!isOnRollWorker && !isContractualWorker && totalEarnings > 10000) {
     ptDeduction = (mth === 1) ? 300 : 200;
   }
+  const tdsDeduction = 0;
 
-  let tdsDeduction = 0;
-  const annualGross = effectivePay * 12;
-  if (annualGross > 700000) {
-    tdsDeduction = Math.max(0, Math.round(((annualGross - 700000) * 0.10) / 12));
-  }
-
-  const totalDeduction = pfDeduction + esicDeduction + ptDeduction + tdsDeduction + lopDeduction + advanceDeduction;
+  const totalDeduction = pfDeduction + esicDeduction + ptDeduction + tdsDeduction + advanceDeduction + lopDeduction;
   const finalNetPay = Math.max(0, totalEarnings - totalDeduction);
 
   const totalPFStatutory = hasPF ? Math.max(0, Math.round(pfEligibleAmount * 0.13)) : 0;
@@ -332,7 +327,7 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
     },
     deductions: {
       pf: pfDeduction, esic: esicDeduction, pt: ptDeduction, tds: tdsDeduction,
-      advance: advanceDeduction, total: totalDeduction
+      advance: advanceDeduction, lop: lopDeduction, total: totalDeduction
     },
     pfReport: {
       epfWages: hasPF ? pfEligibleAmount : 0, epsWages: hasPF ? pfEligibleAmount : 0,
@@ -344,8 +339,8 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
     },
     erTotalStatutory: totalErStatutory,
     netPay: finalNetPay,
-    remainingAmount: Math.round(baseGross * prorationRatio) - componentTotal,
-    isBalanced: Math.abs(Math.round(baseGross * prorationRatio) - componentTotal) <= 1,
+    remainingAmount: Math.round(baseGross) - componentTotal,
+    isBalanced: Math.abs(Math.round(baseGross) - componentTotal) <= 1,
     divisor,
     absentDays,
     lopDeduction,
