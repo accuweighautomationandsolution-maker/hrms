@@ -196,6 +196,7 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
   const cat = (category || '').toLowerCase().trim();
   const isOnRollWorker = cat === 'on role worker' || cat === 'on-roll worker';
   const isContractualWorker = cat === 'contractual worker';
+  const isStaff = !isOnRollWorker && !isContractualWorker;
 
   let divisor = actualDaysInMonth;
   if (isOnRollWorker) {
