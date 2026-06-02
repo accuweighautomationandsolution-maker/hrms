@@ -120,6 +120,10 @@ const Sidebar = ({ userRole, isManager }) => {
               <Calculator size={24} />
               <span>Payroll Ledger</span>
             </Link>
+            <Link to="/payroll-formulas" className={`nav-item ${location.pathname === '/payroll-formulas' ? 'active' : ''}`}>
+              <Calculator size={24} />
+              <span>Payroll Formula Settings</span>
+            </Link>
 
             {/* Collapsible Reports Group */}
             <div style={{ marginBottom: '0.25rem' }}>
