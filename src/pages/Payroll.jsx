@@ -426,19 +426,7 @@ const Payroll = () => {
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>Professional Tax (PT)</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(deductions.pt)}</td></tr>
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>TDS (Income Tax)</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(deductions.tds)}</td></tr>
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: '#475569' }}>Advance / Loan Deduction</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600' }}>{fmt(deductions.advance)}</td></tr>
-                    {deductions.lop > 0 && (
-                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.5rem 1rem', color: '#dc2626' }}>
-                          Unpaid Absence Deduction 
-                          <span style={{ fontSize: '0.75rem', marginLeft: '0.5rem', color: '#f87171' }}>
-                            ({payrollContext.absentDays} day{payrollContext.absentDays !== 1 ? 's' : ''})
-                          </span>
-                        </td>
-                        <td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: '600', color: '#dc2626' }}>
-                          {fmt(deductions.lop)}
-                        </td>
-                      </tr>
-                    )}
+                    {/* Unpaid Absence Deduction hidden per user request */}
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '0.5rem 1rem', color: 'transparent' }}>-</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', color: 'transparent' }}>0</td></tr>
                     <tr style={{ borderBottom: '1px solid #cbd5e1' }}><td style={{ padding: '0.5rem 1rem', color: 'transparent' }}>-</td><td style={{ padding: '0.5rem 1rem', textAlign: 'right', color: 'transparent' }}>0</td></tr>
                     <tr style={{ backgroundColor: '#f8fafc', fontWeight: '700' }}><td style={{ padding: '0.6rem 1rem', color: '#0f172a' }}>Total Deductions</td><td style={{ padding: '0.6rem 1rem', textAlign: 'right', color: '#0f172a' }}>{fmt(deductions.total)}</td></tr>

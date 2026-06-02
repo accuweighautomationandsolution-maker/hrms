@@ -225,7 +225,7 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
       fullMonthGross = baseGross * daysWorked;
     }
   } else {
-    const basicPct = options.formulaConfig?.basic_pct !== undefined ? options.formulaConfig.basic_pct : 0.50;
+    const basicPct = options.formulaConfig?.basic_pct !== undefined ? options.formulaConfig.basic_pct : 0.45;
     const daPct = options.formulaConfig?.da_pct !== undefined ? options.formulaConfig.da_pct : 0.05;
     // Employee-specific HRA (options.hraPercent) must override the global formulaConfig.hra_pct
     const hraPct = options.hraPercent !== undefined 
@@ -235,7 +235,7 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
     const washingFixed = options.formulaConfig?.washing_fixed !== undefined ? options.formulaConfig.washing_fixed : ((options.salWashing !== undefined && options.salWashing !== '') ? Number(options.salWashing) : 1000);
 
     const fullBasic           = baseGross * basicPct;
-    const fullDA              = fullBasic * daPct;
+    const fullDA              = baseGross * daPct;
     const fullHRA             = fullBasic * hraPct;
     const fullWashing         = washingFixed;
     const fullConveyance      = Number(options.salConveyance) || 0;

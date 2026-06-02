@@ -182,8 +182,12 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
     fullMonthGross  = baseGross * daysWorked;
   } else {
     // Staff / On-Roll: compute full components then pro-rate
-    const fullBasic           = baseGross * 0.50;
-    const fullDA              = fullBasic * 0.05;
+    const basicPct            = options.formulaConfig?.basic_pct !== undefined ? options.formulaConfig.basic_pct : 0.45;
+    const daPct               = options.formulaConfig?.da_pct !== undefined ? options.formulaConfig.da_pct : 0.05;
+    
+    const fullBasic           = baseGross * basicPct;
+    const fullDA              = baseGross * daPct;
+    
     const hraPercentVal       = (options.hraPercent !== undefined) ? (Number(options.hraPercent) / 100) : 0.40;
     const fullHRA             = fullBasic * hraPercentVal;
     const fullWashing         = options.salWashing !== undefined ? Number(options.salWashing) : 1000;
