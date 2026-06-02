@@ -301,7 +301,7 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
   }
 
   let ptDeduction = 0;
-  if (!isOnRollWorker && !isContractualWorker && totalEarnings > 10000) {
+  if (!isContractualWorker && totalEarnings > 10000) {
     ptDeduction = (mth === 1) ? 300 : 200;
   }
   const tdsDeduction = 0;
