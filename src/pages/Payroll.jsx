@@ -129,7 +129,7 @@ const Payroll = () => {
     );
   };
 
-  const ProcessPayrollModal = ({ employee, onClose }) => {
+  const renderProcessPayrollModal = (employee, onClose) => {
     const struct = salaryStructures[String(employee.id)] || {};
     
     // Live calculation inside modal
@@ -1029,7 +1029,7 @@ const Payroll = () => {
       )}
 
       {processModalEmp && (
-        <ProcessPayrollModal employee={processModalEmp} onClose={() => setProcessModalEmp(null)} />
+        renderProcessPayrollModal(processModalEmp, () => setProcessModalEmp(null))
       )}
 
       {/* Payment Details Entry Modal */}

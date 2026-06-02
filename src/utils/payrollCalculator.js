@@ -306,8 +306,8 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
   }
   const tdsDeduction = 0;
 
-  const totalDeduction = pfDeduction + esicDeduction + ptDeduction + tdsDeduction + advanceDeduction + lopDeduction;
-  const finalNetPay = Math.max(0, totalEarnings - totalDeduction);
+  const totalDeduction = pfDeduction + esicDeduction + ptDeduction + tdsDeduction + advanceDeduction;
+  const finalNetPay = Math.max(0, totalEarnings - (totalDeduction + lopDeduction));
 
   const totalPFStatutory = hasPF ? Math.max(0, Math.round(pfEligibleAmount * 0.13)) : 0;
   const erPension = hasPF ? Math.max(0, Math.round(pfEligibleAmount * ER_PENSION_PERCENTAGE)) : 0;

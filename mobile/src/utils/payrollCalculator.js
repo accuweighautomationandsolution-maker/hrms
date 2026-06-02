@@ -261,8 +261,8 @@ export const calculateSalaryComponents = (targetGrossInput, pfCapped = true, adv
     tdsDeduction = Math.max(0, Math.round(((annualGross - 700000) * 0.10) / 12));
   }
 
-  const totalDeduction = pfDeduction + esicDeduction + ptDeduction + tdsDeduction + lopDeduction + advanceDeduction;
-  const finalNetPay = Math.max(0, totalEarnings - totalDeduction);
+  const totalDeduction = pfDeduction + esicDeduction + ptDeduction + tdsDeduction + advanceDeduction;
+  const finalNetPay = Math.max(0, totalEarnings - (totalDeduction + lopDeduction));
 
   // 4. Employer Shares
   const totalPFStatutory = hasPF ? Math.max(0, Math.round(pfEligibleAmount * 0.13)) : 0;
