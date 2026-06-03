@@ -48,6 +48,7 @@ const LeaveReport = () => {
 
   const [employees, setEmployees] = useState([]);
   const [leaveBalances, setLeaveBalances] = useState({});
+  const [leaveTypes, setLeaveTypes] = useState([]);
   const [filteredData, setFilteredData] = useState({ leaves: [], employees: [] });
   const [analytics, setAnalytics] = useState({ typeDistribution: {}, statusBreakdown: { Approved: 0, Pending: 0, Rejected: 0 }, monthlyTrend: {}, totalDays: 0 });
   const [loading, setLoading] = useState(true);
@@ -60,12 +61,18 @@ const LeaveReport = () => {
   const loadReport = async () => {
     setLoading(true);
     try {
-      const [emps, bal] = await Promise.all([
+      const [emps, bal, types] = await Promise.all([
         dataService.getEmployees(),
-        dataService.getLeaveBalances()
+        dataService.getLeaveBalances(),
+        dataService.getLeaveTypes ? dataService.getLeaveTypes() : Promise.resolve([])
       ]);
       setEmployees(emps);
       setLeaveBalances(bal);
+      setLeaveTypes(types && types.length > 0 ? types : [
+        { name: 'Annual Leave', isPaid: true },
+        { name: 'Sick Leave', isPaid: true },
+        { name: 'Casual Leave', isPaid: true }
+      ]);
 
       const filters = {
         departments: selectedDepts,
@@ -315,7 +322,7 @@ const LeaveReport = () => {
                 <th style={{ padding: '1rem' }}>Employee</th>
                 <th style={{ padding: '1rem' }}>Department</th>
                 <th style={{ padding: '1rem' }}>Total Availed</th>
-                <th style={{ padding: '1rem' }}>S / C / P (Remaining)</th>
+                <th style={{ padding: '1rem' }}>Balances (Avail / CF)</th>
                 <th style={{ padding: '1rem', textAlign: 'right' }}>Audit</th>
               </tr>
             </thead>
@@ -343,10 +350,18 @@ const LeaveReport = () => {
                         </div>
                     </td>
                     <td style={{ padding: '1rem' }}>
-                        <div style={{ display: 'flex', gap: '0.4rem' }}>
-                            <span className="badge badge-success" title="Sick">S: {balance.Sick}</span>
-                            <span className="badge badge-warning" title="Casual">C: {balance.Casual}</span>
-                            <span className="badge badge-blue" title="Paid">P: {balance.Paid}</span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                            {leaveTypes.filter(lt => lt.isPaid || lt.defaultAllocation > 0).map(lt => {
+                                const typeBal = balance[lt.name] || {};
+                                const available = typeof typeBal === 'object' ? (typeBal.available || 0) : (typeBal || 0);
+                                const cf = typeof typeBal === 'object' ? (typeBal.carried_forward || 0) : 0;
+                                return (
+                                    <span key={lt.name} className="badge badge-ghost" title={lt.name} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', border: '1px solid var(--color-border)' }}>
+                                        <strong>{lt.name.substring(0,3)}: {available}</strong>
+                                        <small style={{ fontSize: '0.65rem' }}>CF: {cf}</small>
+                                    </span>
+                                );
+                            })}
                         </div>
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'right' }}>

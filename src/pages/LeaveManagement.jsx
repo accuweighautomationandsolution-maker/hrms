@@ -4,18 +4,30 @@ import { Calendar as CalendarIcon, Clock, CheckCircle, Download, FileText, FileS
 import { dataService } from '../utils/dataService';
 import { authService } from '../utils/authService';
 
-const SummaryCard = ({ title, value, colorClass }) => (
-  <div className="card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-    <h4 style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', fontWeight: '500' }}>{title}</h4>
-    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-      <span style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--color-text-main)' }}>{value}</span>
-      <span style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>days</span>
+const SummaryCard = ({ title, balanceData, colorClass }) => {
+  const available = typeof balanceData === 'object' ? balanceData.available : (balanceData || 0);
+  const allocated = typeof balanceData === 'object' ? balanceData.allocated : 0;
+  const used = typeof balanceData === 'object' ? balanceData.used : 0;
+  const reserved = typeof balanceData === 'object' ? balanceData.reserved : 0;
+
+  return (
+    <div className="card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <h4 style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', fontWeight: '500' }}>{title}</h4>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+        <span style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--color-text-main)' }}>{available}</span>
+        <span style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>days</span>
+      </div>
+      <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'flex', gap: '0.5rem' }}>
+        <span>Alloc: {allocated}</span>
+        <span>Used: {used}</span>
+        <span>Pending: {reserved}</span>
+      </div>
+      <div style={{ height: '4px', width: '100%', backgroundColor: 'var(--color-border)', borderRadius: '2px', overflow: 'hidden', marginTop: '0.25rem' }}>
+        <div className={colorClass} style={{ height: '100%', width: allocated ? `${Math.min(100, (available / allocated) * 100)}%` : '0%' }}></div>
+      </div>
     </div>
-    <div style={{ height: '4px', width: '100%', backgroundColor: 'var(--color-border)', borderRadius: '2px', overflow: 'hidden' }}>
-      <div className={colorClass} style={{ height: '100%', width: '60%' }}></div>
-    </div>
-  </div>
-);
+  );
+};
 
 const LeaveManagement = () => {
   const currentUser = authService.getCurrentUser();
@@ -23,7 +35,8 @@ const LeaveManagement = () => {
   const isEmployee = userRole === 'employee';
 
   const [requests, setRequests] = useState([]);
-  const [balances, setBalances] = useState({ Paid: 0, Sick: 0, Casual: 0 });
+  const [balances, setBalances] = useState({});
+  const [leaveTypes, setLeaveTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [activeEmp, setActiveEmp] = useState(null);
@@ -48,12 +61,11 @@ const LeaveManagement = () => {
         // Use the resolved employee's actual ID for all data filtering
         const myEmpId = resolvedId || currentUser.id;
 
-        const [leaves, emps, paidBal, sickBal, casualBal] = await Promise.all([
+        const [leaves, emps, dynamicTypes, myBalances] = await Promise.all([
           dataService.getLeaveRequests(),
           dataService.getEmployees(),
-          dataService.getEmployeeBalance(myEmpId, 'Paid'),
-          dataService.getEmployeeBalance(myEmpId, 'Sick'),
-          dataService.getEmployeeBalance(myEmpId, 'Casual')
+          dataService.getLeaveTypes ? dataService.getLeaveTypes() : Promise.resolve([]),
+          dataService.getDetailedEmployeeBalances ? dataService.getDetailedEmployeeBalances(myEmpId) : Promise.resolve({})
         ]);
         
         // Find current user's employee record to get real status
@@ -77,7 +89,12 @@ const LeaveManagement = () => {
         } else {
           setRequests(leaves);
         }
-        setBalances({ Paid: paidBal, Sick: sickBal, Casual: casualBal });
+        setLeaveTypes(dynamicTypes && dynamicTypes.length > 0 ? dynamicTypes : [
+          { name: 'Annual Leave', isPaid: true },
+          { name: 'Sick Leave', isPaid: true },
+          { name: 'Personal Leave', isPaid: false }
+        ]);
+        setBalances(myBalances || {});
       } catch (err) {
         console.error("Failed to load leave data:", err);
       } finally {
@@ -88,7 +105,7 @@ const LeaveManagement = () => {
   }, [currentUser?.id, isEmployee]);
   
   // Form State
-  const [leaveType,   setLeaveType]   = useState('Annual Leave');
+  const [leaveType,   setLeaveType]   = useState('');
   const [startDate,   setStartDate]   = useState('');
   const [endDate,     setEndDate]     = useState('');
   const [reason,      setReason]      = useState('');
@@ -110,6 +127,30 @@ const LeaveManagement = () => {
     } else {
       const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, worksheet, "Leaves");
       XLSX.writeFile(wb, `Leave_Tracker.xlsx`);
+    }
+  };
+
+  const handleCancelRequest = async (request) => {
+    if (!window.confirm('Are you sure you want to cancel this leave request?')) return;
+    try {
+      const updated = await dataService.updateRequestWorkflowAction(request.id, {
+        status: 'Cancelled',
+        actionType: 'Cancel',
+        managerName: currentUser.name,
+        remarks: 'Cancelled by employee'
+      });
+      setRequests(prev => prev.map(r => r.id === request.id ? updated : r));
+      
+      // Reload balances if it was pending
+      if (request.status === 'Pending') {
+        const myEmpId = resolvedMyEmpId || currentUser.id;
+        const newBals = await dataService.getDetailedEmployeeBalances(myEmpId);
+        setBalances(newBals);
+      }
+      alert('Request cancelled successfully.');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to cancel request: ' + err.message);
     }
   };
 
@@ -152,9 +193,9 @@ const LeaveManagement = () => {
       </div>
 
       <div className="grid-3" style={{ marginBottom: '2rem' }}>
-        <SummaryCard title="Annual Leave Balance" value={balances.Paid} colorClass="bg-blue-500" />
-        <SummaryCard title="Sick Leave Balance" value={balances.Sick} colorClass="bg-emerald-500" />
-        <SummaryCard title="Casual Leave Balance" value={balances.Casual} colorClass="bg-amber-500" />
+        {leaveTypes.filter(t => t.isPaid || t.defaultAllocation > 0).slice(0, 3).map((lt, idx) => (
+          <SummaryCard key={lt.id || lt.name} title={`${lt.name} Balance`} balanceData={balances[lt.name]} colorClass={['bg-blue-500', 'bg-emerald-500', 'bg-amber-500'][idx % 3]} />
+        ))}
       </div>
       
       <style>{`
@@ -189,9 +230,12 @@ const LeaveManagement = () => {
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                <span className={`badge ${request.status === 'Approved' ? 'badge-success' : request.status === 'Pending' ? 'badge-warning' : 'badge-danger'}`}>
+                <span className={`badge ${request.status === 'Approved' ? 'badge-success' : request.status === 'Pending' ? 'badge-warning' : request.status === 'Cancelled' ? 'badge-secondary' : 'badge-danger'}`}>
                   {request.status}
                 </span>
+                {request.status === 'Pending' && String(request.empId || request.emp_id) === String(resolvedMyEmpId || currentUser.id) && (
+                  <button className="btn btn-ghost" style={{ color: 'var(--color-danger)', fontSize: '0.875rem' }} onClick={() => handleCancelRequest(request)}>Cancel</button>
+                )}
               </div>
             </div>
           ))}
@@ -216,10 +260,13 @@ const LeaveManagement = () => {
                   </span>
                 </label>
                 <select className="form-input" style={{ width: '100%' }} value={leaveType} onChange={e => setLeaveType(e.target.value)}>
-                  {!isProbation && <option value="Annual Leave">Annual Leave</option>}
-                  {!isProbation && <option value="Sick Leave">Sick Leave</option>}
-                  {!isProbation && <option value="Personal Leave">Personal Leave</option>}
-                  <option value="Unpaid Leave">Unpaid Leave</option>
+                  <option value="">-- Select Leave Type --</option>
+                  {!isProbation && leaveTypes.map(t => (
+                    <option key={t.id || t.name} value={t.name}>{t.name}</option>
+                  ))}
+                  {isProbation && leaveTypes.filter(t => !t.isPaid).map(t => (
+                    <option key={t.id || t.name} value={t.name}>{t.name}</option>
+                  ))}
                   <option value="Out Duty Request">Out Duty Request</option>
                   <option value="Out Pass Request">Out Pass Request</option>
                 </select>
@@ -277,9 +324,9 @@ const LeaveManagement = () => {
               <button className="btn btn-outline" onClick={() => setShowModal(false)}>Cancel</button>
               <button className="btn btn-primary" 
                 disabled={
-                  leaveType === 'Out Pass Request'
+                  !leaveType || (leaveType === 'Out Pass Request'
                     ? !requestDate || !startTime || !endTime || !reason.trim()
-                    : !startDate || !endDate || !reason.trim() || (new Date(startDate) > new Date(endDate))
+                    : !startDate || !endDate || !reason.trim() || (new Date(startDate) > new Date(endDate)))
                 }
                 onClick={async () => {
                   const isOutPass = leaveType === 'Out Pass Request';
@@ -324,6 +371,17 @@ const LeaveManagement = () => {
                       console.warn(`Leave request raised by employee ${currentUser.name} (ID: ${finalEmpId}) has no assigned reporting manager.`);
                     }
 
+                    if (calcDays > 0) {
+                      const lTypeObj = leaveTypes.find(t => t.name === leaveType);
+                      if (lTypeObj && lTypeObj.isPaid) {
+                        const bal = balances[leaveType] || { available: 0 };
+                        if (calcDays > bal.available) {
+                          alert(`Insufficient ${leaveType} balance. You have ${bal.available} days available.`);
+                          return;
+                        }
+                      }
+                    }
+
                     const newRequest = {
                       empId: finalEmpId,
                       emp_id: String(finalEmpId),
@@ -345,12 +403,18 @@ const LeaveManagement = () => {
                     // Use the new single-record save (persists to letter_templates JSONB store)
                     const savedRecord = await dataService.saveLeaveRequest(newRequest);
                     
-                    // Update local UI state with the saved record (which has the real LR_ prefixed ID)
+                    // Update local UI state
                     setRequests(prev => [...prev, savedRecord]);
+                    
+                    // Reload balances to reflect reservation
+                    const newBals = await dataService.getDetailedEmployeeBalances(finalEmpId);
+                    setBalances(newBals);
+
                     alert('✅ Request submitted and saved successfully!');
                     setShowModal(false);
                     setStartDate(''); setEndDate(''); setReason('');
                     setRequestDate(''); setStartTime(''); setEndTime('');
+                    setLeaveType('');
                   } catch (err) {
                     console.error("Failed to submit request:", err);
                     alert("❌ Database save failed: " + err.message);

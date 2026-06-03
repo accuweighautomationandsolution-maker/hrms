@@ -198,6 +198,10 @@ const Sidebar = ({ userRole, isManager }) => {
               <ShieldCheck size={24} />
               <span>Movement Policy Config</span>
             </Link>
+            <Link to="/leave-settings" className={`nav-item ${location.pathname === '/leave-settings' ? 'active' : ''}`}>
+              <CalendarDays size={24} />
+              <span>Leave Config</span>
+            </Link>
             <Link to="/budget-control" className={`nav-item ${location.pathname === '/budget-control' ? 'active' : ''}`}>
               <Building2 size={24} />
               <span>Budget Control</span>

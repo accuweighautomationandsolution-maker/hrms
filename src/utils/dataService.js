@@ -900,6 +900,21 @@ export const dataService = {
   // dashboard stats queries (which filter by status/date) continue to work.
   //
 
+  // ── Leave Types Config ──────────────────────────────────────────────────
+  getLeaveTypes: async () => {
+    const defaultTypes = [
+      { id: 'Casual Leave', name: 'Casual Leave', isPaid: true, allowCarryForward: true, defaultAllocation: 10 },
+      { id: 'Sick Leave', name: 'Sick Leave', isPaid: true, allowCarryForward: false, defaultAllocation: 6 },
+      { id: 'Earned Leave', name: 'Earned Leave', isPaid: true, allowCarryForward: true, defaultAllocation: 12 },
+      { id: 'Unpaid Leave', name: 'Unpaid Leave', isPaid: false, allowCarryForward: false, defaultAllocation: 0 }
+    ];
+    return await getConfig('leave_types', defaultTypes);
+  },
+
+  saveLeaveTypes: async (types) => {
+    return await saveConfig('leave_types', types);
+  },
+
   getLeaveRequests: async () => {
     if (!supabase) return [];
     try {
@@ -961,9 +976,28 @@ export const dataService = {
   saveLeaveRequest: async (req) => {
     if (!supabase || !req) return req;
     try {
+      const isNew = !req.id;
       // Generate a stable string ID if not present
       const id = req.id ? String(req.id) : `LR_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
       const fullRecord = { ...req, id };
+
+      // Balance Reservation Logic
+      if (isNew && req.status === 'Pending' && req.empId && req.type && req.days > 0) {
+        const balancesMap = await dataService.getLeaveBalances();
+        const empBals = balancesMap[req.empId] || {};
+        
+        if (!empBals[req.type]) {
+          empBals[req.type] = { allocated: 0, carried_forward: 0, used: 0, reserved: 0, available: 0 };
+        }
+        
+        const typeBal = empBals[req.type];
+        // Only reserve if it's a paid/allocated leave type. Keep negative values correct.
+        typeBal.available = (typeBal.available || 0) - req.days;
+        typeBal.reserved = (typeBal.reserved || 0) + req.days;
+        
+        empBals[req.type] = typeBal;
+        await dataService.updateLeaveBalance(req.empId, empBals);
+      }
 
       // ── 1. Write full object to letter_templates (JSONB store) ──
       const ltId = id.startsWith('LR_') ? id : `LR_${id}`;
@@ -1028,14 +1062,62 @@ export const dataService = {
   getEmployeeBalance: async (empId, type = 'total') => {
     if (!supabase) return 0;
     const { data } = await supabase.from('leave_balances').select('data').eq('emp_id', empId).maybeSingle();
-    const bals = (data && data.data) ? data.data : { Sick: 0, Casual: 0, Paid: 0 };
-    if (type === 'total') return Object.values(bals).reduce((a, b) => a + b, 0);
-    return bals[type] || 0;
+    const bals = (data && data.data) ? data.data : {};
+    
+    // Support for both legacy flat format and new detailed format
+    const getVal = (val) => typeof val === 'object' && val !== null ? (val.available || 0) : (val || 0);
+    
+    if (type === 'total') {
+      return Object.values(bals).reduce((a, b) => a + getVal(b), 0);
+    }
+    return getVal(bals[type]);
+  },
+
+  getDetailedEmployeeBalances: async (empId) => {
+    if (!supabase) return {};
+    const { data } = await supabase.from('leave_balances').select('data').eq('emp_id', empId).maybeSingle();
+    return (data && data.data) ? data.data : {};
   },
 
   updateLeaveBalance: async (empId, newBalance) => {
     if (!supabase) return;
     await supabase.from('leave_balances').upsert({ emp_id: empId, data: newBalance, updated_at: new Date().toISOString() });
+  },
+
+  processYearEndCarryForward: async () => {
+    if (!supabase) return;
+    const allBalances = await dataService.getLeaveBalances();
+    const leaveTypes = await dataService.getLeaveTypes();
+    
+    for (const [empId, bals] of Object.entries(allBalances)) {
+      let updated = false;
+      for (const [type, data] of Object.entries(bals)) {
+        if (typeof data === 'object') {
+          const lType = leaveTypes.find(t => t.name === type || t.id === type);
+          if (lType && lType.allowCarryForward) {
+            // Max 8 days carry forward
+            const carryForward = Math.min(8, data.available || 0);
+            data.carried_forward = carryForward;
+            data.allocated = lType.defaultAllocation || 0;
+            data.used = 0;
+            // Reserved stays the same (leaves from last year that are pending)
+            data.available = data.allocated + data.carried_forward - (data.reserved || 0);
+            updated = true;
+          } else if (lType) {
+            // Lapses
+            data.carried_forward = 0;
+            data.allocated = lType.defaultAllocation || 0;
+            data.used = 0;
+            data.available = data.allocated - (data.reserved || 0);
+            updated = true;
+          }
+        }
+      }
+      if (updated) {
+        await dataService.updateLeaveBalance(empId, bals);
+      }
+    }
+    return true;
   },
 
   // ── Notices ─────────────────────────────────────────────────────────────
@@ -2318,6 +2400,27 @@ export const dataService = {
         .update({ data: updatedRecord })
         .eq('id', ltId);
       if (updateErr) throw updateErr;
+
+      // Balance Deduction/Rollback Logic
+      if (prevData && prevData.status === 'Pending' && prevData.empId && prevData.type && prevData.days > 0) {
+        if (actionDetails.status === 'Approved' || actionDetails.status === 'Rejected' || actionDetails.status === 'Cancelled') {
+          const balancesMap = await dataService.getLeaveBalances();
+          const empBals = balancesMap[prevData.empId] || {};
+          const typeBal = empBals[prevData.type];
+          
+          if (typeBal && typeof typeBal === 'object') {
+            if (actionDetails.status === 'Approved') {
+              typeBal.reserved = Math.max(0, (typeBal.reserved || 0) - prevData.days);
+              typeBal.used = (typeBal.used || 0) + prevData.days;
+            } else if (actionDetails.status === 'Rejected' || actionDetails.status === 'Cancelled') {
+              typeBal.reserved = Math.max(0, (typeBal.reserved || 0) - prevData.days);
+              typeBal.available = (typeBal.available || 0) + prevData.days;
+            }
+            empBals[prevData.type] = typeBal;
+            await dataService.updateLeaveBalance(prevData.empId, empBals);
+          }
+        }
+      }
 
       // Mirror status update to leave_requests (non-fatal)
       try {

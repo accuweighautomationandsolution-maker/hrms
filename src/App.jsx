@@ -44,6 +44,7 @@ import OutDuty from './pages/OutDuty';
 import OutPass from './pages/OutPass';
 import MovementReports from './pages/MovementReports';
 import MovementPolicySettings from './pages/MovementPolicySettings';
+import LeaveAdminSettings from './pages/LeaveAdminSettings';
 import ErrorBoundary from './components/ErrorBoundary';
 import { authService } from './utils/authService';
 import './App.css'; 
@@ -291,6 +292,7 @@ function App() {
                     <Route path="/departments" element={<DepartmentManagement />} />
                     <Route path="/designations" element={<DesignationManagement />} />
                     <Route path="/movement-policies" element={<MovementPolicySettings />} />
+                    <Route path="/leave-settings" element={<LeaveAdminSettings />} />
                     <Route path="/payroll-formulas" element={<PayrollFormulaSettings />} />
                   </>
                 )}
