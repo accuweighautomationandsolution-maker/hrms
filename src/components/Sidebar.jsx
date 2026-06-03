@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, CalendarDays, Clock, Calculator, IndianRupee, Receipt, CheckSquare, LineChart, FileSignature, FileSpreadsheet, ShieldCheck, ChevronDown, ChevronUp, BarChart, Building2, UserPlus, MapPin, Coins, GraduationCap, Briefcase, FileText, FileCheck, Zap, Smartphone } from 'lucide-react';
+import { LayoutDashboard, Users, CalendarDays, Clock, Calculator, IndianRupee, Receipt, CheckSquare, LineChart, FileSignature, FileSpreadsheet, ShieldCheck, ChevronDown, ChevronUp, BarChart, Building2, UserPlus, MapPin, Coins, GraduationCap, Briefcase, FileText, FileCheck, Zap, Smartphone, Settings } from 'lucide-react';
 
 const Sidebar = ({ userRole, isManager }) => {
   const location = useLocation();
@@ -11,6 +11,15 @@ const Sidebar = ({ userRole, isManager }) => {
     location.pathname === '/leaves' ||
     location.pathname === '/out-duty' ||
     location.pathname === '/out-pass'
+  );
+  const [configOpen, setConfigOpen] = useState(
+    location.pathname === '/payroll-formulas' ||
+    location.pathname === '/movement-policies' ||
+    location.pathname === '/leave-settings' ||
+    location.pathname === '/performance' ||
+    location.pathname === '/departments' ||
+    location.pathname === '/designations' ||
+    location.pathname === '/user-management'
   );
 
   return (
@@ -120,10 +129,6 @@ const Sidebar = ({ userRole, isManager }) => {
               <Calculator size={24} />
               <span>Payroll Ledger</span>
             </Link>
-            <Link to="/payroll-formulas" className={`nav-item ${location.pathname === '/payroll-formulas' ? 'active' : ''}`}>
-              <Calculator size={24} />
-              <span>Payroll Formula Settings</span>
-            </Link>
 
             {/* Collapsible Reports Group */}
             <div style={{ marginBottom: '0.25rem' }}>
@@ -194,14 +199,6 @@ const Sidebar = ({ userRole, isManager }) => {
             </div>
 
 
-            <Link to="/movement-policies" className={`nav-item ${location.pathname === '/movement-policies' ? 'active' : ''}`}>
-              <ShieldCheck size={24} />
-              <span>Movement Policy Config</span>
-            </Link>
-            <Link to="/leave-settings" className={`nav-item ${location.pathname === '/leave-settings' ? 'active' : ''}`}>
-              <CalendarDays size={24} />
-              <span>Leave Config</span>
-            </Link>
             <Link to="/budget-control" className={`nav-item ${location.pathname === '/budget-control' ? 'active' : ''}`}>
               <Building2 size={24} />
               <span>Budget Control</span>
@@ -226,22 +223,66 @@ const Sidebar = ({ userRole, isManager }) => {
               <FileSignature size={24} />
               <span>Compensation & Offers</span>
             </Link>
-            <Link to="/performance" className={`nav-item ${location.pathname === '/performance' ? 'active' : ''}`}>
-              <Zap size={24} />
-              <span>Performance Config</span>
-            </Link>
-            <Link to="/departments" className={`nav-item ${location.pathname === '/departments' ? 'active' : ''}`}>
-              <Building2 size={24} />
-              <span>Department Master</span>
-            </Link>
-            <Link to="/designations" className={`nav-item ${location.pathname === '/designations' ? 'active' : ''}`}>
-              <Briefcase size={24} />
-              <span>Designation Master</span>
-            </Link>
-            <Link to="/user-management" className={`nav-item ${location.pathname === '/user-management' ? 'active' : ''}`}>
-              <ShieldCheck size={24} />
-              <span>Identity & Access</span>
-            </Link>
+
+            {/* Collapsible Masters & Config Group */}
+            <div style={{ marginBottom: '0.25rem' }}>
+              <div 
+                onClick={() => setConfigOpen(!configOpen)}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  padding: '0.75rem 1rem', 
+                  fontSize: '1.05rem', 
+                  color: configOpen ? 'var(--color-primary)' : 'var(--color-text-muted)', 
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  borderRadius: '8px',
+                  transition: 'all 0.2s ease',
+                  backgroundColor: configOpen ? 'rgba(37, 99, 235, 0.04)' : 'transparent'
+                }}
+                className="nav-item-group-header"
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <Settings size={24} />
+                  <span>Masters & Config</span>
+                </div>
+                {configOpen ? <ChevronUp size={21} /> : <ChevronDown size={21} />}
+              </div>
+              
+              {configOpen && (
+                <div style={{ paddingLeft: '0.5rem', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', overflow: 'hidden' }}>
+                  <Link to="/departments" className={`nav-item ${location.pathname === '/departments' ? 'active' : ''}`} style={{ paddingLeft: '2.5rem' }}>
+                    <Building2 size={21} />
+                    <span>Department Master</span>
+                  </Link>
+                  <Link to="/designations" className={`nav-item ${location.pathname === '/designations' ? 'active' : ''}`} style={{ paddingLeft: '2.5rem' }}>
+                    <Briefcase size={21} />
+                    <span>Designation Master</span>
+                  </Link>
+                  <Link to="/leave-settings" className={`nav-item ${location.pathname === '/leave-settings' ? 'active' : ''}`} style={{ paddingLeft: '2.5rem' }}>
+                    <CalendarDays size={21} />
+                    <span>Leave Config</span>
+                  </Link>
+                  <Link to="/movement-policies" className={`nav-item ${location.pathname === '/movement-policies' ? 'active' : ''}`} style={{ paddingLeft: '2.5rem' }}>
+                    <ShieldCheck size={21} />
+                    <span>Movement Policy Config</span>
+                  </Link>
+                  <Link to="/payroll-formulas" className={`nav-item ${location.pathname === '/payroll-formulas' ? 'active' : ''}`} style={{ paddingLeft: '2.5rem' }}>
+                    <Calculator size={21} />
+                    <span>Payroll Formula Settings</span>
+                  </Link>
+                  <Link to="/performance" className={`nav-item ${location.pathname === '/performance' ? 'active' : ''}`} style={{ paddingLeft: '2.5rem' }}>
+                    <Zap size={21} />
+                    <span>Performance Config</span>
+                  </Link>
+                  <Link to="/user-management" className={`nav-item ${location.pathname === '/user-management' ? 'active' : ''}`} style={{ paddingLeft: '2.5rem' }}>
+                    <ShieldCheck size={21} />
+                    <span>Identity & Access</span>
+                  </Link>
+                </div>
+              )}
+            </div>
 
             <div style={{ marginTop: '2rem', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '1px', paddingLeft: '1rem' }}>Lifecycle & Offboarding</div>
             <Link to="/exit-management" className={`nav-item ${location.pathname === '/exit-management' ? 'active' : ''}`}>
