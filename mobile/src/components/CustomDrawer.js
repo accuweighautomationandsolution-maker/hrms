@@ -166,6 +166,54 @@ export default function CustomDrawer(props) {
                 onPress={() => navigateTo('Reports')} 
               />
               <DrawerItem 
+                iconName="calculator" 
+                label="Budget Control" 
+                active={currentRouteName === 'BudgetControl'}
+                onPress={() => navigateTo('BudgetControl')} 
+              />
+              <DrawerItem 
+                iconName="person-add" 
+                label="Hiring Requests" 
+                active={currentRouteName === 'HiringRequests'}
+                onPress={() => navigateTo('HiringRequests')} 
+              />
+              <DrawerItem 
+                iconName="search" 
+                label="Recruitment" 
+                active={currentRouteName === 'Recruitment'}
+                onPress={() => navigateTo('Recruitment')} 
+              />
+              <DrawerItem 
+                iconName="documents" 
+                label="Document Hub" 
+                active={currentRouteName === 'DocumentHub'}
+                onPress={() => navigateTo('DocumentHub')} 
+              />
+              <DrawerItem 
+                iconName="mail-open" 
+                label="Letter Templates" 
+                active={currentRouteName === 'LetterTemplates'}
+                onPress={() => navigateTo('LetterTemplates')} 
+              />
+              <DrawerItem 
+                iconName="card" 
+                label="Compensation & Offers" 
+                active={currentRouteName === 'CompensationOffers'}
+                onPress={() => navigateTo('CompensationOffers')} 
+              />
+              <DrawerItem 
+                iconName="exit" 
+                label="Exit & FnF Settlement" 
+                active={currentRouteName === 'ExitManagement'}
+                onPress={() => navigateTo('ExitManagement')} 
+              />
+              <DrawerItem 
+                iconName="star" 
+                label="Statutory Bonus" 
+                active={currentRouteName === 'StatutoryBonus'}
+                onPress={() => navigateTo('StatutoryBonus')} 
+              />
+              <DrawerItem 
                 iconName="settings" 
                 label="Config & Masters" 
                 active={currentRouteName === 'Config'}

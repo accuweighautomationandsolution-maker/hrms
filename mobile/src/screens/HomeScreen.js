@@ -69,7 +69,8 @@ export default function HomeScreen() {
         setMonthlyOT(otStats);
       }
 
-      await checkLocation();
+      // Fire and forget so we don't block UI load if permissions hang on web
+      checkLocation();
     } catch (err) {
       console.error(err);
       Alert.alert('Error', 'Failed to load data');
