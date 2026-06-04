@@ -62,6 +62,7 @@ export default function CustomDrawer(props) {
             active={currentRouteName === 'EmployeeDirectory'}
             onPress={() => navigateTo('EmployeeDirectory')} 
           />
+          <DrawerGroup title="ATTENDANCE & MOVEMENT" />
           <DrawerItem 
             iconName="calendar" 
             label="Leave Management" 
@@ -70,9 +71,35 @@ export default function CustomDrawer(props) {
           />
           <DrawerItem 
             iconName="time" 
+            label="Regularization" 
+            active={currentRouteName === 'Regularization'}
+            onPress={() => navigateTo('Regularization')} 
+          />
+          <DrawerItem 
+            iconName="car" 
             label="Out Duty / Pass" 
             active={currentRouteName === 'OutDuty'}
             onPress={() => navigateTo('OutDuty')} 
+          />
+          <DrawerItem 
+            iconName="walk" 
+            label="Movement Requests" 
+            active={currentRouteName === 'MovementRequests'}
+            onPress={() => navigateTo('MovementRequests')} 
+          />
+          <DrawerItem 
+            iconName="document-text" 
+            label="Attendance Reports" 
+            active={currentRouteName === 'AttendanceReports'}
+            onPress={() => navigateTo('AttendanceReports')} 
+          />
+
+          <DrawerGroup title="FINANCE" />
+          <DrawerItem 
+            iconName="cash" 
+            label="Advance & Loans" 
+            active={currentRouteName === 'AdvanceLoans'}
+            onPress={() => navigateTo('AdvanceLoans')} 
           />
           <DrawerItem 
             iconName="receipt" 
@@ -80,6 +107,39 @@ export default function CustomDrawer(props) {
             active={currentRouteName === 'Expenses'}
             onPress={() => navigateTo('Expenses')} 
           />
+
+          <DrawerGroup title="COMPANY" />
+          <DrawerItem 
+            iconName="calendar-outline" 
+            label="Holiday List" 
+            active={currentRouteName === 'HolidayList'}
+            onPress={() => navigateTo('HolidayList')} 
+          />
+          <DrawerItem 
+            iconName="trending-up" 
+            label="Growth & Training" 
+            active={currentRouteName === 'GrowthTraining'}
+            onPress={() => navigateTo('GrowthTraining')} 
+          />
+          <DrawerItem 
+            iconName="shield-checkmark" 
+            label="Compliance Hub" 
+            active={currentRouteName === 'ComplianceHub'}
+            onPress={() => navigateTo('ComplianceHub')} 
+          />
+          <DrawerItem 
+            iconName="book" 
+            label="HR Policies" 
+            active={currentRouteName === 'HRPolicies'}
+            onPress={() => navigateTo('HRPolicies')} 
+          />
+          <DrawerItem 
+            iconName="folder" 
+            label="My Documents" 
+            active={currentRouteName === 'MyDocuments'}
+            onPress={() => navigateTo('MyDocuments')} 
+          />
+
           
           {(isAdmin || isManager) && (
             <DrawerItem 

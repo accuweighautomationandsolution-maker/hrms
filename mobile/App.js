@@ -24,6 +24,7 @@ import ApprovalsScreen from './src/screens/ApprovalsScreen';
 import PayrollLedgerScreen from './src/screens/PayrollLedgerScreen';
 import ReportsScreen from './src/screens/ReportsScreen';
 import ConfigScreen from './src/screens/ConfigScreen';
+import PlaceholderScreen from './src/screens/PlaceholderScreen';
 
 import CustomDrawer from './src/components/CustomDrawer';
 
@@ -71,7 +72,17 @@ function DrawerNavigator() {
       <Drawer.Screen name="EmployeeDirectory" component={EmployeeDirectoryScreen} options={{ title: 'Employee Directory' }} />
       <Drawer.Screen name="LeaveManagement" component={LeaveManagementScreen} options={{ title: 'Leave Management' }} />
       <Drawer.Screen name="OutDuty" component={OutDutyScreen} options={{ title: 'Out Duty & Pass' }} />
+      <Drawer.Screen name="Regularization" component={PlaceholderScreen} initialParams={{ title: 'Regularization', icon: 'time-outline' }} options={{ title: 'Regularization' }} />
+      <Drawer.Screen name="MovementRequests" component={PlaceholderScreen} initialParams={{ title: 'Movement Requests', icon: 'walk-outline' }} options={{ title: 'Movement Requests' }} />
+      <Drawer.Screen name="AttendanceReports" component={PlaceholderScreen} initialParams={{ title: 'Attendance Reports', icon: 'document-text-outline' }} options={{ title: 'Attendance Reports' }} />
+      <Drawer.Screen name="AdvanceLoans" component={PlaceholderScreen} initialParams={{ title: 'Advance & Loans', icon: 'cash-outline' }} options={{ title: 'Advance & Loans' }} />
       <Drawer.Screen name="Expenses" component={ExpensesScreen} options={{ title: 'Expenses' }} />
+      <Drawer.Screen name="HolidayList" component={PlaceholderScreen} initialParams={{ title: 'Holiday List', icon: 'calendar-outline' }} options={{ title: 'Holiday List' }} />
+      <Drawer.Screen name="GrowthTraining" component={PlaceholderScreen} initialParams={{ title: 'Growth & Training', icon: 'trending-up-outline' }} options={{ title: 'Growth & Training' }} />
+      <Drawer.Screen name="ComplianceHub" component={PlaceholderScreen} initialParams={{ title: 'Compliance Hub', icon: 'shield-checkmark-outline' }} options={{ title: 'Compliance Hub' }} />
+      <Drawer.Screen name="HRPolicies" component={PlaceholderScreen} initialParams={{ title: 'HR Policies', icon: 'book-outline' }} options={{ title: 'HR Policies' }} />
+      <Drawer.Screen name="MyDocuments" component={PlaceholderScreen} initialParams={{ title: 'My Documents', icon: 'folder-outline' }} options={{ title: 'My Documents' }} />
+      
       <Drawer.Screen name="Approvals" component={ApprovalsScreen} options={{ title: 'Approvals' }} />
       <Drawer.Screen name="PayrollLedger" component={PayrollLedgerScreen} options={{ title: 'Payroll Ledger' }} />
       <Drawer.Screen name="Reports" component={ReportsScreen} options={{ title: 'Reports' }} />
