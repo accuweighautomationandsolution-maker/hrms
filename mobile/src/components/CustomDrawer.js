@@ -71,15 +71,21 @@ export default function CustomDrawer(props) {
           />
           <DrawerItem 
             iconName="time" 
-            label="Regularization" 
+            label="Regular Attendance" 
             active={currentRouteName === 'Regularization'}
             onPress={() => navigateTo('Regularization')} 
           />
           <DrawerItem 
             iconName="car" 
-            label="Out Duty / Pass" 
+            label="Out Duty Request" 
             active={currentRouteName === 'OutDuty'}
             onPress={() => navigateTo('OutDuty')} 
+          />
+          <DrawerItem 
+            iconName="time" 
+            label="Out Pass Request" 
+            active={currentRouteName === 'OutPass'}
+            onPress={() => navigateTo('OutPass')} 
           />
           <DrawerItem 
             iconName="walk" 
@@ -140,15 +146,12 @@ export default function CustomDrawer(props) {
             onPress={() => navigateTo('MyDocuments')} 
           />
 
-          
-          {(isAdmin || isManager) && (
-            <DrawerItem 
-              iconName="checkmark-done" 
-              label="Approvals" 
-              active={currentRouteName === 'Approvals'}
-              onPress={() => navigateTo('Approvals')} 
-            />
-          )}
+          <DrawerItem 
+            iconName="checkmark-done" 
+            label="Approvals" 
+            active={currentRouteName === 'Approvals'}
+            onPress={() => navigateTo('Approvals')} 
+          />
 
           {isAdmin && (
             <>

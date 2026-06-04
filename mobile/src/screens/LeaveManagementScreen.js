@@ -33,7 +33,8 @@ export default function LeaveManagementScreen() {
       const emp = await dataService.getMyEmployeeProfile(user);
       if (!emp) return;
 
-      const userLeaves = await dataService.getLeavesForEmployee(emp.id);
+      const allLeaves = await dataService.getLeaveRequests();
+      const userLeaves = allLeaves.filter(req => req.empId === emp.id);
       setLeaves(userLeaves.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
 
       const currentYear = new Date().getFullYear();
