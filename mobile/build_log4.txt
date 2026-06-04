@@ -1,0 +1,12 @@
+env: load .env
+env: export EXPO_PUBLIC_APP_ENV EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY EXPO_PUBLIC_SUPABASE_URL
+Starting Metro Bundler
+
+ WARN  The package C:\Users\Saurabh.b\.gemini\antigravity\scratch\hrms\mobile\node_modules\@react-native-async-storage\async-storage contains an invalid package.json configuration. Consider raising this issue with the package maintainer(s).
+Reason: The resolution for "C:\Users\Saurabh.b\.gemini\antigravity\scratch\hrms\mobile\node_modules\@react-native-async-storage\async-storage" defined in "exports" is C:\Users\Saurabh.b\.gemini\antigravity\scratch\hrms\mobile\node_modules\@react-native-async-storage\async-storage\lib\module\index.js, however this file does not exist. Falling back to file-based resolution.
+Web Bundling failed 2408ms index.js (1130 modules)
+
+Error: While trying to resolve module `@react-native-async-storage/async-storage` from file `C:\Users\Saurabh.b\.gemini\antigravity\scratch\hrms\mobile\src\utils\supabaseClient.js`, the package `C:\Users\Saurabh.b\.gemini\antigravity\scratch\hrms\mobile\node_modules\@react-native-async-storage\async-storage\package.json` was successfully found. However, this package itself specifies a `main` module field that could not be resolved (`C:\Users\Saurabh.b\.gemini\antigravity\scratch\hrms\mobile\node_modules\@react-native-async-storage\async-storage\lib\module\index.js`. Indeed, none of these files exist:
+
+  * C:\Users\Saurabh.b\.gemini\antigravity\scratch\hrms\mobile\node_modules\@react-native-async-storage\async-storage\lib\module\index.js(.web.ts|.ts|.web.tsx|.tsx|.web.mjs|.mjs|.web.js|.js|.web.jsx|.jsx|.web.json|.json|.web.cjs|.cjs|.web.scss|.scss|.web.sass|.sass|.web.css|.css)
+  * C:\Users\Saurabh.b\.gemini\antigravity\scratch\hrms\mobile\node_modules\@react-native-async-storage\async-storage\lib\module\index.js\index(.web.ts|.ts|.web.tsx|.tsx|.web.mjs|.mjs|.web.js|.js|.web.jsx|.jsx|.web.json|.json|.web.cjs|.cjs|.web.scss|.scss|.web.sass|.sass|.web.css|.css)

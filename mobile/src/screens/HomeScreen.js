@@ -9,7 +9,6 @@ import {
   ScrollView
 } from 'react-native';
 import * as Location from 'expo-location';
-import { getDistance } from 'geolib'; // Oh wait, I don't have geolib installed. Let's do manual haversine formula.
 import { authService } from '../utils/authService';
 import { dataService } from '../utils/dataService';
 
@@ -38,6 +37,7 @@ export default function HomeScreen() {
   const [locationStatus, setLocationStatus] = useState('Checking location...');
   const [inRange, setInRange] = useState(false);
   const [todayAttendance, setTodayAttendance] = useState(null);
+  const [monthlyOT, setMonthlyOT] = useState({ otHours: 0, holidayOtHours: 0 });
 
   useEffect(() => {
     loadData();
@@ -60,6 +60,13 @@ export default function HomeScreen() {
         if (record) {
           setTodayAttendance(record);
         }
+
+        // Calculate monthly overtime from attendance records
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth();
+        const otStats = calculateMonthlyOT(empProfile.id, year, month, allAtt);
+        setMonthlyOT(otStats);
       }
 
       await checkLocation();
@@ -69,6 +76,66 @@ export default function HomeScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Calculate OT hours for current month from attendance records
+  // Uses same logic as web app payrollCalculator.js
+  const calculateMonthlyOT = (empId, year, month, recordsMap) => {
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const toMins = (t) => { if (!t) return null; const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+    const shiftEnd = toMins('18:30'); // 18:30
+
+    // Determine holidays (Sundays + odd Saturdays)
+    const holidaySet = new Set();
+    let satCount = 0;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dow = new Date(year, month, d).getDay();
+      if (dow === 0) {
+        holidaySet.add(d);
+      } else if (dow === 6) {
+        satCount++;
+        if (satCount % 2 !== 0) { // Odd Saturdays are holidays
+          holidaySet.add(d);
+        }
+      }
+    }
+
+    let otHours = 0;
+    let holidayOtHours = 0;
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateObj = new Date(year, month, d);
+      if (dateObj > today) continue; // Skip future days
+
+      const key = `${empId}_${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const rec = recordsMap[key];
+      if (!rec || !rec.punchIn || !rec.punchOut) continue;
+
+      const inMins = toMins(rec.punchIn);
+      const outMins = toMins(rec.punchOut);
+      if (!inMins || !outMins || outMins <= inMins) continue;
+
+      const duration = outMins - inMins;
+      const isHoliday = holidaySet.has(d);
+
+      if (isHoliday && duration) {
+        // Holiday OT: 30 min deduction if worked > half day
+        let payableMins = duration;
+        if (duration >= 240) {
+          payableMins = Math.max(0, duration - 30);
+        }
+        holidayOtHours += (payableMins / 60);
+      } else if (!isHoliday && outMins > shiftEnd) {
+        // Regular day OT: time worked beyond shift end
+        const otDuration = outMins - shiftEnd;
+        otHours += (otDuration / 60);
+      }
+    }
+
+    return { otHours: Math.round(otHours * 100) / 100, holidayOtHours: Math.round(holidayOtHours * 100) / 100 };
   };
 
   const checkLocation = async () => {
@@ -140,6 +207,12 @@ export default function HomeScreen() {
     await authService.logout();
   };
 
+  // Check if employee type is eligible for OT display
+  const empType = (employee?.empType || '').toLowerCase().trim();
+  const showOT = empType === 'on role worker' || empType === 'on-roll worker' || empType === 'contractual worker';
+  const totalOT = monthlyOT.otHours + monthlyOT.holidayOtHours;
+  const currentMonthName = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+
   if (loading && !employee) {
     return (
       <View style={styles.center}>
@@ -208,6 +281,37 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Monthly Overtime Card - Visible for On-Roll Workers & Contractual Workers */}
+      {showOT && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Monthly Overtime — {currentMonthName}</Text>
+          
+          <View style={styles.otContainer}>
+            <View style={styles.otBox}>
+              <Text style={styles.otValue}>{monthlyOT.otHours.toFixed(1)}</Text>
+              <Text style={styles.otLabel}>Regular OT (hrs)</Text>
+            </View>
+            <View style={styles.otDivider} />
+            <View style={styles.otBox}>
+              <Text style={styles.otValue}>{monthlyOT.holidayOtHours.toFixed(1)}</Text>
+              <Text style={styles.otLabel}>Holiday OT (hrs)</Text>
+            </View>
+          </View>
+
+          <View style={styles.otTotalRow}>
+            <Text style={styles.otTotalLabel}>Total OT This Month</Text>
+            <View style={styles.otTotalBadge}>
+              <Text style={styles.otTotalValue}>{totalOT.toFixed(1)} hrs</Text>
+            </View>
+          </View>
+
+          <Text style={styles.otNote}>
+            Regular OT = hours worked beyond 18:30 on working days.{'\n'}
+            Holiday OT = hours worked on Sundays & odd Saturdays (30 min deducted if &gt;4 hrs).
+          </Text>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -235,5 +339,16 @@ const styles = StyleSheet.create({
   btnIn: { backgroundColor: '#10B981' },
   btnOut: { backgroundColor: '#F59E0B' },
   btnDisabled: { backgroundColor: '#9CA3AF', opacity: 0.7 },
-  actionText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 }
+  actionText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
+  // Overtime card styles
+  otContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  otBox: { flex: 1, alignItems: 'center', paddingVertical: 12 },
+  otValue: { fontSize: 28, fontWeight: 'bold', color: '#2563EB' },
+  otLabel: { fontSize: 12, color: '#6B7280', marginTop: 4, textAlign: 'center' },
+  otDivider: { width: 1, height: 50, backgroundColor: '#E5E7EB' },
+  otTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#F3F4F6', marginBottom: 8 },
+  otTotalLabel: { fontSize: 16, fontWeight: '600', color: '#374151' },
+  otTotalBadge: { backgroundColor: '#EFF6FF', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
+  otTotalValue: { fontSize: 16, fontWeight: 'bold', color: '#2563EB' },
+  otNote: { fontSize: 12, color: '#9CA3AF', lineHeight: 18, marginTop: 4 },
 });

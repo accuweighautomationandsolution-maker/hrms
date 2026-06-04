@@ -1,0 +1,29 @@
+env: load .env
+env: export EXPO_PUBLIC_APP_ENV EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY EXPO_PUBLIC_SUPABASE_URL
+Starting Metro Bundler
+
+Web Bundling failed 2160ms index.js (750 modules)
+
+Error: Unable to resolve module @expo/vector-icons from C:\Users\Saurabh.b\.gemini\antigravity\scratch\hrms\mobile\App.js: @expo/vector-icons could not be found within the project or in these directories:
+  node_modules
+  ..\node_modules
+  ..\..\..\..\..\node_modules
+[0m [90m  7 |[39m [36mimport[39m { [33mSafeAreaProvider[39m } [36mfrom[39m [32m'react-native-safe-area-context'[39m[33m;[39m
+ [90m  8 |[39m [36mimport[39m { [33mActivityIndicator[39m[33m,[39m [33mView[39m } [36mfrom[39m [32m'react-native'[39m[33m;[39m
+[31m[1m>[22m[39m[90m  9 |[39m [36mimport[39m { [33mIonicons[39m } [36mfrom[39m [32m'@expo/vector-icons'[39m[33m;[39m
+ [90m    |[39m                           [31m[1m^[22m[39m
+ [90m 10 |[39m
+ [90m 11 |[39m [36mimport[39m { decode[33m,[39m encode } [36mfrom[39m [32m'base-64'[39m[33m;[39m
+ [90m 12 |[39m [36mif[39m ([33m![39mglobalThis[33m.[39mbtoa) { globalThis[33m.[39mbtoa [33m=[39m encode[33m;[39m }[0m
+
+Import stack:
+
+ App.js
+ | import "@expo/vector-icons"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
