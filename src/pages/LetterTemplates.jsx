@@ -50,6 +50,7 @@ const LetterTemplates = () => {
     const [selectedTemplate, setSelectedTemplate] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState({ type: '', subject: '', content: '' });
+    const editorRef = React.useRef(null);
 
     const openEdit = (template = null) => {
         if (template) {
@@ -98,8 +99,11 @@ const LetterTemplates = () => {
     }
 
     const insertTag = (tag) => {
-        // Simple append for now, more advanced would be cursor position insertion
-        setEditForm(prev => ({ ...prev, content: prev.content + ' ' + tag + ' ' }));
+        if (editorRef.current) {
+            editorRef.current.insertText(tag);
+        } else {
+            setEditForm(prev => ({ ...prev, content: prev.content + ' ' + tag + ' ' }));
+        }
     };
 
     return (
@@ -173,6 +177,7 @@ const LetterTemplates = () => {
                         <div className="form-group" style={{ marginBottom: '2rem' }}>
                             <label className="form-label">Body Content (HTML Editor)</label>
                             <RichTextEditor 
+                                ref={editorRef}
                                 value={editForm.content} 
                                 onChange={(content) => setEditForm(prev => ({...prev, content}))}
                                 height="400px"

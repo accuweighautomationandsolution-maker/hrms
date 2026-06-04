@@ -1,8 +1,31 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, forwardRef, useImperativeHandle, useState } from 'react';
 import { Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Type } from 'lucide-react';
 
-const RichTextEditor = ({ value, onChange, height = '400px' }) => {
+const RichTextEditor = forwardRef(({ value, onChange, height = '400px' }, ref) => {
     const editorRef = useRef(null);
+    const [savedRange, setSavedRange] = useState(null);
+
+    useImperativeHandle(ref, () => ({
+        insertText: (text) => {
+            if (editorRef.current) {
+                editorRef.current.focus();
+                const sel = window.getSelection();
+                if (savedRange) {
+                    sel.removeAllRanges();
+                    sel.addRange(savedRange);
+                }
+                document.execCommand('insertText', false, text);
+                onChange(editorRef.current.innerHTML);
+            }
+        }
+    }));
+
+    const saveSelection = () => {
+        const sel = window.getSelection();
+        if (sel.getRangeAt && sel.rangeCount) {
+            setSavedRange(sel.getRangeAt(0));
+        }
+    };
 
     // Sync initial value only
     useEffect(() => {
@@ -68,6 +91,9 @@ const RichTextEditor = ({ value, onChange, height = '400px' }) => {
                 ref={editorRef}
                 contentEditable
                 onInput={handleInput}
+                onBlur={saveSelection}
+                onMouseUp={saveSelection}
+                onKeyUp={saveSelection}
                 style={{ 
                     padding: '1.5rem', 
                     height: height, 
@@ -80,7 +106,7 @@ const RichTextEditor = ({ value, onChange, height = '400px' }) => {
             />
         </div>
     );
-};
+});
 
 const ToolbarButton = ({ icon, onClick, title }) => (
     <button 
