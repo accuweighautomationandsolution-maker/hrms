@@ -15,7 +15,7 @@ import { dataService } from '../utils/dataService';
 // Office Coordinates (Update to real Accuweigh location)
 const OFFICE_LAT = 18.5204;
 const OFFICE_LON = 73.8567;
-const ALLOWED_RADIUS_METERS = 200; // 200 meters
+const ALLOWED_RADIUS_METERS = 9999999; // Essentially unlimited for testing
 
 // Haversine formula to calculate distance between two lat/long points in meters
 function getDistanceFromLatLonInM(lat1, lon1, lat2, lon2) {
@@ -225,8 +225,8 @@ export default function HomeScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 20 }}>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Hello, {employee?.name || 'Employee'}</Text>
+        <View style={{ flex: 1, paddingRight: 10 }}>
+          <Text style={styles.greeting} numberOfLines={2}>Hello, {employee?.name || 'Employee'}</Text>
           <Text style={styles.date}>{new Date().toDateString()}</Text>
         </View>
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>

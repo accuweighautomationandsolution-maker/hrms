@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createDrawerNavigator } from '@react-navigation/drawer';
+import { createDrawerNavigator, DrawerToggleButton } from '@react-navigation/drawer';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -37,11 +37,11 @@ function MainTabs() {
   const isAdminOrManager = userRole === 'admin' || userRole === 'management' || userRole === 'manager';
 
   return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: true,
-        headerLeft: () => null, 
-        tabBarIcon: ({ focused, color, size }) => {
+      <Tab.Navigator
+        screenOptions={({ route }) => ({
+          headerShown: true,
+          headerLeft: () => <DrawerToggleButton tintColor="#111827" />, 
+          tabBarIcon: ({ focused, color, size }) => {
           if (route.name === 'HomeTab') return <Ionicons name="home" size={size} color={color} />;
           if (route.name === 'LeavesTab') return <Ionicons name="calendar" size={size} color={color} />;
           if (route.name === 'ApprovalsTab') return <Ionicons name="checkmark-done" size={size} color={color} />;

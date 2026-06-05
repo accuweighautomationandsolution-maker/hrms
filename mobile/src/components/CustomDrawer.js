@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView } from 'rea
 import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AccuweighLogo from '../../assets/Accuweigh.svg';
 
 import { authService } from '../utils/authService';
 
@@ -41,12 +42,7 @@ export default function CustomDrawer(props) {
     <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
       <DrawerContentScrollView {...props} contentContainerStyle={{ paddingTop: insets.top }}>
         <View style={styles.header}>
-          {/* Logo Placeholder - use icon.png as it exists in assets */}
-          <Image 
-            source={require('../../assets/icon.png')} 
-            style={styles.logo}
-            resizeMode="contain"
-          />
+          <AccuweighLogo width={180} height={40} style={{ alignSelf: 'center' }} />
         </View>
 
         <View style={styles.navSection}>
