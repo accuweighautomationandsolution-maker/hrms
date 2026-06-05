@@ -5,8 +5,9 @@ import { createDrawerNavigator, DrawerToggleButton } from '@react-navigation/dra
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, View, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Updates from 'expo-updates';
 
 import { decode, encode } from 'base-64';
 if (!globalThis.btoa) { globalThis.btoa = encode; }
@@ -69,7 +70,7 @@ function DrawerNavigator() {
       <Drawer.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false, title: 'Dashboard' }} />
       <Drawer.Screen name="EmployeeDirectory" component={EmployeeDirectoryScreen} options={{ title: 'Employee Directory' }} />
       <Drawer.Screen name="LeaveManagement" component={LeaveManagementScreen} options={{ title: 'Leave Management' }} />
-      <Drawer.Screen name="OutDuty" component={OutDutyScreen} options={{ title: 'Out Duty Request' }} />
+      <Drawer.Screen name="OutDuty" component={WebViewScreen} initialParams={{ title: 'Out Duty Request', icon: 'car-outline', path: '/out-duty' }} options={{ title: 'Out Duty Request' }} />
       <Drawer.Screen name="OutPass" component={WebViewScreen} initialParams={{ title: 'Out Pass Request', icon: 'time-outline', path: '/out-pass' }} options={{ title: 'Out Pass Request' }} />
       <Drawer.Screen name="Regularization" component={WebViewScreen} initialParams={{ title: 'Regular Attendance', icon: 'time-outline', path: '/attendance' }} options={{ title: 'Regular Attendance' }} />
       <Drawer.Screen name="MovementRequests" component={WebViewScreen} initialParams={{ title: 'Movement Requests', icon: 'walk-outline', path: '/movement-reports' }} options={{ title: 'Movement Requests' }} />
@@ -109,6 +110,19 @@ export default function App() {
     const setup = async () => {
       try {
         await authService.init();
+        
+        // Check for OTA updates immediately
+        try {
+          if (!__DEV__) {
+            const update = await Updates.checkForUpdateAsync();
+            if (update.isAvailable) {
+              await Updates.fetchUpdateAsync();
+              await Updates.reloadAsync();
+            }
+          }
+        } catch (e) {
+          console.log("Update check failed", e);
+        }
         
         authService.onSessionChange((profile) => {
           if (mounted) {
