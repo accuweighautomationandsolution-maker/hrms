@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
-  ActivityIndicator, Alert 
+  ActivityIndicator, Alert, StatusBar
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { CheckCircle, XCircle, Calendar as CalendarIcon, User, Inbox, Briefcase } from 'lucide-react-native';
 import { dataService } from '../utils/dataService';
 
 export default function ApprovalsScreen() {
@@ -52,27 +52,51 @@ export default function ApprovalsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.sectionTitle}>Pending Leave Requests</Text>
+      <StatusBar barStyle="light-content" backgroundColor="#2563EB" />
+      <View style={styles.headerBackground} />
+
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Manager Approvals</Text>
+          <Text style={styles.headerSubtitle}>Review pending leave requests</Text>
+        </View>
+
         {pendingLeaves.length === 0 ? (
-          <Text style={styles.emptyText}>You're all caught up! No pending approvals.</Text>
+          <View style={styles.emptyCard}>
+            <Inbox size={48} color="#CBD5E1" style={{ marginBottom: 16 }} />
+            <Text style={styles.emptyTitle}>You're all caught up!</Text>
+            <Text style={styles.emptySubtitle}>No pending approvals at the moment.</Text>
+          </View>
         ) : (
           pendingLeaves.map((l, i) => (
             <View key={i} style={styles.card}>
-              <View style={styles.header}>
-                <View>
-                  <Text style={styles.empName}>{l.empName || `Employee ID: ${l.empId}`}</Text>
-                  <Text style={styles.department}>{l.department || 'General'}</Text>
+              <View style={styles.cardHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={styles.avatarBox}>
+                    <User size={20} color="#3B82F6" />
+                  </View>
+                  <View style={{ marginLeft: 12 }}>
+                    <Text style={styles.empName}>{l.empName || `Employee ID: ${l.empId}`}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                      <Briefcase size={12} color="#64748B" />
+                      <Text style={styles.department}>{l.department || 'General'}</Text>
+                    </View>
+                  </View>
                 </View>
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{l.leaveType}</Text>
+                <View style={styles.typeBadge}>
+                  <Text style={styles.typeBadgeText}>{l.leaveType}</Text>
                 </View>
               </View>
 
-              <Text style={styles.dates}>
-                {new Date(l.startDate).toLocaleDateString()} to {new Date(l.endDate).toLocaleDateString()}
-              </Text>
+              <View style={styles.datesBox}>
+                <CalendarIcon size={16} color="#64748B" />
+                <Text style={styles.dates}>
+                  {new Date(l.startDate).toLocaleDateString('en-GB', {day:'numeric', month:'short'})} - {new Date(l.endDate).toLocaleDateString('en-GB', {day:'numeric', month:'short'})}
+                </Text>
+              </View>
+              
+              <Text style={styles.reasonLabel}>Reason:</Text>
               <Text style={styles.reason}>"{l.reason}"</Text>
 
               <View style={styles.actions}>
@@ -80,7 +104,7 @@ export default function ApprovalsScreen() {
                   style={[styles.actionBtn, styles.rejectBtn]} 
                   onPress={() => handleAction(l, 'Rejected')}
                 >
-                  <Ionicons name="close-circle" size={20} color="#EF4444" style={{marginRight: 6}} />
+                  <XCircle size={20} color="#EF4444" style={{marginRight: 8}} />
                   <Text style={styles.rejectText}>Reject</Text>
                 </TouchableOpacity>
 
@@ -88,7 +112,7 @@ export default function ApprovalsScreen() {
                   style={[styles.actionBtn, styles.approveBtn]} 
                   onPress={() => handleAction(l, 'Approved')}
                 >
-                  <Ionicons name="checkmark-circle" size={20} color="#10B981" style={{marginRight: 6}} />
+                  <CheckCircle size={20} color="#10B981" style={{marginRight: 8}} />
                   <Text style={styles.approveText}>Approve</Text>
                 </TouchableOpacity>
               </View>
@@ -102,28 +126,41 @@ export default function ApprovalsScreen() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
-  scrollContent: { padding: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 16 },
-  emptyText: { color: '#6B7280', textAlign: 'center', marginTop: 40, fontSize: 16 },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  headerBackground: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 180,
+    backgroundColor: '#2563EB', borderBottomLeftRadius: 36, borderBottomRightRadius: 36,
+  },
+  scrollContent: { padding: 20, paddingTop: 40, paddingBottom: 100 },
+  header: { marginBottom: 30 },
+  headerTitle: { fontSize: 28, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.5 },
+  headerSubtitle: { fontSize: 14, color: '#BFDBFE', fontWeight: '500', marginTop: 4 },
+  
+  emptyCard: { backgroundColor: '#FFFFFF', padding: 40, borderRadius: 24, alignItems: 'center', shadowColor: '#64748B', shadowOpacity: 0.05, shadowRadius: 15, shadowOffset:{width:0, height:6}, elevation: 3, marginTop: 20 },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: '#1E293B', marginBottom: 8 },
+  emptySubtitle: { fontSize: 15, color: '#64748B', textAlign: 'center' },
   
   card: {
-    backgroundColor: '#FFF', borderRadius: 12, padding: 16, marginBottom: 16,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width:0, height:2}, elevation: 2
+    backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, marginBottom: 20,
+    shadowColor: '#64748B', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width:0, height:6}, elevation: 4
   },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  empName: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  department: { fontSize: 13, color: '#6B7280', marginTop: 2 },
-  badge: { backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  badgeText: { color: '#2563EB', fontSize: 12, fontWeight: '700' },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
+  avatarBox: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center' },
+  empName: { fontSize: 17, fontWeight: '800', color: '#0F172A' },
+  department: { fontSize: 13, color: '#64748B', fontWeight: '600', marginLeft: 4 },
+  typeBadge: { backgroundColor: '#F1F5F9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
+  typeBadgeText: { color: '#475569', fontSize: 13, fontWeight: '800' },
   
-  dates: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 6 },
-  reason: { fontSize: 14, color: '#4B5563', fontStyle: 'italic', marginBottom: 16 },
+  datesBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 16 },
+  dates: { fontSize: 15, fontWeight: '700', color: '#334155', marginLeft: 10 },
   
-  actions: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 16 },
-  actionBtn: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 10, borderRadius: 8, marginHorizontal: 4 },
-  rejectBtn: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' },
-  approveBtn: { backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0' },
-  rejectText: { color: '#EF4444', fontWeight: '600', fontSize: 15 },
-  approveText: { color: '#10B981', fontWeight: '600', fontSize: 15 }
+  reasonLabel: { fontSize: 12, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  reason: { fontSize: 15, color: '#475569', fontStyle: 'italic', marginBottom: 24, lineHeight: 22 },
+  
+  actions: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 20 },
+  actionBtn: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 14, borderRadius: 14, marginHorizontal: 6, borderWidth: 1 },
+  rejectBtn: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  approveBtn: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
+  rejectText: { color: '#EF4444', fontWeight: '800', fontSize: 15 },
+  approveText: { color: '#10B981', fontWeight: '800', fontSize: 15 }
 });
