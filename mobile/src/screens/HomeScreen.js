@@ -6,8 +6,10 @@ import {
   TouchableOpacity, 
   Alert, 
   ActivityIndicator,
-  ScrollView
+  ScrollView,
+  StatusBar
 } from 'react-native';
+import { MapPin, Clock, LogOut, CalendarClock, RefreshCw } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { authService } from '../utils/authService';
 import { dataService } from '../utils/dataService';
@@ -223,133 +225,188 @@ export default function HomeScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 20 }}>
-      <View style={styles.header}>
-        <View style={{ flex: 1, paddingRight: 10 }}>
-          <Text style={styles.greeting} numberOfLines={2}>Hello, {employee?.name || 'Employee'}</Text>
-          <Text style={styles.date}>{new Date().toDateString()}</Text>
-        </View>
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Location Status</Text>
-        <Text style={[styles.statusText, inRange ? styles.success : styles.error]}>
-          {locationStatus}
-        </Text>
-        <TouchableOpacity style={styles.refreshBtn} onPress={checkLocation}>
-          <Text style={styles.refreshText}>Refresh Location</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Today's Attendance</Text>
-        
-        <View style={styles.row}>
-          <Text style={styles.label}>Punch In:</Text>
-          <Text style={styles.value}>{todayAttendance?.punchIn || '--:--'}</Text>
-        </View>
-        <View style={styles.row}>
-          <Text style={styles.label}>Punch Out:</Text>
-          <Text style={styles.value}>{todayAttendance?.punchOut || '--:--'}</Text>
-        </View>
-
-        <View style={styles.actions}>
-          <TouchableOpacity 
-            style={[
-              styles.actionBtn, 
-              styles.btnIn, 
-              (!inRange || todayAttendance?.punchIn) && styles.btnDisabled
-            ]} 
-            onPress={() => handlePunch('IN')}
-            disabled={!inRange || !!todayAttendance?.punchIn || loading}
-          >
-            <Text style={styles.actionText}>PUNCH IN</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[
-              styles.actionBtn, 
-              styles.btnOut, 
-              (!inRange || !todayAttendance?.punchIn || todayAttendance?.punchOut) && styles.btnDisabled
-            ]} 
-            onPress={() => handlePunch('OUT')}
-            disabled={!inRange || !todayAttendance?.punchIn || !!todayAttendance?.punchOut || loading}
-          >
-            <Text style={styles.actionText}>PUNCH OUT</Text>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#2563EB" />
+      <View style={styles.headerBackground} />
+      
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <View style={{ flex: 1, paddingRight: 10 }}>
+            <Text style={styles.date}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
+            <Text style={styles.greeting} numberOfLines={2}>Hi, {employee?.name?.split(' ')[0] || 'Employee'} 👋</Text>
+          </View>
+          <TouchableOpacity style={styles.logoutIconBtn} onPress={handleLogout}>
+            <LogOut size={22} color="#FFF" />
           </TouchableOpacity>
         </View>
-      </View>
 
-      {/* Monthly Overtime Card - Visible for On-Roll Workers & Contractual Workers */}
-      {showOT && (
+        {/* Location Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Monthly Overtime — {currentMonthName}</Text>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardIconBox}>
+              <MapPin size={20} color="#3B82F6" />
+            </View>
+            <Text style={styles.cardTitle}>Location Status</Text>
+            <TouchableOpacity onPress={checkLocation} style={{ marginLeft: 'auto', padding: 8 }}>
+              <RefreshCw size={18} color="#64748B" />
+            </TouchableOpacity>
+          </View>
           
-          <View style={styles.otContainer}>
-            <View style={styles.otBox}>
-              <Text style={styles.otValue}>{monthlyOT.otHours.toFixed(1)}</Text>
-              <Text style={styles.otLabel}>Regular OT (hrs)</Text>
-            </View>
-            <View style={styles.otDivider} />
-            <View style={styles.otBox}>
-              <Text style={styles.otValue}>{monthlyOT.holidayOtHours.toFixed(1)}</Text>
-              <Text style={styles.otLabel}>Holiday OT (hrs)</Text>
-            </View>
+          <View style={[styles.statusBanner, inRange ? styles.statusBannerSuccess : styles.statusBannerError]}>
+            <Text style={[styles.statusText, inRange ? styles.successText : styles.errorText]}>
+              {locationStatus}
+            </Text>
           </View>
-
-          <View style={styles.otTotalRow}>
-            <Text style={styles.otTotalLabel}>Total OT This Month</Text>
-            <View style={styles.otTotalBadge}>
-              <Text style={styles.otTotalValue}>{totalOT.toFixed(1)} hrs</Text>
-            </View>
-          </View>
-
-          <Text style={styles.otNote}>
-            Regular OT = hours worked beyond 18:30 on working days.{'\n'}
-            Holiday OT = hours worked on Sundays & odd Saturdays (30 min deducted if &gt;4 hrs).
-          </Text>
         </View>
-      )}
-    </ScrollView>
+
+        {/* Attendance Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={[styles.cardIconBox, { backgroundColor: '#ECFDF5' }]}>
+              <Clock size={20} color="#10B981" />
+            </View>
+            <Text style={styles.cardTitle}>Today's Attendance</Text>
+          </View>
+          
+          <View style={styles.timeRow}>
+            <View style={styles.timeBox}>
+              <Text style={styles.timeLabel}>PUNCH IN</Text>
+              <Text style={styles.timeValue}>{todayAttendance?.punchIn || '--:--'}</Text>
+            </View>
+            <View style={styles.timeDivider} />
+            <View style={styles.timeBox}>
+              <Text style={styles.timeLabel}>PUNCH OUT</Text>
+              <Text style={styles.timeValue}>{todayAttendance?.punchOut || '--:--'}</Text>
+            </View>
+          </View>
+
+          <View style={styles.actions}>
+            <TouchableOpacity 
+              style={[
+                styles.actionBtn, 
+                styles.btnIn, 
+                (!inRange || todayAttendance?.punchIn) && styles.btnDisabled
+              ]} 
+              onPress={() => handlePunch('IN')}
+              disabled={!inRange || !!todayAttendance?.punchIn || loading}
+            >
+              <Text style={styles.actionText}>PUNCH IN</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[
+                styles.actionBtn, 
+                styles.btnOut, 
+                (!inRange || !todayAttendance?.punchIn || todayAttendance?.punchOut) && styles.btnDisabled
+              ]} 
+              onPress={() => handlePunch('OUT')}
+              disabled={!inRange || !todayAttendance?.punchIn || !!todayAttendance?.punchOut || loading}
+            >
+              <Text style={styles.actionText}>PUNCH OUT</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Monthly Overtime Card */}
+        {showOT && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={[styles.cardIconBox, { backgroundColor: '#FFFBEB' }]}>
+                <CalendarClock size={20} color="#F59E0B" />
+              </View>
+              <Text style={styles.cardTitle}>Monthly Overtime</Text>
+              <Text style={styles.monthBadge}>{currentMonthName.substring(0, 3)}</Text>
+            </View>
+            
+            <View style={styles.otContainer}>
+              <View style={styles.otBox}>
+                <Text style={styles.otValue}>{monthlyOT.otHours.toFixed(1)}</Text>
+                <Text style={styles.otLabel}>Regular OT</Text>
+              </View>
+              <View style={styles.otDivider} />
+              <View style={styles.otBox}>
+                <Text style={styles.otValue}>{monthlyOT.holidayOtHours.toFixed(1)}</Text>
+                <Text style={styles.otLabel}>Holiday OT</Text>
+              </View>
+            </View>
+
+            <View style={styles.otTotalRow}>
+              <Text style={styles.otTotalLabel}>Total Approved OT</Text>
+              <View style={styles.otTotalBadge}>
+                <Text style={styles.otTotalValue}>{totalOT.toFixed(1)} hrs</Text>
+              </View>
+            </View>
+          </View>
+        )}
+        <View style={{height: 30}} />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F3F4F6' },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  headerBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 240,
+    backgroundColor: '#2563EB',
+    borderBottomLeftRadius: 36,
+    borderBottomRightRadius: 36,
+  },
+  scrollContent: { padding: 20, paddingTop: 60 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, marginTop: 40 },
-  greeting: { fontSize: 24, fontWeight: 'bold', color: '#111827' },
-  date: { fontSize: 14, color: '#6B7280', marginTop: 4 },
-  logoutBtn: { backgroundColor: '#EF4444', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
-  logoutText: { color: '#FFF', fontWeight: 'bold', fontSize: 14 },
-  card: { backgroundColor: '#FFF', borderRadius: 12, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#374151', marginBottom: 12 },
-  statusText: { fontSize: 16, marginBottom: 12, lineHeight: 22 },
-  success: { color: '#10B981' },
-  error: { color: '#EF4444' },
-  refreshBtn: { alignSelf: 'flex-start', backgroundColor: '#E5E7EB', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 },
-  refreshText: { color: '#374151', fontWeight: '600' },
-  row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  label: { fontSize: 16, color: '#6B7280' },
-  value: { fontSize: 16, fontWeight: '600', color: '#111827' },
-  actions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 24 },
-  actionBtn: { flex: 1, padding: 16, borderRadius: 8, alignItems: 'center', marginHorizontal: 4 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 32 },
+  greeting: { fontSize: 28, fontWeight: '800', color: '#FFFFFF', marginTop: 6, letterSpacing: -0.5 },
+  date: { fontSize: 13, color: '#BFDBFE', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1.5 },
+  logoutIconBtn: { backgroundColor: 'rgba(255,255,255,0.15)', padding: 12, borderRadius: 14 },
+  
+  card: { 
+    backgroundColor: '#FFFFFF', 
+    borderRadius: 24, 
+    padding: 24, 
+    marginBottom: 20, 
+    shadowColor: '#64748B', 
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08, 
+    shadowRadius: 20, 
+    elevation: 4 
+  },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
+  cardIconBox: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center', marginRight: 14 },
+  cardTitle: { fontSize: 19, fontWeight: '700', color: '#1E293B' },
+  monthBadge: { marginLeft: 'auto', backgroundColor: '#F1F5F9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, fontSize: 13, fontWeight: '700', color: '#475569', textTransform: 'uppercase' },
+  
+  statusBanner: { padding: 16, borderRadius: 16, backgroundColor: '#F8FAFC', borderLeftWidth: 4, borderLeftColor: '#CBD5E1' },
+  statusBannerSuccess: { backgroundColor: '#ECFDF5', borderLeftColor: '#10B981' },
+  statusBannerError: { backgroundColor: '#FEF2F2', borderLeftColor: '#EF4444' },
+  statusText: { fontSize: 15, fontWeight: '600', color: '#475569', lineHeight: 22 },
+  successText: { color: '#047857' },
+  errorText: { color: '#B91C1C' },
+  
+  timeRow: { flexDirection: 'row', justifyContent: 'center', paddingVertical: 20, backgroundColor: '#F8FAFC', borderRadius: 20, marginBottom: 24 },
+  timeBox: { flex: 1, alignItems: 'center' },
+  timeLabel: { fontSize: 12, color: '#64748B', fontWeight: '700', marginBottom: 8, letterSpacing: 0.8 },
+  timeValue: { fontSize: 26, fontWeight: '800', color: '#0F172A' },
+  timeDivider: { width: 1, height: '70%', backgroundColor: '#E2E8F0', alignSelf: 'center' },
+  
+  actions: { flexDirection: 'row', justifyContent: 'space-between' },
+  actionBtn: { flex: 1, paddingVertical: 18, borderRadius: 16, alignItems: 'center', marginHorizontal: 6, shadowColor: '#000', shadowOffset: {width:0, height:4}, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
   btnIn: { backgroundColor: '#10B981' },
   btnOut: { backgroundColor: '#F59E0B' },
-  btnDisabled: { backgroundColor: '#9CA3AF', opacity: 0.7 },
-  actionText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
-  // Overtime card styles
-  otContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  otBox: { flex: 1, alignItems: 'center', paddingVertical: 12 },
-  otValue: { fontSize: 28, fontWeight: 'bold', color: '#2563EB' },
-  otLabel: { fontSize: 12, color: '#6B7280', marginTop: 4, textAlign: 'center' },
-  otDivider: { width: 1, height: 50, backgroundColor: '#E5E7EB' },
-  otTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#F3F4F6', marginBottom: 8 },
-  otTotalLabel: { fontSize: 16, fontWeight: '600', color: '#374151' },
-  otTotalBadge: { backgroundColor: '#EFF6FF', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
-  otTotalValue: { fontSize: 16, fontWeight: 'bold', color: '#2563EB' },
-  otNote: { fontSize: 12, color: '#9CA3AF', lineHeight: 18, marginTop: 4 },
+  btnDisabled: { backgroundColor: '#E2E8F0', shadowOpacity: 0, elevation: 0 },
+  actionText: { color: '#FFF', fontWeight: '800', fontSize: 16, letterSpacing: 0.5 },
+  
+  otContainer: { flexDirection: 'row', backgroundColor: '#F8FAFC', borderRadius: 16, paddingVertical: 20, marginBottom: 16 },
+  otBox: { flex: 1, alignItems: 'center' },
+  otValue: { fontSize: 32, fontWeight: '800', color: '#2563EB' },
+  otLabel: { fontSize: 13, color: '#64748B', fontWeight: '600', marginTop: 6 },
+  otDivider: { width: 1, height: '100%', backgroundColor: '#E2E8F0' },
+  
+  otTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 4 },
+  otTotalLabel: { fontSize: 16, fontWeight: '700', color: '#334155' },
+  otTotalBadge: { backgroundColor: '#DBEAFE', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  otTotalValue: { fontSize: 16, fontWeight: '800', color: '#1D4ED8' },
 });
