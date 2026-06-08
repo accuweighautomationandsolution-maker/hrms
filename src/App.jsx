@@ -146,8 +146,13 @@ function App() {
       try {
         setInitStatus('Authenticating session...');
 
-        // SSO Intercept
+        // SSO Intercept & Mobile Mode
         const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('mobile') === 'true') {
+          sessionStorage.setItem('isMobileMode', 'true');
+        }
+        const isMobileUrl = urlParams.get('mobile') === 'true';
+
         const ssoEmail = urlParams.get('sso_email');
         const ssoPwd = urlParams.get('sso_pwd');
         
@@ -237,6 +242,7 @@ function App() {
 
   const userRole = currentUser?.role;
   const isAdmin = userRole === 'management' || userRole === 'admin';
+  const isMobileMode = sessionStorage.getItem('isMobileMode') === 'true';
 
   // Unauthenticated Wrapper
   if (!currentUser) {
@@ -258,11 +264,11 @@ function App() {
     <NotificationProvider>
       <Router>
         <Toast />
-        <div className="app-layout">
-          <Sidebar userRole={userRole} isManager={isManager} />
-          <div className="main-content">
-            <Header onLogout={handleLogout} userRole={userRole} userName={currentUser.name} />
-            <main className="page-content">
+        <div className="app-layout" style={isMobileMode ? { display: 'block', height: '100%', overflowY: 'auto' } : {}}>
+          {!isMobileMode && <Sidebar userRole={userRole} isManager={isManager} />}
+          <div className="main-content" style={isMobileMode ? { height: '100%' } : {}}>
+            {!isMobileMode && <Header onLogout={handleLogout} userRole={userRole} userName={currentUser.name} />}
+            <main className="page-content" style={isMobileMode ? { padding: 0 } : {}}>
               <ErrorBoundary>
                 <Routes>
                   {/* Universal Authorized Routes */}

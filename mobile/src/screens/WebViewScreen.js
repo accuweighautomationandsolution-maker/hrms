@@ -17,7 +17,10 @@ export default function WebViewScreen({ route }) {
     if (profile && profile.email && profile.emp_id) {
       // emp_id contains the base64 encoded password for our internal shadow auth
       const connector = uri.includes('?') ? '&' : '?';
-      uri = `${uri}${connector}sso_email=${encodeURIComponent(profile.email)}&sso_pwd=${encodeURIComponent(profile.emp_id)}`;
+      uri = `${uri}${connector}sso_email=${encodeURIComponent(profile.email)}&sso_pwd=${encodeURIComponent(profile.emp_id)}&mobile=true`;
+    } else {
+      const connector = uri.includes('?') ? '&' : '?';
+      uri = `${uri}${connector}mobile=true`;
     }
     
     setFinalUri(uri);
