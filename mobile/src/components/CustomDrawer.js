@@ -66,10 +66,10 @@ export default function CustomDrawer(props) {
             onPress={() => navigateTo('LeaveManagement')} 
           />
           <DrawerItem 
-            iconName="time" 
-            label="Regular Attendance" 
-            active={currentRouteName === 'Regularization'}
-            onPress={() => navigateTo('Regularization')} 
+            iconName="calendar-sharp" 
+            label="Attendance History" 
+            active={currentRouteName === 'AttendanceHistory'}
+            onPress={() => navigateTo('AttendanceHistory')} 
           />
           <DrawerItem 
             iconName="car" 

@@ -22,6 +22,7 @@ import EmployeeDirectoryScreen from './src/screens/EmployeeDirectoryScreen';
 import OutDutyScreen from './src/screens/OutDutyScreen';
 import ExpensesScreen from './src/screens/ExpensesScreen';
 import ApprovalsScreen from './src/screens/ApprovalsScreen';
+import AttendanceHistoryScreen from './src/screens/AttendanceHistoryScreen';
 import PayrollLedgerScreen from './src/screens/PayrollLedgerScreen';
 import ReportsScreen from './src/screens/ReportsScreen';
 import ConfigScreen from './src/screens/ConfigScreen';
@@ -72,7 +73,7 @@ function DrawerNavigator() {
       <Drawer.Screen name="LeaveManagement" component={LeaveManagementScreen} options={{ title: 'Leave Management' }} />
       <Drawer.Screen name="OutDuty" component={WebViewScreen} initialParams={{ title: 'Out Duty Request', icon: 'car-outline', path: '/out-duty' }} options={{ title: 'Out Duty Request' }} />
       <Drawer.Screen name="OutPass" component={WebViewScreen} initialParams={{ title: 'Out Pass Request', icon: 'time-outline', path: '/out-pass' }} options={{ title: 'Out Pass Request' }} />
-      <Drawer.Screen name="Regularization" component={WebViewScreen} initialParams={{ title: 'Regular Attendance', icon: 'time-outline', path: '/attendance' }} options={{ title: 'Regular Attendance' }} />
+      <Drawer.Screen name="AttendanceHistory" component={AttendanceHistoryScreen} options={{ title: 'Attendance History' }} />
       <Drawer.Screen name="MovementRequests" component={WebViewScreen} initialParams={{ title: 'Movement Requests', icon: 'walk-outline', path: '/movement-reports' }} options={{ title: 'Movement Requests' }} />
       <Drawer.Screen name="AttendanceReports" component={WebViewScreen} initialParams={{ title: 'Attendance Reports', icon: 'document-text-outline', path: '/attendance-report' }} options={{ title: 'Attendance Reports' }} />
       <Drawer.Screen name="AdvanceLoans" component={WebViewScreen} initialParams={{ title: 'Advance & Loans', icon: 'cash-outline', path: '/advances' }} options={{ title: 'Advance & Loans' }} />
