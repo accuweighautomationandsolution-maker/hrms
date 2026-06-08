@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { supabase } from '../utils/supabaseClient';
+import { authService } from '../utils/authService';
 
 export default function WebViewScreen({ route }) {
   const { title, path } = route.params || { title: 'Module', path: '/' };
@@ -15,6 +16,8 @@ export default function WebViewScreen({ route }) {
     const prepareSession = async () => {
       try {
         const { data } = await supabase.auth.getSession();
+        let script = '';
+
         if (data?.session) {
           const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://qqpwlhguxxqqpsnigmpn.supabase.co';
           const urlObj = new URL(supabaseUrl);
@@ -22,18 +25,54 @@ export default function WebViewScreen({ route }) {
           const storageKey = `sb-${projectId}-auth-token`;
           const sessionStr = JSON.stringify(data.session);
 
-          // We inject the token into localStorage before the page content loads.
-          // This allows the web app's authService to immediately find the session.
-          const script = `
+          // We MUST inject APP_VERSION so the web app doesn't immediately clear localStorage!
+          script = `
             try {
-              localStorage.setItem('${storageKey}', JSON.stringify(${sessionStr}));
+              window.localStorage.setItem('${storageKey}', JSON.stringify(${sessionStr}));
+              window.localStorage.setItem('APP_VERSION', 'v3.4.3-EMP-ISOLATION-FIX');
+              
+              // If we are stuck on the login page despite having a token, reload to trigger auth.
+              if (window.location.pathname.includes('/login') && !window.location.search.includes('logout')) {
+                window.location.href = '${path}';
+              }
             } catch(e) {}
             true;
           `;
-          setInjectedJs(script);
         } else {
-          setInjectedJs('true;');
+          // Fallback if they used Internal Shadow Auth
+          const profile = authService.getCurrentUser();
+          if (profile && profile.email) {
+            // If they don't have a Supabase session but DO have a shadow profile, 
+            // we can try to inject a script to auto-fill the login form as a fallback.
+            // Note: password is in emp_id as base64
+            const pwd = profile.emp_id ? atob(profile.emp_id) : '';
+            script = `
+              setTimeout(function() {
+                try {
+                  if (window.location.pathname.includes('/login')) {
+                    const emailInput = document.querySelector('input[type="email"]');
+                    const pwdInput = document.querySelector('input[type="password"]');
+                    const btn = document.querySelector('button[type="submit"]');
+                    
+                    if (emailInput && pwdInput && btn) {
+                      emailInput.value = '${profile.email}';
+                      emailInput.dispatchEvent(new Event('input', { bubbles: true }));
+                      
+                      pwdInput.value = '${pwd}';
+                      pwdInput.dispatchEvent(new Event('input', { bubbles: true }));
+                      
+                      btn.click();
+                    }
+                  }
+                } catch(e) {}
+              }, 1000);
+              true;
+            `;
+          } else {
+            script = 'true;';
+          }
         }
+        setInjectedJs(script);
       } catch (err) {
         console.error("Failed to prepare session for WebView:", err);
         setInjectedJs('true;');
@@ -43,7 +82,6 @@ export default function WebViewScreen({ route }) {
     prepareSession();
   }, []);
 
-  // On Web, use a native iframe since react-native-webview's web support is basically an iframe anyway
   if (Platform.OS === 'web') {
     return (
       <View style={styles.container}>
@@ -63,6 +101,7 @@ export default function WebViewScreen({ route }) {
           source={{ uri }} 
           style={{ flex: 1 }} 
           startInLoadingState={true}
+          injectedJavaScript={injectedJs}
           injectedJavaScriptBeforeContentLoaded={injectedJs}
         />
       )}
