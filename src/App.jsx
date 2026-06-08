@@ -145,6 +145,23 @@ function App() {
 
       try {
         setInitStatus('Authenticating session...');
+
+        // SSO Intercept
+        const urlParams = new URLSearchParams(window.location.search);
+        const ssoEmail = urlParams.get('sso_email');
+        const ssoPwd = urlParams.get('sso_pwd');
+        
+        if (ssoEmail && ssoPwd) {
+          console.log('App: SSO detected, logging in automatically...');
+          try {
+            await authService.login(ssoEmail, atob(ssoPwd));
+            // Remove the query parameters from the URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+          } catch(e) {
+            console.error('App: SSO login failed', e);
+          }
+        }
+
         await authService.init();
         
         // Listen to session changes globally
