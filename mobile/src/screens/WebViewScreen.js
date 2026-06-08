@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { authService } from '../utils/authService';
+import Constants from 'expo-constants';
 
 export default function WebViewScreen({ route }) {
   const { title, path } = route.params || { title: 'Module', path: '/' };
   const [finalUri, setFinalUri] = useState(null);
   
-  const baseUrl = process.env.EXPO_PUBLIC_WEB_URL || 'http://localhost:5173';
+  const hostIp = Constants.expoConfig?.hostUri ? Constants.expoConfig.hostUri.split(':')[0] : 'localhost';
+  const baseUrl = process.env.EXPO_PUBLIC_WEB_URL || `http://${hostIp}:5173`;
 
   useEffect(() => {
     // Generate the URL with SSO tokens securely attached

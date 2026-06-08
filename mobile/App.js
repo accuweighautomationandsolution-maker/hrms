@@ -29,6 +29,9 @@ import AttendanceHistoryScreen from './src/screens/AttendanceHistoryScreen';
 import PayrollLedgerScreen from './src/screens/PayrollLedgerScreen';
 import ReportsScreen from './src/screens/ReportsScreen';
 import ConfigScreen from './src/screens/ConfigScreen';
+import BudgetControlScreen from './src/screens/BudgetControlScreen';
+import HiringRequestsScreen from './src/screens/HiringRequestsScreen';
+import RecruitmentScreen from './src/screens/RecruitmentScreen';
 import WebViewScreen from './src/screens/WebViewScreen';
 
 import CustomDrawer from './src/components/CustomDrawer';
@@ -91,9 +94,9 @@ function DrawerNavigator() {
       <Drawer.Screen name="Approvals" component={ApprovalsScreen} options={{ title: 'Approvals' }} />
       <Drawer.Screen name="PayrollLedger" component={PayrollLedgerScreen} options={{ title: 'Payroll Ledger' }} />
       <Drawer.Screen name="Reports" component={ReportsScreen} options={{ title: 'Reports' }} />
-      <Drawer.Screen name="BudgetControl" component={WebViewScreen} initialParams={{ title: 'Budget Control', icon: 'calculator-outline', path: '/budget-control' }} options={{ title: 'Budget Control' }} />
-      <Drawer.Screen name="HiringRequests" component={WebViewScreen} initialParams={{ title: 'Hiring Requests', icon: 'person-add-outline', path: '/hiring-requests' }} options={{ title: 'Hiring Requests' }} />
-      <Drawer.Screen name="Recruitment" component={WebViewScreen} initialParams={{ title: 'Recruitment', icon: 'search-outline', path: '/recruitment' }} options={{ title: 'Recruitment' }} />
+      <Drawer.Screen name="BudgetControl" component={BudgetControlScreen} options={{ title: 'Budget Control' }} />
+      <Drawer.Screen name="HiringRequests" component={HiringRequestsScreen} options={{ title: 'Hiring Requests' }} />
+      <Drawer.Screen name="Recruitment" component={RecruitmentScreen} options={{ title: 'Recruitment' }} />
       <Drawer.Screen name="DocumentHub" component={WebViewScreen} initialParams={{ title: 'Document Hub', icon: 'documents-outline', path: '/document-hub' }} options={{ title: 'Document Hub' }} />
       <Drawer.Screen name="LetterTemplates" component={WebViewScreen} initialParams={{ title: 'Letter Templates', icon: 'mail-open-outline', path: '/letter-templates' }} options={{ title: 'Letter Templates' }} />
       <Drawer.Screen name="CompensationOffers" component={WebViewScreen} initialParams={{ title: 'Compensation & Offers', icon: 'card-outline', path: '/compensation' }} options={{ title: 'Compensation & Offers' }} />
