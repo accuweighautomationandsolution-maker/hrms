@@ -10,7 +10,24 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = (supabaseUrl && supabaseAnonKey) 
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        fetch: (url, options) => {
+          const timeout = 15000;
+          const controller = new AbortController();
+          const id = setTimeout(() => controller.abort(), timeout);
+          return fetch(url, { ...options, signal: controller.signal })
+            .then(res => {
+              clearTimeout(id);
+              return res;
+            })
+            .catch(err => {
+              clearTimeout(id);
+              throw err;
+            });
+        }
+      }
+    })
   : null;
 
 // Admin client uses the service role key — bypasses RLS and email confirmation.
@@ -18,6 +35,22 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
 // This key is safe for internal HRMS tools where all users are trusted admins.
 export const supabaseAdmin = (supabaseUrl && supabaseServiceRoleKey)
   ? createClient(supabaseUrl, supabaseServiceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: {
+        fetch: (url, options) => {
+          const timeout = 15000;
+          const controller = new AbortController();
+          const id = setTimeout(() => controller.abort(), timeout);
+          return fetch(url, { ...options, signal: controller.signal })
+            .then(res => {
+              clearTimeout(id);
+              return res;
+            })
+            .catch(err => {
+              clearTimeout(id);
+              throw err;
+            });
+        }
+      }
     })
   : null;
