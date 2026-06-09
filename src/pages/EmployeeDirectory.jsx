@@ -330,12 +330,12 @@ const EmployeeDirectory = ({ userRole }) => {
     setIsSaving(true);
     setErrorMsg('');
 
-    // 15-second safety timeout so the button never hangs forever
+    // 65-second safety timeout so the button never hangs forever (dataService has a 60s timeout)
     const saveTimeout = setTimeout(() => {
       setIsSaving(false);
       setErrorMsg('Request timed out. Please check your internet connection and try again.');
       showNotification('Save timed out. Please try again.', 'error');
-    }, 15000);
+    }, 65000);
 
     try {
       const empData = {
