@@ -26,13 +26,22 @@ import HolidayListScreen from './src/screens/HolidayListScreen';
 import ExpensesScreen from './src/screens/ExpensesScreen';
 import ApprovalsScreen from './src/screens/ApprovalsScreen';
 import AttendanceHistoryScreen from './src/screens/AttendanceHistoryScreen';
+import MovementRequestsScreen from './src/screens/MovementRequestsScreen';
 import PayrollLedgerScreen from './src/screens/PayrollLedgerScreen';
 import ReportsScreen from './src/screens/ReportsScreen';
 import ConfigScreen from './src/screens/ConfigScreen';
 import BudgetControlScreen from './src/screens/BudgetControlScreen';
 import HiringRequestsScreen from './src/screens/HiringRequestsScreen';
 import RecruitmentScreen from './src/screens/RecruitmentScreen';
-import WebViewScreen from './src/screens/WebViewScreen';
+import DocumentHubScreen from './src/screens/DocumentHubScreen';
+import LetterTemplatesScreen from './src/screens/LetterTemplatesScreen';
+import CompensationOffersScreen from './src/screens/CompensationOffersScreen';
+import AttendanceReportsScreen from './src/screens/AttendanceReportsScreen';
+import GrowthTrainingScreen from './src/screens/GrowthTrainingScreen';
+import ComplianceHubScreen from './src/screens/ComplianceHubScreen';
+import HRPoliciesScreen from './src/screens/HRPoliciesScreen';
+import ExitManagementScreen from './src/screens/ExitManagementScreen';
+import StatutoryBonusScreen from './src/screens/StatutoryBonusScreen';
 
 import CustomDrawer from './src/components/CustomDrawer';
 
@@ -80,15 +89,15 @@ function DrawerNavigator() {
       <Drawer.Screen name="OutDuty" component={OutDutyScreen} options={{ title: 'Out Duty Request' }} />
       <Drawer.Screen name="OutPass" component={OutPassScreen} options={{ title: 'Out Pass Request' }} />
       <Drawer.Screen name="AttendanceHistory" component={AttendanceHistoryScreen} options={{ title: 'Attendance History' }} />
-      <Drawer.Screen name="MovementRequests" component={WebViewScreen} initialParams={{ title: 'Movement Requests', icon: 'walk-outline', path: '/movement-reports' }} options={{ title: 'Movement Requests' }} />
-      <Drawer.Screen name="AttendanceReports" component={WebViewScreen} initialParams={{ title: 'Attendance Reports', icon: 'document-text-outline', path: '/attendance-report' }} options={{ title: 'Attendance Reports' }} />
+      <Drawer.Screen name="MovementRequests" component={MovementRequestsScreen} options={{ title: 'Movement Requests' }} />
+      <Drawer.Screen name="AttendanceReports" component={AttendanceReportsScreen} options={{ title: 'Attendance Reports' }} />
       <Drawer.Screen name="AdvanceLoans" component={AdvanceLoansScreen} options={{ title: 'Advance & Loans' }} />
       <Drawer.Screen name="Expenses" component={ExpensesScreen} options={{ title: 'Expenses' }} />
       <Drawer.Screen name="HolidayList" component={HolidayListScreen} options={{ title: 'Holiday List' }} />
-      <Drawer.Screen name="GrowthTraining" component={WebViewScreen} initialParams={{ title: 'Growth & Training', icon: 'trending-up-outline', path: '/training' }} options={{ title: 'Growth & Training' }} />
-      <Drawer.Screen name="ComplianceHub" component={WebViewScreen} initialParams={{ title: 'Compliance Hub', icon: 'shield-checkmark-outline', path: '/compliance' }} options={{ title: 'Compliance Hub' }} />
-      <Drawer.Screen name="HRPolicies" component={WebViewScreen} initialParams={{ title: 'HR Policies', icon: 'book-outline', path: '/policies' }} options={{ title: 'HR Policies' }} />
-      <Drawer.Screen name="MyDocuments" component={WebViewScreen} initialParams={{ title: 'My Documents', icon: 'folder-outline', path: '/my-documents' }} options={{ title: 'My Documents' }} />
+      <Drawer.Screen name="GrowthTraining" component={GrowthTrainingScreen} options={{ title: 'Growth & Training' }} />
+      <Drawer.Screen name="ComplianceHub" component={ComplianceHubScreen} options={{ title: 'Compliance Hub' }} />
+      <Drawer.Screen name="HRPolicies" component={HRPoliciesScreen} options={{ title: 'HR Policies' }} />
+      <Drawer.Screen name="MyDocuments" component={DocumentHubScreen} options={{ title: 'My Documents' }} />
       
       {/* Admin Modules */}
       <Drawer.Screen name="Approvals" component={ApprovalsScreen} options={{ title: 'Approvals' }} />
@@ -97,11 +106,11 @@ function DrawerNavigator() {
       <Drawer.Screen name="BudgetControl" component={BudgetControlScreen} options={{ title: 'Budget Control' }} />
       <Drawer.Screen name="HiringRequests" component={HiringRequestsScreen} options={{ title: 'Hiring Requests' }} />
       <Drawer.Screen name="Recruitment" component={RecruitmentScreen} options={{ title: 'Recruitment' }} />
-      <Drawer.Screen name="DocumentHub" component={WebViewScreen} initialParams={{ title: 'Document Hub', icon: 'documents-outline', path: '/document-hub' }} options={{ title: 'Document Hub' }} />
-      <Drawer.Screen name="LetterTemplates" component={WebViewScreen} initialParams={{ title: 'Letter Templates', icon: 'mail-open-outline', path: '/letter-templates' }} options={{ title: 'Letter Templates' }} />
-      <Drawer.Screen name="CompensationOffers" component={WebViewScreen} initialParams={{ title: 'Compensation & Offers', icon: 'card-outline', path: '/compensation' }} options={{ title: 'Compensation & Offers' }} />
-      <Drawer.Screen name="ExitManagement" component={WebViewScreen} initialParams={{ title: 'Exit & FnF Settlement', icon: 'exit-outline', path: '/exit-management' }} options={{ title: 'Exit & FnF Settlement' }} />
-      <Drawer.Screen name="StatutoryBonus" component={WebViewScreen} initialParams={{ title: 'Statutory Bonus', icon: 'star-outline', path: '/bonus-management' }} options={{ title: 'Statutory Bonus' }} />
+      <Drawer.Screen name="DocumentHub" component={DocumentHubScreen} options={{ title: 'Document Hub' }} />
+      <Drawer.Screen name="LetterTemplates" component={LetterTemplatesScreen} options={{ title: 'Letter Templates' }} />
+      <Drawer.Screen name="CompensationOffers" component={CompensationOffersScreen} options={{ title: 'Compensation & Offers' }} />
+      <Drawer.Screen name="ExitManagement" component={ExitManagementScreen} options={{ title: 'Exit & FnF Settlement' }} />
+      <Drawer.Screen name="StatutoryBonus" component={StatutoryBonusScreen} options={{ title: 'Statutory Bonus' }} />
       <Drawer.Screen name="Config" component={ConfigScreen} options={{ title: 'Config & Masters' }} />
     </Drawer.Navigator>
   );
