@@ -60,8 +60,8 @@ const PTReport = () => {
             
             const ptDeducted = dbRec.payrollContext.deductions?.pt || 0;
             
-            // Per requirements: Exclude employees with zero PT if required (we will exclude them for the official challan)
-            if (ptDeducted <= 0) return;
+            // Allow all employees in the report to show gross wages even if PT is 0
+            // if (ptDeducted <= 0) return;
 
             const gross = dbRec.payrollContext.earnings?.gross || 0;
 
