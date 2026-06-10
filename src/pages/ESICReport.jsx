@@ -110,7 +110,7 @@ const ESICReport = () => {
             
             // Map status to ESIC Reason Codes
             let reasonCode = 0;
-            if (presentDays === 0) {
+            if (presentDaysForCalc === 0) {
                 if (emp.status === 'On Leave') reasonCode = 1;
                 else if (emp.status === 'Terminated') reasonCode = 10;
                 else if (emp.status === 'Inactive') reasonCode = 2; // Left Service
