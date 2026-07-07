@@ -343,7 +343,8 @@ const Attendance = () => {
     try {
       // The bridge server auto-syncs to Supabase every 30 seconds.
       // We no longer ping localhost:9001 directly to support cloud-hosted Vercel access.
-      await loadAttendance();
+      const freshAtt = await dataService.getAttendance();
+      setRecords(freshAtt || {});
       
       alert("✅ Synchronized!\n\nThe office bridge server automatically syncs data to the cloud every 30 seconds. Latest data has been refreshed from the cloud database.");
     } catch (err) {
