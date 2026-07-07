@@ -340,136 +340,15 @@ const Attendance = () => {
       return;
     }
     setSyncLoading(true);
-    const startTime = Date.now();
     try {
-      const logs = await BiometricService.fetchLogs(bioConfig.ip, bioConfig.port);
-      const recordsToSave = {};
-      let addedCount = 0;
-      let skippedMappingCount = 0;
-      let futureRejectedCount = 0;
-
-      const today = new Date();
-      today.setHours(23, 59, 59, 999); // End of today
-
-      if (logs.length === 0) {
-        alert("📊 Biometric Pull Complete: 0 records found on device.");
-        return;
-      }
-
-      if (syncSelection.size === 0 && !window.confirm("No specific employees selected. Proceed to pull attendance for ALL employees?")) {
-        setSyncLoading(false);
-        return;
-      }
-
-      // Base minimum date (May 1st, 2026) per business requirements
-      const HARD_MIN_DATE = new Date("2026-05-01T00:00:00");
+      // The bridge server auto-syncs to Supabase every 30 seconds.
+      // We no longer ping localhost:9001 directly to support cloud-hosted Vercel access.
+      await loadAttendance();
       
-      const customFrom = syncDateRange.from ? new Date(`${syncDateRange.from}T00:00:00`) : null;
-      const customTo = syncDateRange.to ? new Date(`${syncDateRange.to}T23:59:59`) : null;
-
-      let legacyRejectedCount = 0;
-      let rangeRejectedCount = 0;
-
-      console.log("Sync DEBUG: Raw logs received:", logs);
-      if (logs.length > 0) console.table(logs.slice(0, 10).map(l => ({ empId: l.empId, punchIn: l.punchIn, punchOut: l.punchOut })));
-
-      const nextRecords = { ...records };
-      logs.forEach(log => {
-        const logDate = new Date(log.year, log.month - 1, log.day);
-        
-        if (logDate > today) {
-          futureRejectedCount++;
-          return;
-        }
-
-        // 1. HARD CUTOFF: Ignore logs prior to May 1st 2026
-        if (logDate < HARD_MIN_DATE) {
-          legacyRejectedCount++;
-          return;
-        }
-
-        // 2. CUSTOM DATE RANGE
-        if (customFrom && logDate < customFrom) {
-          rangeRejectedCount++;
-          return;
-        }
-        if (customTo && logDate > customTo) {
-          rangeRejectedCount++;
-          return;
-        }
-
-        // STRICT MAPPING: Only use Biometrics ID (biometricCode)
-        const internalId = bioIdMap[String(log.empId)];
-        if (!internalId) {
-          skippedMappingCount++;
-          return;
-        }
-
-        // 3. EMPLOYEE SELECTION FILTER
-        if (syncSelection.size > 0 && !syncSelection.has(internalId)) {
-          // Exclude if specific employees are checked, but this employee isn't one of them
-          return;
-        }
-
-        const dStr = `${log.year}-${String(log.month).padStart(2, '0')}-${String(log.day).padStart(2, '0')}`;
-        const logKey = `${internalId}_${dStr}`;
-        // FORCE OVERWRITE: If the existing record is from DB or previous sync, allow update
-        const existing = nextRecords[logKey];
-        const canOverwrite = !existing || existing.source !== 'Manual';
-
-        if (canOverwrite) {
-          let finalOut = log.punchOut;
-          if (finalOut === log.punchIn) {
-            finalOut = null; // Prevent single punch from duplicating into both IN and OUT
-          }
-          
-          const entry = {
-            punchIn: log.punchIn,
-            punchOut: finalOut,
-            remark: log.remark || 'Identix Hardware Pull',
-            source: 'Biometric Terminal'
-          };
-          nextRecords[logKey] = entry;
-          recordsToSave[logKey] = entry;
-          addedCount++;
-
-          // Check movement exceptions & auto-closures for synced biometric logs
-          if (log.punchOut) {
-            dataService.checkMovementException(internalId, dStr, log.punchOut).catch(console.error);
-          }
-          if (log.punchIn) {
-            dataService.autoCloseMovementRequest(internalId, dStr, log.punchIn).catch(console.error);
-          }
-        }
-      });
-
-      setRecords(nextRecords);
-
-      if (Object.keys(recordsToSave).length > 0) {
-        console.log("Sync DEBUG: Committing to database...", recordsToSave);
-        await dataService.saveAttendance(recordsToSave);
-      }
-
-      // FORCE REFRESH: Re-fetch existing from DB to ensure state is perfectly synced
-      const freshAtt = await dataService.getAttendance().catch(() => ({}));
-      setRecords(freshAtt);
-
-      const timestamp = new Date().toLocaleString();
-      setLastSync(timestamp);
-      await dataService.saveConfig('biometric_last_sync', timestamp);
-
-      console.log(`Sync completed. Added ${addedCount}, Skipped Mapping ${skippedMappingCount}, Future Rejected ${futureRejectedCount}, Legacy Rejected ${legacyRejectedCount}, Outside Range ${rangeRejectedCount}`);
-      alert(`✅ Biometric Sync Successful\n\n- Records Synced: ${addedCount}\n- Legacy Ignored (< May 2026): ${legacyRejectedCount}\n- Skipped (No ID match): ${skippedMappingCount}\n\nData is permanently stored in the database.`);
+      alert("✅ Synchronized!\n\nThe office bridge server automatically syncs data to the cloud every 30 seconds. Latest data has been refreshed from the cloud database.");
     } catch (err) {
-      console.error("Sync Error Detailed:", err);
-      // Surface the actual error message to the user for better debugging
-      const errorMsg = err.message || 'Unknown Error';
-      
-      if (errorMsg.includes("Permission Denied") || errorMsg.includes("Database Error")) {
-        alert("📊 " + errorMsg + "\n\nThis usually means the biometric terminal is reached, but the HRMS cannot save the logs to the database. Please check your internet connection or database permissions.");
-      } else {
-        alert("🔌 Connectivity Issue\n\nTechnical Error: " + errorMsg + "\n\nFailed to reach the terminal at " + bioConfig.ip + ". Even if Ethernet is connected, ensure your local firewall allows traffic on port " + bioConfig.port + ".");
-      }
+      console.error(err);
+      alert("Failed to refresh attendance from database.");
     } finally {
       setSyncLoading(false);
     }
